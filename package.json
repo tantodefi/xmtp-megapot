@@ -1,0 +1,44 @@
+{
+  "name": "@examples/xmtp-megapot",
+  "version": "0.0.1",
+  "private": true,
+  "description": "XMTP MegaPot Lottery Agent - Create and manage lottery ticket purchases with group sharing",
+  "keywords": [
+    "xmtp",
+    "agent",
+    "megapot",
+    "lottery",
+    "blockchain",
+    "base",
+    "inline-actions",
+    "agent-sdk"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx --env-file .env --watch src/index.ts",
+    "gen:keys": "tsx src/generateKeys.ts",
+    "lint": "cd ../.. && yarn eslint examples/xmtp-megapot",
+    "start": "npx tsx --env-file .env src/index.ts",
+    "test": "tsx --env-file .env src/test.ts"
+  },
+  "dependencies": {
+    "@xmtp/agent-sdk": "^0.0.9",
+    "@xmtp/content-type-primitives": "^2.0.2",
+    "@xmtp/content-type-reaction": "^1.1.8",
+    "@xmtp/content-type-remote-attachment": "^1.1.9",
+    "@xmtp/content-type-transaction-reference": "^2.0.2",
+    "@xmtp/content-type-wallet-send-calls": "^1.0.1",
+    "@xmtp/node-sdk": "^2.0.2",
+    "axios": "^1.6.0",
+    "uint8arrays": "^5.1.0",
+    "viem": "^2.22.17"
+  },
+  "devDependencies": {
+    "tsx": "*",
+    "typescript": "*"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
