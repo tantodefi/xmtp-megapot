@@ -225,6 +225,7 @@ export interface MegaPotStats {
   totalWinnings: string; // USDC amount
   userOdds?: string | null; // User's odds to win (1 in X)
   ticketsSoldRound?: number; // Total tickets sold in current round
+  userTicketsInCurrentRound?: number; // User's tickets in current round
   activePlayers?: number; // Number of active players
   jackpotPool?: string; // Current jackpot pool in USD
   ticketPrice?: string; // Ticket price in USDC
@@ -1016,6 +1017,22 @@ export class MegaPotManager {
               );
             }
 
+            // Calculate user's tickets in current round
+            let userTicketsInCurrentRound = 0;
+            if (userTicketHistory && userTicketHistory.length > 0) {
+              // Get current round ID from API data or use a default
+              const currentRoundId = apiData.drawId || 110; // Default to 110 if not provided
+              console.log(`🎯 Current round ID: ${currentRoundId}`);
+
+              // Count user's tickets in current round
+              for (const purchase of userTicketHistory) {
+                if (purchase.jackpotRoundId === currentRoundId) {
+                  userTicketsInCurrentRound += purchase.ticketsPurchased || 0;
+                }
+              }
+              console.log(`🎫 User has ${userTicketsInCurrentRound} tickets in current round (${currentRoundId})`);
+            }
+
             // Calculate odds for user if they have tickets
             let userOdds = null;
             if (userTotalTickets > 0 && apiData.oddsPerTicket) {
@@ -1052,6 +1069,7 @@ export class MegaPotManager {
               totalWinnings: localStats?.totalWinnings || "0",
               userOdds: userOdds,
               ticketsSoldRound: apiData.ticketsSoldCount || 0,
+              userTicketsInCurrentRound: userTicketsInCurrentRound,
               activePlayers: apiData.activePlayers || 0,
               jackpotPool: apiData.prizeUsd || "0",
               ticketPrice: (
@@ -1108,6 +1126,8 @@ export class MegaPotManager {
         groupTicketsPurchased: 0,
         totalSpent: "0",
         totalWinnings: "0",
+        ticketsSoldRound: 0,
+        userTicketsInCurrentRound: 0,
         groupPurchases: localStats?.groupPurchases || [],
         currentDraw: {
           drawId: 0,
@@ -1131,6 +1151,7 @@ export class MegaPotManager {
           totalWinnings: localStats.totalWinnings || "0",
           userOdds: null, // Will be calculated below if we have API data
           ticketsSoldRound: 0, // Will be set from API if available
+          userTicketsInCurrentRound: 0, // Will be set from API if available
           activePlayers: 0, // Will be set from API if available
           jackpotPool: "0", // Will be set from API if available
           ticketPrice: "1", // Will be set from API if available

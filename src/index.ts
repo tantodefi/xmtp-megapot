@@ -545,9 +545,9 @@ async function handleTicketPurchaseStream(
       },
     };
 
-    await conversation.send(
-      `🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)} - approve in wallet! 🍀`,
-    );
+    await conversation.send(`🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)} - approve in wallet!
+
+⚠️ Make sure you have USDC on Base network (not Ethereum mainnet)! 🍀`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
     await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
@@ -858,6 +858,7 @@ async function handleStatsRequest(ctx: any, megaPotManager: MegaPotManager) {
 • Jackpot: $${stats.jackpotPool || "0"}
 • Ticket Price: $${stats.ticketPrice || "1"}
 • Tickets Sold: ${stats.ticketsSoldRound || 0}
+• Your Tickets: ${stats.userTicketsInCurrentRound || 0}
 • Active Players: ${stats.activePlayers || 0}`;
 
     if (stats.userOdds) {
