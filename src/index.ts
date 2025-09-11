@@ -389,17 +389,6 @@ async function main() {
           const content = message.content as string;
           const lowerContent = content.toLowerCase();
 
-          // Check if this is a group chat (not a DM)
-          const conversationType =
-            conversation instanceof Group ? "group" : "dm";
-          const isGroupChat = conversation instanceof Group;
-
-          // In group chats, only respond to @megapot mentions
-          if (isGroupChat && !lowerContent.includes("@megapot")) {
-            console.log("🚫 Skipping group message without @megapot mention");
-            continue;
-          }
-
           console.log(`🎯 Processing message: "${content}"`);
 
           // Get the conversation for responding
@@ -409,6 +398,17 @@ async function main() {
             );
           if (!conversation) {
             console.log("🚫 Could not find conversation for message");
+            continue;
+          }
+
+          // Check if this is a group chat (not a DM)
+          const conversationType =
+            conversation instanceof Group ? "group" : "dm";
+          const isGroupChat = conversation instanceof Group;
+
+          // In group chats, only respond to @megapot mentions
+          if (isGroupChat && !lowerContent.includes("@megapot")) {
+            console.log("🚫 Skipping group message without @megapot mention");
             continue;
           }
 
@@ -429,15 +429,26 @@ async function main() {
           }
 
           // Handle action button clicks first
-          if (message.contentType?.typeId === "actions") {
-            console.log("🎯 Detected action button click");
-            await handleActionButtonClick(
-              message,
-              conversation,
-              megaPotManager,
-              agent,
-            );
-            return;
+          if (message.contentType) {
+            const contentTypeStr = JSON.stringify(message.contentType);
+            console.log(`📝 Message content type: ${contentTypeStr}`);
+
+            // Check for action buttons in multiple ways
+            const isActionsType =
+              message.contentType.typeId === "actions" ||
+              contentTypeStr.includes("actions") ||
+              message.contentType.authorityId === "coinbase.com";
+
+            if (isActionsType) {
+              console.log("🎯 Detected action button click");
+              await handleActionButtonClick(
+                message,
+                conversation,
+                megaPotManager,
+                agent,
+              );
+              return;
+            }
           }
 
           // Handle specific commands
