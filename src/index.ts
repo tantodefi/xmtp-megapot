@@ -516,6 +516,14 @@ async function handleTicketPurchaseStream(
     console.log(`📋 Transaction reference ID: ${txData.referenceId}`); // Keep in logs only
 
     // Send the transaction directly to user's wallet
+    console.log(`💰 Transaction Details:`);
+    console.log(`   • User Address: ${userAddress}`);
+    console.log(`   • Number of Tickets: ${numTickets}`);
+    console.log(`   • Total Cost: ${totalCostUSDC.toString()} (6 decimals) = $${totalCostUSDC.toFixed(2)}`);
+    console.log(`   • Contract: 0xbEDd4F2beBE9E3E636161E644759f3cbe3d51B95`);
+    console.log(`   • USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`);
+    console.log(`   • Referrer: 0xa14ce36e7b135b66c3e3cb2584e777f32b15f5dc`);
+
     const walletSendCalls: WalletSendCallsParams = {
       version: "1.0",
       chainId: `0x${base.id.toString(16)}`,

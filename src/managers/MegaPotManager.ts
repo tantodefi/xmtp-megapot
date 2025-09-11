@@ -1030,7 +1030,9 @@ export class MegaPotManager {
                   userTicketsInCurrentRound += purchase.ticketsPurchased || 0;
                 }
               }
-              console.log(`🎫 User has ${userTicketsInCurrentRound} tickets in current round (${currentRoundId})`);
+              console.log(
+                `🎫 User has ${userTicketsInCurrentRound} tickets in current round (${currentRoundId})`,
+              );
             }
 
             // Calculate odds for user if they have tickets
