@@ -484,29 +484,30 @@ export class MegaPotManager {
       });
 
       let ticketPrice: bigint;
+      // First try the simpler ticketPrice function (more reliable)
       try {
-        const drawData = await contract.read.getCurrentDraw();
-        console.log(`📊 Draw data:`, drawData);
-        const [, , ticketPriceFromContract] = drawData;
-        ticketPrice = ticketPriceFromContract;
+        ticketPrice = await contract.read.ticketPrice();
         console.log(
-          `✅ Got ticket price from getCurrentDraw: ${ticketPrice.toString()}`,
+          `✅ Got ticket price from ticketPrice function: ${ticketPrice.toString()}`,
         );
       } catch (error) {
-        console.error(
-          "❌ Failed to get ticket price from mainnet contract:",
-          error,
+        console.warn(
+          "⚠️ ticketPrice() failed, trying getCurrentDraw() fallback:",
+          error.message,
         );
-        // Try fallback to ticketPrice function
+        // Try fallback to getCurrentDraw function
         try {
-          ticketPrice = await contract.read.ticketPrice();
+          const drawData = await contract.read.getCurrentDraw();
+          console.log(`📊 Draw data:`, drawData);
+          const [, , ticketPriceFromContract] = drawData;
+          ticketPrice = ticketPriceFromContract;
           console.log(
-            `✅ Got ticket price from ticketPrice function: ${ticketPrice.toString()}`,
+            `✅ Got ticket price from getCurrentDraw fallback: ${ticketPrice.toString()}`,
           );
         } catch (fallbackError) {
           console.error(
-            "❌ Failed to get ticket price from fallback:",
-            fallbackError,
+            "❌ Both ticket price functions failed:",
+            fallbackError.message,
           );
           console.log("⚠️ Using reasonable fallback ticket price (1 USDC)");
           ticketPrice = 1000000n; // 1 USDC in 6 decimals
@@ -672,29 +673,30 @@ export class MegaPotManager {
       });
 
       let ticketPrice: bigint;
+      // First try the simpler ticketPrice function (more reliable)
       try {
-        const drawData = await contract.read.getCurrentDraw();
-        console.log(`📊 Draw data:`, drawData);
-        const [, , ticketPriceFromContract] = drawData;
-        ticketPrice = ticketPriceFromContract;
+        ticketPrice = await contract.read.ticketPrice();
         console.log(
-          `✅ Got ticket price from getCurrentDraw: ${ticketPrice.toString()}`,
+          `✅ Got ticket price from ticketPrice function: ${ticketPrice.toString()}`,
         );
       } catch (error) {
-        console.error(
-          "❌ Failed to get ticket price from mainnet contract:",
-          error,
+        console.warn(
+          "⚠️ ticketPrice() failed, trying getCurrentDraw() fallback:",
+          error.message,
         );
-        // Try fallback to ticketPrice function
+        // Try fallback to getCurrentDraw function
         try {
-          ticketPrice = await contract.read.ticketPrice();
+          const drawData = await contract.read.getCurrentDraw();
+          console.log(`📊 Draw data:`, drawData);
+          const [, , ticketPriceFromContract] = drawData;
+          ticketPrice = ticketPriceFromContract;
           console.log(
-            `✅ Got ticket price from ticketPrice function: ${ticketPrice.toString()}`,
+            `✅ Got ticket price from getCurrentDraw fallback: ${ticketPrice.toString()}`,
           );
         } catch (fallbackError) {
           console.error(
-            "❌ Failed to get ticket price from fallback:",
-            fallbackError,
+            "❌ Both ticket price functions failed:",
+            fallbackError.message,
           );
           console.log("⚠️ Using reasonable fallback ticket price (1 USDC)");
           ticketPrice = 1000000n; // 1 USDC in 6 decimals
