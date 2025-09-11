@@ -574,7 +574,7 @@ export class MegaPotManager {
           [
             this.contractConfig.referrerAddress, // referrer address from env
             BigInt(numTickets), // number of tickets
-            this.wallet.account.address, // recipient (user) address
+            userAddress, // recipient (user) address
           ],
         );
 

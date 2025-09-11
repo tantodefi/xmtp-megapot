@@ -546,18 +546,7 @@ async function handleTicketPurchaseStream(
     };
 
     await conversation.send(
-      `🎫 Ready to purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}!
-
-💰 Ticket Price: ${ticketPriceUSDC.toFixed(2)} USDC each
-💰 Total Cost: ${totalCostUSDC.toFixed(2)} USDC
-
-📋 Reference ID: ${txData.referenceId}
-
-Please approve both transactions in your wallet:
-1. First: Approve USDC spending (${totalCostUSDC.toFixed(2)} USDC)
-2. Second: Purchase ${numTickets} ticket${numTickets > 1 ? "s" : ""}
-
-Good luck! 🍀`,
+      `🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)} - approve in wallet! 🍀`,
     );
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
