@@ -9,7 +9,7 @@ import {
   WalletSendCallsCodec,
   type WalletSendCallsParams,
 } from "@xmtp/content-type-wallet-send-calls";
-import { IdentifierKind, Signer } from "@xmtp/node-sdk";
+import { Group, IdentifierKind, Signer } from "@xmtp/node-sdk";
 import { createWalletClient, http, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -388,6 +388,17 @@ async function main() {
 
           const content = message.content as string;
           const lowerContent = content.toLowerCase();
+
+          // Check if this is a group chat (not a DM)
+          const conversationType =
+            conversation instanceof Group ? "group" : "dm";
+          const isGroupChat = conversation instanceof Group;
+
+          // In group chats, only respond to @megapot mentions
+          if (isGroupChat && !lowerContent.includes("@megapot")) {
+            console.log("🚫 Skipping group message without @megapot mention");
+            continue;
+          }
 
           console.log(`🎯 Processing message: "${content}"`);
 

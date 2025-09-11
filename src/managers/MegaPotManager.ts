@@ -508,7 +508,7 @@ export class MegaPotManager {
             fallbackError,
           );
           console.log("⚠️ Using reasonable fallback ticket price (0.01 USDC)");
-          ticketPrice = 10000n; // 0.01 USDC in 6 decimals
+          ticketPrice = 1000000000000000000n; // 1 USDC in 18 decimals (wei)
         }
       }
 
@@ -694,7 +694,7 @@ export class MegaPotManager {
             fallbackError,
           );
           console.log("⚠️ Using reasonable fallback ticket price (0.01 USDC)");
-          ticketPrice = 10000n; // 0.01 USDC in 6 decimals
+          ticketPrice = 1000000000000000000n; // 1 USDC in 18 decimals (wei)
         }
       }
 
@@ -971,12 +971,12 @@ export class MegaPotManager {
 
             // Calculate spending now that we have ticket price and update group purchase costs
             if (userTicketHistory && userTicketHistory.length > 0) {
-              const rawTicketPrice = apiData.ticketPrice || "1";
-              const ticketPrice = parseFloat(rawTicketPrice);
+              const rawTicketPrice = apiData.ticketPrice || 1000000; // Default to 1 USDC in 6 decimals
+              const ticketPrice = rawTicketPrice / 1000000; // Convert from 6 decimals to USDC
               console.log(
-                `💰 DEBUG: Raw ticket price from API: "${rawTicketPrice}"`,
+                `💰 DEBUG: Raw ticket price from API: ${rawTicketPrice}`,
               );
-              console.log(`💰 DEBUG: Parsed ticket price: ${ticketPrice}`);
+              console.log(`💰 DEBUG: Converted ticket price: $${ticketPrice}`);
               console.log(
                 `💰 DEBUG: apiData.ticketPrice type: ${typeof apiData.ticketPrice}`,
               );
