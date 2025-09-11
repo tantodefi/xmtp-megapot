@@ -535,6 +535,7 @@ async function handleTicketPurchaseStream(
           to: txData.approveCall.to,
           data: txData.approveCall.data as `0x${string}`,
           value: txData.approveCall.value as `0x${string}`,
+          gasLimit: "0xC350", // ~50,000 gas for ERC20 approval
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
             transactionType: "erc20_approve",
@@ -544,6 +545,7 @@ async function handleTicketPurchaseStream(
           to: txData.purchaseCall.to,
           data: txData.purchaseCall.data as `0x${string}`,
           value: txData.purchaseCall.value as `0x${string}`,
+          gasLimit: "0x30D40", // ~200,000 gas for contract call
           metadata: {
             description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
             transactionType: "purchase_tickets",
@@ -555,15 +557,21 @@ async function handleTicketPurchaseStream(
       },
     };
 
-    await conversation.send(`🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)} - approve in wallet!
+    await conversation.send(`🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
 
-💡 **If you see "insufficient funds":**
-• Make sure you have ~$0.01 ETH on Base for gas fees
-• Check that your wallet is connected to Base network
-• Try refreshing your wallet balance
-• If still failing, try approving just the USDC first, then purchasing
+✅ **Transaction Ready!** Open your wallet to approve:
+1️⃣ **USDC Approval** - Allow spending $${totalCostUSDC.toFixed(2)}
+2️⃣ **Ticket Purchase** - Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
 
-⚠️ Make sure you have USDC on Base network! 🍀`);
+💡 **Common Issues & Fixes:**
+• **"Insufficient funds"**: Need ~$0.01 ETH on Base for gas
+• **Wrong network**: Make sure wallet is on Base network
+• **Balance not updating**: Refresh your wallet
+• **Transaction stuck**: Try approving each step separately
+
+⚠️ **Important**: You need USDC on Base network, not Ethereum mainnet!
+
+Good luck! 🍀🎰`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
     await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);

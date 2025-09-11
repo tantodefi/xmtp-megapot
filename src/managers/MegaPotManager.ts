@@ -574,7 +574,9 @@ export class MegaPotManager {
         // value = total USDC amount (not number of tickets)
         console.log(`🎫 Calling purchaseTickets with:`);
         console.log(`   • Referrer: ${this.contractConfig.referrerAddress}`);
-        console.log(`   • Value: ${totalCostUSDC.toString()} (6 decimals) = $${(Number(totalCostUSDC) / 1000000).toFixed(2)}`);
+        console.log(
+          `   • Value: ${totalCostUSDC.toString()} (6 decimals) = $${(Number(totalCostUSDC) / 1000000).toFixed(2)}`,
+        );
         console.log(`   • Recipient: ${userAddress}`);
 
         const purchaseData = encodeFunctionDataCall(
