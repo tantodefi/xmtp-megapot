@@ -570,12 +570,19 @@ export class MegaPotManager {
 
       try {
         // Use purchaseTickets function with referrer
+        // purchaseTickets(referrer, value, recipient)
+        // value = total USDC amount (not number of tickets)
+        console.log(`🎫 Calling purchaseTickets with:`);
+        console.log(`   • Referrer: ${this.contractConfig.referrerAddress}`);
+        console.log(`   • Value: ${totalCostUSDC.toString()} (6 decimals) = $${(Number(totalCostUSDC) / 1000000).toFixed(2)}`);
+        console.log(`   • Recipient: ${userAddress}`);
+
         const purchaseData = encodeFunctionDataCall(
           [...MEGAPOT_ABI],
           "purchaseTickets",
           [
             this.contractConfig.referrerAddress, // referrer address from env
-            BigInt(numTickets), // number of tickets
+            totalCostUSDC, // total amount in USDC (6 decimals)
             userAddress, // recipient (user) address
           ],
         );
