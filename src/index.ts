@@ -14,30 +14,12 @@ import { createWalletClient, http, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { MegaPotManager } from "./managers/MegaPotManager.js";
-
-// Action button types for inline actions (following XIP-67 specification)
-type Action = {
-  id: string;
-  label: string;
-  imageUrl?: string;
-  style?: "primary" | "secondary" | "danger";
-  expiresAt?: string;
-};
-
-type ActionsContent = {
-  id: string;
-  description: string;
-  actions: Action[];
-  expiresAt?: string;
-};
-
-// Content type definition for actions
-const ContentTypeActions = {
-  authorityId: "coinbase.com",
-  typeId: "actions",
-  versionMajor: 1,
-  versionMinor: 0,
-};
+import {
+  ActionsCodec,
+  ContentTypeActions,
+  type Action,
+  type ActionsContent,
+} from "./types/ActionsContent.js";
 
 // Environment variables
 const WALLET_KEY = process.env.WALLET_KEY as `0x${string}`;
@@ -123,7 +105,26 @@ async function handleActionButtonClick(
       const action = actionContent.actions[0]; // The clicked action
       const actionId = actionContent.id;
 
-      if (action.id === "purchase_tickets") {
+      if (action.id === "buy_tickets") {
+        console.log("🎫 User clicked buy tickets button");
+        await conversation.send(
+          "🎫 How many tickets would you like to buy? For example: 'buy 5 tickets'",
+        );
+      } else if (action.id === "view_stats") {
+        console.log("📊 User clicked view stats button");
+        await handleStatsRequestStream(
+          message,
+          conversation,
+          megaPotManager,
+          agent,
+        );
+      } else if (action.id === "view_jackpot") {
+        console.log("🎰 User clicked view jackpot button");
+        await handleJackpotInfoStream(message, conversation, megaPotManager);
+      } else if (action.id === "help") {
+        console.log("❓ User clicked help button");
+        await handleHelpRequestStream(message, conversation);
+      } else if (action.id === "purchase_tickets") {
         console.log("🚀 User clicked purchase tickets button");
 
         // Retrieve the stored transaction data
@@ -325,6 +326,7 @@ async function main() {
       new ReactionCodec(),
       new RemoteAttachmentCodec(),
       new WalletSendCallsCodec(),
+      new ActionsCodec(),
     ],
   });
 
@@ -598,7 +600,10 @@ async function handleWelcomeMessageStream(message: any, conversation: any) {
       message.senderInboxId,
     );
 
-    const welcomeMessage = `🎉 Welcome to the MegaPot Agent! 🎰
+    // Send inline action buttons for welcome options
+    await sendActionButtons(
+      conversation,
+      `🎉 Welcome to the MegaPot Agent! 🎰
 
 I'm your lottery assistant on Base network. I can help you:
 • Purchase MegaPot lottery tickets with USDC
@@ -606,21 +611,37 @@ I'm your lottery assistant on Base network. I can help you:
 • View current jackpot information
 • Claim lottery winnings when you win!
 
-Commands:
-• "buy 5 tickets" - Purchase lottery tickets
-• "stats" - View your statistics
-• "jackpot" - View jackpot information
-• "claim" - Claim winnings
-• "help" - Show this help`;
+🌐 Mini App: https://megapot.io
 
-    console.log("📤 Sending welcome message...");
-    await conversation.send(welcomeMessage);
+What would you like to do?`,
+      [
+        {
+          id: "buy_tickets",
+          label: "🎫 Buy Tickets",
+          style: "primary",
+        },
+        {
+          id: "view_stats",
+          label: "📊 My Stats",
+          style: "secondary",
+        },
+        {
+          id: "view_jackpot",
+          label: "🎰 Jackpot Info",
+          style: "secondary",
+        },
+        {
+          id: "help",
+          label: "❓ Help",
+          style: "secondary",
+        },
+      ],
+      `welcome_${message.senderInboxId}_${Date.now()}`,
+    );
 
-    // Send mini app URL as separate message for better rendering
-    console.log("📤 Sending mini app URL...");
-    await conversation.send("https://megapot.io");
-
-    console.log("✅ Welcome message and mini app URL sent successfully");
+    console.log(
+      "✅ Welcome message with inline action buttons sent successfully",
+    );
   } catch (error) {
     console.error("❌ Error in handleWelcomeMessage:", error);
     console.error(
