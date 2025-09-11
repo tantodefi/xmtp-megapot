@@ -14,12 +14,6 @@ import { createWalletClient, http, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { MegaPotManager } from "./managers/MegaPotManager.js";
-import {
-  ActionsCodec,
-  ContentTypeActions,
-  type Action,
-  type ActionsContent,
-} from "./types/ActionsContent.js";
 
 // Environment variables
 const WALLET_KEY = process.env.WALLET_KEY as `0x${string}`;
@@ -27,17 +21,6 @@ const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 const XMTP_ENV = process.env.XMTP_ENV || "dev";
 const MEGAPOT_DATA_API_KEY = process.env.MEGAPOT_DATA_API_KEY;
 const BASE_RPC_URL = process.env.BASE_RPC_URL || "https://sepolia.base.org";
-
-// In-memory store for pending transactions (actionId -> transaction data)
-const pendingTransactions = new Map<
-  string,
-  {
-    txData: any;
-    userAddress: `0x${string}`;
-    numTickets: number;
-    timestamp: number;
-  }
->();
 
 // MegaPot Contract Configuration
 const MEGAPOT_CONTRACT_ADDRESS = process.env
@@ -63,170 +46,6 @@ if (!WALLET_KEY) {
   process.exit(1);
 }
 
-/**
- * Send inline action buttons to user for interactive actions
- */
-async function sendActionButtons(
-  conversation: any,
-  description: string,
-  actions: Action[],
-  actionId: string,
-): Promise<string> {
-  const actionsContent: ActionsContent = {
-    id: actionId,
-    description,
-    actions,
-  };
-
-  console.log(`🎯 Sending action buttons with ID: ${actionId}`);
-  console.log(
-    `📝 Actions:`,
-    actions.map((a) => `${a.id}: ${a.label}`).join(", "),
-  );
-
-  await conversation.send(actionsContent, ContentTypeActions);
-  return actionId;
-}
-
-/**
- * Handle action button clicks from users
- */
-async function handleActionButtonClick(
-  message: any,
-  conversation: any,
-  megaPotManager: MegaPotManager,
-  agent: any,
-) {
-  try {
-    const actionContent = message.content as ActionsContent;
-    console.log(`🎯 Action clicked:`, actionContent);
-
-    if (actionContent.actions && actionContent.actions.length > 0) {
-      const action = actionContent.actions[0]; // The clicked action
-      const actionId = actionContent.id;
-
-      if (action.id === "buy_tickets") {
-        console.log("🎫 User clicked buy tickets button");
-        await conversation.send(
-          "🎫 How many tickets would you like to buy? For example: 'buy 5 tickets'",
-        );
-      } else if (action.id === "view_stats") {
-        console.log("📊 User clicked view stats button");
-        await handleStatsRequestStream(
-          message,
-          conversation,
-          megaPotManager,
-          agent,
-        );
-      } else if (action.id === "view_jackpot") {
-        console.log("🎰 User clicked view jackpot button");
-        await handleJackpotInfoStream(message, conversation, megaPotManager);
-      } else if (action.id === "help") {
-        console.log("❓ User clicked help button");
-        await handleHelpRequestStream(message, conversation);
-      } else if (action.id === "purchase_tickets") {
-        console.log("🚀 User clicked purchase tickets button");
-
-        // Retrieve the stored transaction data
-        const pendingTx = pendingTransactions.get(actionId);
-
-        if (!pendingTx) {
-          console.log(
-            "❌ No pending transaction found for action ID:",
-            actionId,
-          );
-          await conversation.send(
-            "❌ Transaction data expired. Please try purchasing tickets again.",
-          );
-          return;
-        }
-
-        // Check if transaction is not too old (5 minutes expiry)
-        const now = Date.now();
-        if (now - pendingTx.timestamp > 5 * 60 * 1000) {
-          console.log("❌ Transaction expired for action ID:", actionId);
-          pendingTransactions.delete(actionId);
-          await conversation.send(
-            "❌ Transaction expired. Please try purchasing tickets again.",
-          );
-          return;
-        }
-
-        const { txData, userAddress, numTickets } = pendingTx;
-        const totalCostUSDC = Number(txData.totalCostUSDC) / 1000000;
-        const ticketPriceUSDC = Number(txData.ticketPriceUSDC) / 1000000;
-
-        // Send the actual wallet send calls
-        const walletSendCalls: WalletSendCallsParams = {
-          version: "1.0",
-          chainId: `0x${base.id.toString(16)}`,
-          from: userAddress,
-          calls: [
-            {
-              to: txData.approveCall.to,
-              data: txData.approveCall.data as `0x${string}`,
-              value: txData.approveCall.value as `0x${string}`,
-              metadata: {
-                description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
-                transactionType: "erc20_approve",
-              },
-            },
-            {
-              to: txData.purchaseCall.to,
-              data: txData.purchaseCall.data as `0x${string}`,
-              value: txData.purchaseCall.value as `0x${string}`,
-              metadata: {
-                description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
-                transactionType: "purchase_tickets",
-              },
-            },
-          ],
-          capabilities: {
-            reference: txData.referenceId,
-          },
-        };
-
-        console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
-        await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
-
-        await conversation.send(
-          `✅ Transactions sent to your wallet!
-
-Please approve both transactions:
-1. First: Approve USDC spending (${totalCostUSDC.toFixed(2)} USDC)
-2. Second: Purchase ${numTickets} ticket${numTickets > 1 ? "s" : ""}
-
-Good luck! 🍀`,
-        );
-
-        // Clean up the pending transaction
-        pendingTransactions.delete(actionId);
-        console.log(
-          `🧹 Cleaned up pending transaction for action ID: ${actionId}`,
-        );
-      } else if (action.id === "cancel_purchase") {
-        console.log("❌ User cancelled purchase");
-
-        // Clean up any pending transaction
-        if (pendingTransactions.has(actionId)) {
-          pendingTransactions.delete(actionId);
-          console.log(
-            `🧹 Cleaned up cancelled transaction for action ID: ${actionId}`,
-          );
-        }
-
-        await conversation.send(
-          "❌ Purchase cancelled. Let me know if you'd like to try again!",
-        );
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error handling action button click:", error);
-    await conversation.send(
-      "❌ Sorry, there was an error processing your request.",
-    );
-  }
-}
 if (!ENCRYPTION_KEY) {
   console.error("❌ ENCRYPTION_KEY environment variable is required");
   process.exit(1);
@@ -326,7 +145,6 @@ async function main() {
       new ReactionCodec(),
       new RemoteAttachmentCodec(),
       new WalletSendCallsCodec(),
-      new ActionsCodec(),
     ],
   });
 
@@ -426,29 +244,6 @@ async function main() {
             console.log("✅ Money bag reaction sent to message");
           } catch (reactionError) {
             console.error("❌ Failed to send reaction:", reactionError);
-          }
-
-          // Handle action button clicks first
-          if (message.contentType) {
-            const contentTypeStr = JSON.stringify(message.contentType);
-            console.log(`📝 Message content type: ${contentTypeStr}`);
-
-            // Check for action buttons in multiple ways
-            const isActionsType =
-              message.contentType.typeId === "actions" ||
-              contentTypeStr.includes("actions") ||
-              message.contentType.authorityId === "coinbase.com";
-
-            if (isActionsType) {
-              console.log("🎯 Detected action button click");
-              await handleActionButtonClick(
-                message,
-                conversation,
-                megaPotManager,
-                agent,
-              );
-              return;
-            }
           }
 
           // Handle specific commands
@@ -622,10 +417,8 @@ async function handleWelcomeMessageStream(message: any, conversation: any) {
       message.senderInboxId,
     );
 
-    // Send inline action buttons for welcome options
-    await sendActionButtons(
-      conversation,
-      `🎉 Welcome to the MegaPot Agent! 🎰
+    // Send welcome message with text options
+    await conversation.send(`🎉 Welcome to the MegaPot Agent! 🎰
 
 I'm your lottery assistant on Base network. I can help you:
 • Purchase MegaPot lottery tickets with USDC
@@ -635,35 +428,16 @@ I'm your lottery assistant on Base network. I can help you:
 
 🌐 Mini App: https://megapot.io
 
-What would you like to do?`,
-      [
-        {
-          id: "buy_tickets",
-          label: "🎫 Buy Tickets",
-          style: "primary",
-        },
-        {
-          id: "view_stats",
-          label: "📊 My Stats",
-          style: "secondary",
-        },
-        {
-          id: "view_jackpot",
-          label: "🎰 Jackpot Info",
-          style: "secondary",
-        },
-        {
-          id: "help",
-          label: "❓ Help",
-          style: "secondary",
-        },
-      ],
-      `welcome_${message.senderInboxId}_${Date.now()}`,
-    );
+Available commands:
+• "buy 5 tickets" - Purchase lottery tickets
+• "stats" - View your statistics
+• "jackpot" - View jackpot information
+• "claim" - Claim winnings
+• "help" - Show this help
 
-    console.log(
-      "✅ Welcome message with inline action buttons sent successfully",
-    );
+What would you like to do?`);
+
+    console.log("✅ Welcome message sent successfully");
   } catch (error) {
     console.error("❌ Error in handleWelcomeMessage:", error);
     console.error(
@@ -741,43 +515,56 @@ async function handleTicketPurchaseStream(
 
     console.log(`📋 Transaction reference ID: ${txData.referenceId}`); // Keep in logs only
 
-    // Send inline action buttons for smooth UX
-    const actionId = `megapot_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Send the transaction directly to user's wallet
+    const walletSendCalls: WalletSendCallsParams = {
+      version: "1.0",
+      chainId: `0x${base.id.toString(16)}`,
+      from: userAddress,
+      calls: [
+        {
+          to: txData.approveCall.to,
+          data: txData.approveCall.data as `0x${string}`,
+          value: txData.approveCall.value as `0x${string}`,
+          metadata: {
+            description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
+            transactionType: "erc20_approve",
+          },
+        },
+        {
+          to: txData.purchaseCall.to,
+          data: txData.purchaseCall.data as `0x${string}`,
+          value: txData.purchaseCall.value as `0x${string}`,
+          metadata: {
+            description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
+            transactionType: "purchase_tickets",
+          },
+        },
+      ],
+      capabilities: {
+        reference: txData.referenceId,
+      },
+    };
 
-    await sendActionButtons(
-      conversation,
+    await conversation.send(
       `🎫 Ready to purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}!
 
 💰 Ticket Price: ${ticketPriceUSDC.toFixed(2)} USDC each
 💰 Total Cost: ${totalCostUSDC.toFixed(2)} USDC
 
-Click below to proceed with the purchase:`,
-      [
-        {
-          id: "purchase_tickets",
-          label: `🚀 Buy ${numTickets} Ticket${numTickets > 1 ? "s" : ""}`,
-          style: "primary",
-        },
-        {
-          id: "cancel_purchase",
-          label: "❌ Cancel",
-          style: "secondary",
-        },
-      ],
-      actionId,
+📋 Reference ID: ${txData.referenceId}
+
+Please approve both transactions in your wallet:
+1. First: Approve USDC spending (${totalCostUSDC.toFixed(2)} USDC)
+2. Second: Purchase ${numTickets} ticket${numTickets > 1 ? "s" : ""}
+
+Good luck! 🍀`,
     );
 
-    // Store the transaction data for when user clicks the button
-    pendingTransactions.set(actionId, {
-      txData,
-      userAddress,
-      numTickets,
-      timestamp: Date.now(),
-    });
+    console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
+    await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
 
-    console.log(`✅ Transaction prepared and action buttons sent to user`);
-    console.log(`🎯 User can now click "Buy Tickets" button to proceed`);
-    console.log(`💾 Transaction data stored for action ID: ${actionId}`);
+    console.log(`✅ Transaction sent to user's wallet`);
+    console.log(`🎯 User can now approve the transactions in their wallet`);
 
     console.log(
       `✅ Transaction reference sent successfully with reference ID: ${txData.referenceId}`,

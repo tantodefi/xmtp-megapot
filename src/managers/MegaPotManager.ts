@@ -507,24 +507,26 @@ export class MegaPotManager {
             "❌ Failed to get ticket price from fallback:",
             fallbackError,
           );
-          console.log("⚠️ Using reasonable fallback ticket price (0.01 USDC)");
-          ticketPrice = 1000000000000000000n; // 1 USDC in 18 decimals (wei)
+          console.log("⚠️ Using reasonable fallback ticket price (1 USDC)");
+          ticketPrice = 1000000n; // 1 USDC in 6 decimals
         }
       }
 
-      // Convert ticket price to USDC (6 decimals)
-      const ticketPriceUSDC = ticketPrice / BigInt(10 ** 12); // Convert from 18 to 6 decimals
+      // Ticket price is already in 6 decimals (USDC)
+      const ticketPriceUSDC = ticketPrice; // No conversion needed
       const totalCostUSDC = BigInt(numTickets) * ticketPriceUSDC;
 
-      console.log(`💰 Ticket price: ${ticketPrice.toString()} wei`);
-      console.log(`💰 Ticket price USDC: ${ticketPriceUSDC.toString()} USDC`);
-      console.log(`💰 Total cost: ${totalCostUSDC.toString()} USDC`);
+      console.log(`💰 Ticket price: ${ticketPrice.toString()} (6 decimals)`);
+      console.log(
+        `💰 Ticket price USDC: ${(Number(ticketPriceUSDC) / 1000000).toFixed(2)} USDC`,
+      );
+      console.log(
+        `💰 Total cost: ${(Number(totalCostUSDC) / 1000000).toFixed(2)} USDC`,
+      );
       console.log(`🎫 Number of tickets: ${numTickets}`);
 
-      if (totalCostUSDC === BigInt(0)) {
-        throw new Error(
-          "Ticket price calculation resulted in 0. Cannot proceed with purchase.",
-        );
+      if (ticketPriceUSDC === BigInt(0)) {
+        throw new Error("Ticket price is 0. Cannot proceed with purchase.");
       }
 
       // First, approve USDC spending
@@ -693,24 +695,26 @@ export class MegaPotManager {
             "❌ Failed to get ticket price from fallback:",
             fallbackError,
           );
-          console.log("⚠️ Using reasonable fallback ticket price (0.01 USDC)");
-          ticketPrice = 1000000000000000000n; // 1 USDC in 18 decimals (wei)
+          console.log("⚠️ Using reasonable fallback ticket price (1 USDC)");
+          ticketPrice = 1000000n; // 1 USDC in 6 decimals
         }
       }
 
-      // Convert ticket price to USDC (6 decimals)
-      const ticketPriceUSDC = ticketPrice / BigInt(10 ** 12); // Convert from 18 to 6 decimals
+      // Ticket price is already in 6 decimals (USDC)
+      const ticketPriceUSDC = ticketPrice; // No conversion needed
       const totalCostUSDC = BigInt(numTickets) * ticketPriceUSDC;
 
-      console.log(`💰 Ticket price: ${ticketPrice.toString()} wei`);
-      console.log(`💰 Ticket price USDC: ${ticketPriceUSDC.toString()} USDC`);
-      console.log(`💰 Total cost: ${totalCostUSDC.toString()} USDC`);
+      console.log(`💰 Ticket price: ${ticketPrice.toString()} (6 decimals)`);
+      console.log(
+        `💰 Ticket price USDC: ${(Number(ticketPriceUSDC) / 1000000).toFixed(2)} USDC`,
+      );
+      console.log(
+        `💰 Total cost: ${(Number(totalCostUSDC) / 1000000).toFixed(2)} USDC`,
+      );
       console.log(`🎫 Number of tickets: ${numTickets}`);
 
-      if (totalCostUSDC === BigInt(0)) {
-        throw new Error(
-          "Ticket price calculation resulted in 0. Cannot proceed with purchase.",
-        );
+      if (ticketPriceUSDC === BigInt(0)) {
+        throw new Error("Ticket price is 0. Cannot proceed with purchase.");
       }
 
       // Prepare USDC approval transaction
