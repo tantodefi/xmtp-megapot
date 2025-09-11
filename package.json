@@ -15,12 +15,12 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx --env-file .env --watch src/index.ts",
+    "build": "echo 'No build step needed - tsx handles TypeScript at runtime'",
+    "dev": "tsx --watch src/index.ts",
     "gen:keys": "tsx src/generateKeys.ts",
     "lint": "cd ../.. && yarn eslint examples/xmtp-megapot",
-    "start": "npx tsx --env-file .env src/index.ts",
-    "test": "tsx --env-file .env src/test.ts"
+    "start": "tsx src/index.ts",
+    "test": "tsx src/test.ts"
   },
   "dependencies": {
     "@xmtp/agent-sdk": "^0.0.9",

@@ -1,0 +1,29 @@
+services:
+  - type: worker
+    name: xmtp-megapot-agent
+    env: node
+    plan: starter
+    buildCommand: yarn install --immutable
+    startCommand: yarn start
+    disk:
+      name: megapot-agent-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: XMTP_ENV
+        value: production
+      - key: BASE_RPC_URL
+        value: https://mainnet.base.org
+      - key: MEGAPOT_CONTRACT_ADDRESS
+        value: 0xbEDd4F2beBE9E3E636161E644759f3cbe3d51B95
+      - key: MEGAPOT_USDC_ADDRESS
+        value: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+      - key: MEGAPOT_REFERRER_ADDRESS
+        value: 0xa14ce36e7b135b66c3e3cb2584e777f32b15f5dc
+      - key: MEGAPOT_DATA_API_KEY
+        value: YOUR_API_KEY_HERE
+    # Environment variables that need to be set in Render dashboard:
+    # WALLET_KEY - Agent's private key
+    # ENCRYPTION_KEY - XMTP database encryption key
