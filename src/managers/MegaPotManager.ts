@@ -512,8 +512,8 @@ export class MegaPotManager {
         }
       }
 
-      // Ticket price is already in 6 decimals (USDC format)
-      const ticketPriceUSDC = ticketPrice;
+      // Convert ticket price to USDC (6 decimals)
+      const ticketPriceUSDC = ticketPrice / BigInt(10 ** 12); // Convert from 18 to 6 decimals
       const totalCostUSDC = BigInt(numTickets) * ticketPriceUSDC;
 
       console.log(`💰 Ticket price: ${ticketPrice.toString()} wei`);
@@ -698,8 +698,8 @@ export class MegaPotManager {
         }
       }
 
-      // Ticket price is already in 6 decimals (USDC format)
-      const ticketPriceUSDC = ticketPrice;
+      // Convert ticket price to USDC (6 decimals)
+      const ticketPriceUSDC = ticketPrice / BigInt(10 ** 12); // Convert from 18 to 6 decimals
       const totalCostUSDC = BigInt(numTickets) * ticketPriceUSDC;
 
       console.log(`💰 Ticket price: ${ticketPrice.toString()} wei`);
@@ -863,11 +863,13 @@ export class MegaPotManager {
       if (
         !apiKey ||
         apiKey === "your_megapot_data_api_key_here" ||
+        apiKey === "YOUR_API_KEY_HERE" ||
         apiKey.trim() === ""
       ) {
         console.log(
           "⚠️ MEGAPOT_DATA_API_KEY not set or invalid, skipping API calls",
         );
+        console.log(`📝 Current API key status: ${apiKey ? "SET" : "NOT SET"}`);
       } else if (apiKey && userAddress) {
         try {
           console.log(

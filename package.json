@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "echo 'No build step needed - tsx handles TypeScript at runtime'",
+    "build": "echo 'No build step needed - tsx handles TypeScript at runtime' && exit 0",
     "dev": "tsx --watch src/index.ts",
     "gen:keys": "tsx src/generateKeys.ts",
     "lint": "cd ../.. && yarn eslint examples/xmtp-megapot",
