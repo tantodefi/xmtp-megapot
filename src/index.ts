@@ -519,7 +519,9 @@ async function handleTicketPurchaseStream(
     console.log(`💰 Transaction Details:`);
     console.log(`   • User Address: ${userAddress}`);
     console.log(`   • Number of Tickets: ${numTickets}`);
-    console.log(`   • Total Cost: ${totalCostUSDC.toString()} (6 decimals) = $${totalCostUSDC.toFixed(2)}`);
+    console.log(
+      `   • Total Cost: ${totalCostUSDC.toString()} (6 decimals) = $${totalCostUSDC.toFixed(2)}`,
+    );
     console.log(`   • Contract: 0xbEDd4F2beBE9E3E636161E644759f3cbe3d51B95`);
     console.log(`   • USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`);
     console.log(`   • Referrer: 0xa14ce36e7b135b66c3e3cb2584e777f32b15f5dc`);
@@ -555,7 +557,13 @@ async function handleTicketPurchaseStream(
 
     await conversation.send(`🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)} - approve in wallet!
 
-⚠️ Make sure you have USDC on Base network (not Ethereum mainnet)! 🍀`);
+💡 **If you see "insufficient funds":**
+• Make sure you have ~$0.01 ETH on Base for gas fees
+• Check that your wallet is connected to Base network
+• Try refreshing your wallet balance
+• If still failing, try approving just the USDC first, then purchasing
+
+⚠️ Make sure you have USDC on Base network! 🍀`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
     await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
