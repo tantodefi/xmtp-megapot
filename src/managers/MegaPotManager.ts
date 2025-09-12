@@ -716,14 +716,18 @@ export class MegaPotManager {
       const ticketPriceUSDC = ticketPrice; // No conversion needed
       const totalCostUSDC = BigInt(numTickets) * ticketPriceUSDC;
 
-      console.log(`💰 Ticket price: ${ticketPrice.toString()} (6 decimals)`);
+      console.log(`🎫 Purchase details:`);
+      console.log(`   • Number of tickets: ${numTickets}`);
       console.log(
-        `💰 Ticket price USDC: ${(Number(ticketPriceUSDC) / 1000000).toFixed(2)} USDC`,
+        `   • Ticket price (6 decimals): ${ticketPriceUSDC.toString()}`,
       );
       console.log(
-        `💰 Total cost: ${(Number(totalCostUSDC) / 1000000).toFixed(2)} USDC`,
+        `   • Ticket price (USDC): $${(Number(ticketPriceUSDC) / 1000000).toFixed(6)}`,
       );
-      console.log(`🎫 Number of tickets: ${numTickets}`);
+      console.log(`   • Total cost (6 decimals): ${totalCostUSDC.toString()}`);
+      console.log(
+        `   • Total cost (USDC): $${(Number(totalCostUSDC) / 1000000).toFixed(6)}`,
+      );
 
       if (ticketPriceUSDC === BigInt(0)) {
         throw new Error("Ticket price is 0. Cannot proceed with purchase.");
@@ -755,7 +759,7 @@ export class MegaPotManager {
         "purchaseTickets",
         [
           this.contractConfig.referrerAddress, // referrer address from env
-          BigInt(numTickets), // number of tickets
+          totalCostUSDC, // total amount in USDC (6 decimals)
           userAddress, // recipient (user) address
         ],
       );

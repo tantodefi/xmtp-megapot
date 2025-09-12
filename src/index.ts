@@ -9,11 +9,21 @@ import {
   WalletSendCallsCodec,
   type WalletSendCallsParams,
 } from "@xmtp/content-type-wallet-send-calls";
-import { Group, IdentifierKind, Signer } from "@xmtp/node-sdk";
+import { Group, Signer } from "@xmtp/node-sdk";
 import { createWalletClient, http, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { MegaPotManager } from "./managers/MegaPotManager.js";
+import {
+  ActionsCodec,
+  ContentTypeActions,
+  type ActionsContent,
+} from "./types/ActionsContent.js";
+import {
+  ContentTypeIntent,
+  IntentCodec,
+  type IntentContent,
+} from "./types/IntentContent.js";
 
 // Environment variables
 const WALLET_KEY = process.env.WALLET_KEY as `0x${string}`;
@@ -88,7 +98,7 @@ function createSigner(privateKey: `0x${string}`): Signer {
     const signer = {
       type: "SCW" as const,
       getIdentifier: () => ({
-        identifierKind: IdentifierKind.Ethereum,
+        identifierKind: "ethereum" as any,
         identifier: account.address.toLowerCase(),
       }),
       getChainId: () => {
@@ -145,6 +155,8 @@ async function main() {
       new ReactionCodec(),
       new RemoteAttachmentCodec(),
       new WalletSendCallsCodec(),
+      new ActionsCodec(),
+      new IntentCodec(),
     ],
   });
 
@@ -193,9 +205,41 @@ async function main() {
             continue;
           }
 
-          // Skip if it's not a text message
-          if (message.contentType?.typeId !== "text") {
-            console.log("🚫 Skipping non-text message");
+          // Get the conversation for responding first
+          const conversation =
+            await agent.client.conversations.getConversationById(
+              message.conversationId,
+            );
+          if (!conversation) {
+            console.log("🚫 Could not find conversation for message");
+            continue;
+          }
+
+          // Handle different content types
+          if (message.contentType?.typeId === "text") {
+            console.log("📝 Processing text message");
+          } else if (message.contentType?.typeId === "intent") {
+            console.log("🎯 Processing intent message");
+            try {
+              const intentContent = message.content as IntentContent;
+              console.log(
+                `🎯 Intent: ${intentContent.actionId} from actions: ${intentContent.id}`,
+              );
+              await handleIntentMessage(
+                message,
+                intentContent,
+                conversation,
+                megaPotManager,
+                agent,
+              );
+              continue;
+            } catch (error) {
+              console.error("❌ Error processing intent:", error);
+            }
+          } else {
+            console.log(
+              `🚫 Skipping unsupported message type: ${message.contentType?.typeId}`,
+            );
             continue;
           }
 
@@ -208,16 +252,6 @@ async function main() {
           const lowerContent = content.toLowerCase();
 
           console.log(`🎯 Processing message: "${content}"`);
-
-          // Get the conversation for responding
-          const conversation =
-            await agent.client.conversations.getConversationById(
-              message.conversationId,
-            );
-          if (!conversation) {
-            console.log("🚫 Could not find conversation for message");
-            continue;
-          }
 
           // Check if this is a group chat (not a DM)
           const conversationType =
@@ -306,7 +340,9 @@ async function main() {
             } else if (
               lowerContent.includes("help") ||
               lowerContent.includes("commands") ||
-              lowerContent.includes("what")
+              lowerContent.includes("what") ||
+              lowerContent === "menu" ||
+              lowerContent.includes("actions")
             ) {
               await handleHelpRequestStream(message, conversation);
             } else if (
@@ -417,7 +453,7 @@ async function handleWelcomeMessageStream(message: any, conversation: any) {
       message.senderInboxId,
     );
 
-    // Send welcome message with text options
+    // Send welcome message
     await conversation.send(`🎉 Welcome to the MegaPot Agent! 🎰
 
 I'm your lottery assistant on Base network. I can help you:
@@ -428,16 +464,12 @@ I'm your lottery assistant on Base network. I can help you:
 
 🌐 Mini App: https://megapot.io
 
-Available commands:
-• "buy 5 tickets" - Purchase lottery tickets
-• "stats" - View your statistics
-• "jackpot" - View jackpot information
-• "claim" - Claim winnings
-• "help" - Show this help
+⚠️ Important: You need USDC on Base network (not Ethereum mainnet)!`);
 
-What would you like to do?`);
+    // Send inline action buttons
+    await sendMegaPotActions(conversation);
 
-    console.log("✅ Welcome message sent successfully");
+    console.log("✅ Welcome message with actions sent successfully");
   } catch (error) {
     console.error("❌ Error in handleWelcomeMessage:", error);
     console.error(
@@ -488,7 +520,7 @@ async function handleTicketPurchaseStream(
     }
 
     const userIdentifier = inboxState[0].identifiers.find(
-      (id) => id.identifierKind === IdentifierKind.Ethereum,
+      (id: any) => id.identifierKind === "ethereum",
     );
 
     if (!userIdentifier) {
@@ -525,6 +557,8 @@ async function handleTicketPurchaseStream(
     console.log(`   • Contract: 0xbEDd4F2beBE9E3E636161E644759f3cbe3d51B95`);
     console.log(`   • USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`);
     console.log(`   • Referrer: 0xa14ce36e7b135b66c3e3cb2584e777f32b15f5dc`);
+    console.log(`   • Gas Estimate: ~250k gas total`);
+    console.log(`   • Network: Base (Chain ID: 8453)`);
 
     const walletSendCalls: WalletSendCallsParams = {
       version: "1.0",
@@ -535,7 +569,7 @@ async function handleTicketPurchaseStream(
           to: txData.approveCall.to,
           data: txData.approveCall.data as `0x${string}`,
           value: txData.approveCall.value as `0x${string}`,
-          gasLimit: "0xC350", // ~50,000 gas for ERC20 approval
+          gas: "0xC350", // ~50,000 gas for ERC20 approval
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
             transactionType: "erc20_approve",
@@ -545,7 +579,7 @@ async function handleTicketPurchaseStream(
           to: txData.purchaseCall.to,
           data: txData.purchaseCall.data as `0x${string}`,
           value: txData.purchaseCall.value as `0x${string}`,
-          gasLimit: "0x30D40", // ~200,000 gas for contract call
+          gas: "0x30D40", // ~200,000 gas for contract call
           metadata: {
             description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
             transactionType: "purchase_tickets",
@@ -559,17 +593,17 @@ async function handleTicketPurchaseStream(
 
     await conversation.send(`🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
 
-✅ **Transaction Ready!** Open your wallet to approve:
-1️⃣ **USDC Approval** - Allow spending $${totalCostUSDC.toFixed(2)}
-2️⃣ **Ticket Purchase** - Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
+✅ Transaction Ready! Open your wallet to approve:
+1️⃣ USDC Approval - Allow spending $${totalCostUSDC.toFixed(2)}
+2️⃣ Ticket Purchase - Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
 
-💡 **Common Issues & Fixes:**
-• **"Insufficient funds"**: Need ~$0.01 ETH on Base for gas
-• **Wrong network**: Make sure wallet is on Base network
-• **Balance not updating**: Refresh your wallet
-• **Transaction stuck**: Try approving each step separately
+💡 Common Issues & Fixes:
+• "Insufficient funds": Need ~$0.01 ETH on Base for ~250k gas
+• Wrong network: Make sure wallet is on Base network (Chain ID: 8453)
+• Balance not updating: Refresh your wallet and check Base network specifically
+• Transaction stuck: Try approving each step separately in your wallet
 
-⚠️ **Important**: You need USDC on Base network, not Ethereum mainnet!
+⚠️ Important: You need USDC on Base network, not Ethereum mainnet!
 
 Good luck! 🍀🎰`);
 
@@ -626,7 +660,7 @@ async function handleStatsRequestStream(
 
       if (inboxState && inboxState[0]?.identifiers) {
         const userIdentifier = inboxState[0].identifiers.find(
-          (id) => id.identifierKind === IdentifierKind.Ethereum,
+          (id: { identifierKind: string }) => id.identifierKind === "ethereum",
         );
 
         if (userIdentifier) {
@@ -739,29 +773,32 @@ async function handleHelpRequestStream(message: any, conversation: any) {
 
 I can help you with lottery tickets on Base network:
 
-Buying Tickets:
-• Say "buy 5 tickets" or "purchase tickets"
+🎫 Buying Tickets:
+• Use the action buttons below or say "buy 5 tickets"
 • I automatically handle USDC approval and purchase
 
-Statistics:
-• Say "stats" or "my stats" to see your lottery history
+📊 Statistics:
+• Say "stats" or use the button to see your lottery history
 • View tickets purchased, spending, and winnings
 
-Jackpot Info:
-• Say "jackpot" or "prize" for current round details
+🎰 Jackpot Info:
+• Say "jackpot" or use the button for current round details
 • See jackpot amount, ticket price, and time remaining
 
-Winnings:
-• Say "claim winnings" to claim any lottery prizes
+💰 Winnings:
+• Use the button or say "claim winnings"
 • I check for available winnings and handle the claim process
 
-Mini App:
+🌐 Mini App:
 • Visit https://megapot.io for enhanced features
 • Real-time updates and advanced lottery tools
 
-What would you like to do?`;
+⚠️ Important: You need USDC on Base network (not Ethereum mainnet)!
+
+Choose an action below:`;
 
   await conversation.send(helpMessage);
+  await sendMegaPotActions(conversation);
 }
 
 async function handleMiniAppRequestStream(message: any, conversation: any) {
@@ -782,6 +819,382 @@ The mini app allows you:
 Simply click the link above to open the mini app!`;
 
   await conversation.send(miniAppMessage);
+}
+
+async function handleIntentMessage(
+  message: any,
+  intentContent: IntentContent,
+  conversation: any,
+  megaPotManager: MegaPotManager,
+  agent: any,
+) {
+  console.log(
+    `🎯 Processing intent: ${intentContent.actionId} for actions: ${intentContent.id}`,
+  );
+
+  try {
+    // Get the user's Ethereum address from their inbox ID
+    const inboxState = await agent.client.preferences.inboxStateFromInboxIds([
+      message.senderInboxId,
+    ]);
+
+    if (!inboxState || !inboxState[0]?.identifiers) {
+      await conversation.send(
+        "❌ Could not retrieve your wallet address. Please make sure your XMTP account is properly connected to a wallet.",
+      );
+      return;
+    }
+
+    const userIdentifier = inboxState[0].identifiers.find(
+      (id: any) => id.identifierKind === "ethereum",
+    );
+
+    if (!userIdentifier) {
+      await conversation.send(
+        "❌ Could not find an Ethereum address associated with your XMTP account. Please connect a wallet to your XMTP account.",
+      );
+      return;
+    }
+
+    const userAddress = userIdentifier.identifier as `0x${string}`;
+    console.log(`✅ User address: ${userAddress}`);
+
+    // Handle different action types
+    switch (intentContent.actionId) {
+      case "buy-1-ticket":
+        await handleTicketPurchaseIntent(
+          1,
+          userAddress,
+          conversation,
+          megaPotManager,
+          agent,
+        );
+        break;
+      case "buy-5-tickets":
+        await handleTicketPurchaseIntent(
+          5,
+          userAddress,
+          conversation,
+          megaPotManager,
+          agent,
+        );
+        break;
+      case "buy-10-tickets":
+        await handleTicketPurchaseIntent(
+          10,
+          userAddress,
+          conversation,
+          megaPotManager,
+          agent,
+        );
+        break;
+      case "check-stats":
+        await handleStatsIntent(
+          userAddress,
+          conversation,
+          megaPotManager,
+          agent,
+        );
+        break;
+      case "jackpot-info":
+        await handleJackpotInfoIntent(conversation, megaPotManager);
+        break;
+      case "claim-winnings":
+        await handleClaimIntent(conversation, megaPotManager);
+        break;
+      case "show-help":
+        await handleHelpIntent(conversation);
+        break;
+      default:
+        await conversation.send(`❌ Unknown action: ${intentContent.actionId}`);
+        console.log(`❌ Unknown action ID: ${intentContent.actionId}`);
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("❌ Error processing intent:", errorMessage);
+    await conversation.send(`❌ Error processing action: ${errorMessage}`);
+  }
+}
+
+async function handleTicketPurchaseIntent(
+  numTickets: number,
+  userAddress: `0x${string}`,
+  conversation: any,
+  megaPotManager: MegaPotManager,
+  agent: any,
+) {
+  try {
+    console.log(
+      `🎫 Processing ${numTickets} ticket purchase intent for ${userAddress}`,
+    );
+
+    // Prepare the ticket purchase transactions
+    const txData = await megaPotManager.prepareTicketPurchase(
+      numTickets,
+      userAddress,
+    );
+
+    const totalCostUSDC = Number(txData.totalCostUSDC) / 1000000; // Convert from 6 decimals to readable USDC
+    const ticketPriceUSDC = Number(txData.ticketPriceUSDC) / 1000000;
+
+    console.log(`📋 Transaction reference ID: ${txData.referenceId}`);
+
+    const walletSendCalls: WalletSendCallsParams = {
+      version: "1.0",
+      chainId: `0x${base.id.toString(16)}`,
+      from: userAddress,
+      calls: [
+        {
+          to: txData.approveCall.to,
+          data: txData.approveCall.data as `0x${string}`,
+          value: txData.approveCall.value as `0x${string}`,
+          gas: "0xC350", // ~50,000 gas for ERC20 approval
+          metadata: {
+            description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
+            transactionType: "erc20_approve",
+          },
+        },
+        {
+          to: txData.purchaseCall.to,
+          data: txData.purchaseCall.data as `0x${string}`,
+          value: txData.purchaseCall.value as `0x${string}`,
+          gas: "0x30D40", // ~200,000 gas for contract call
+          metadata: {
+            description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
+            transactionType: "purchase_tickets",
+          },
+        },
+      ],
+      capabilities: {
+        reference: txData.referenceId,
+      },
+    };
+
+    await conversation.send(`🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
+
+✅ Transaction Ready! Open your wallet to approve:
+1️⃣ USDC Approval - Allow spending $${totalCostUSDC.toFixed(2)}
+2️⃣ Ticket Purchase - Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
+
+💡 Common Issues & Fixes:
+• "Insufficient funds": Need ~$0.01 ETH on Base for ~250k gas
+• Wrong network: Make sure wallet is on Base network (Chain ID: 8453)
+• Balance not updating: Refresh your wallet and check Base network specifically
+• Transaction stuck: Try approving each step separately in your wallet
+
+⚠️ Important: You need USDC on Base network, not Ethereum mainnet!
+
+Good luck! 🍀🎰`);
+
+    console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
+    await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
+
+    console.log(`✅ Transaction sent to user's wallet`);
+    console.log(`🎯 User can now approve the transactions in their wallet`);
+
+    console.log(
+      `✅ Transaction reference sent successfully with reference ID: ${txData.referenceId}`,
+    );
+  } catch (error) {
+    console.error("❌ Error preparing ticket purchase intent:", error);
+
+    let errorMessage = "❌ Failed to prepare ticket purchase.";
+    if (error instanceof Error) {
+      if (
+        error.message.includes("insufficient funds") ||
+        error.message.includes("balance")
+      ) {
+        errorMessage = `❌ Issue with contract data. Please try again later.`;
+      } else {
+        errorMessage = `❌ Failed to prepare purchase: ${error.message}`;
+      }
+    }
+
+    await conversation.send(errorMessage);
+  }
+}
+
+async function handleStatsIntent(
+  userAddress: `0x${string}`,
+  conversation: any,
+  megaPotManager: MegaPotManager,
+  agent: any,
+) {
+  try {
+    const stats = await megaPotManager.getStats(userAddress);
+
+    let statsMessage = `📊 Your MegaPot Statistics:
+
+Total Tickets Purchased: ${stats.totalTicketsPurchased}
+Total Spent: ${megaPotManager.formatAmount(stats.totalSpent)}
+Total Winnings: ${megaPotManager.formatAmount(stats.totalWinnings)}
+
+Current Round:
+• Jackpot: $${stats.jackpotPool || "0"}
+• Ticket Price: $${stats.ticketPrice || "1"}
+• Tickets Sold: ${stats.ticketsSoldRound || 0}
+• Active Players: ${stats.activePlayers || 0}`;
+
+    if (stats.userOdds) {
+      statsMessage += `\nYour Odds: 1 in ${stats.userOdds}`;
+    }
+
+    if (stats.endTime) {
+      const timeLeft = Math.floor(
+        (stats.endTime.getTime() - Date.now()) / (1000 * 60 * 60),
+      );
+      statsMessage += `\nRound ends in: ${timeLeft} hours`;
+    }
+
+    await conversation.send(statsMessage);
+  } catch (error) {
+    console.error("❌ Error fetching stats:", error);
+    await conversation.send(
+      "❌ Failed to fetch your statistics. Please try again later.",
+    );
+  }
+}
+
+async function handleJackpotInfoIntent(
+  conversation: any,
+  megaPotManager: MegaPotManager,
+) {
+  try {
+    const stats = await megaPotManager.getStats();
+
+    const jackpotMessage = `🎰 Current MegaPot Jackpot Information:
+
+Current Jackpot: $${stats.jackpotPool || "0"}
+Ticket Price: $${stats.ticketPrice || "1"}
+Tickets Sold: ${stats.ticketsSoldRound || 0}
+Active Players: ${stats.activePlayers || 0}
+
+${stats.endTime ? `Round ends: ${stats.endTime.toLocaleString()}` : ""}
+${stats.isActive ? "Round is active" : "Round is not active"}
+
+Try the MegaPot Mini App for real-time updates: https://megapot.io`;
+
+    await conversation.send(jackpotMessage);
+  } catch (error) {
+    console.error("❌ Error fetching jackpot info:", error);
+    await conversation.send(
+      "❌ Failed to fetch jackpot information. Please try again later.",
+    );
+  }
+}
+
+async function handleClaimIntent(
+  conversation: any,
+  megaPotManager: MegaPotManager,
+) {
+  try {
+    await conversation.send("🎉 Checking for winnings...");
+
+    const hasWinnings = await megaPotManager.hasWinningsToClaim();
+    if (!hasWinnings) {
+      await conversation.send(
+        "😔 No winnings available to claim at this time. Better luck next round!",
+      );
+      return;
+    }
+
+    const result = await megaPotManager.claimWinnings();
+
+    await conversation.send(
+      `🎉 Congratulations! Winnings claimed successfully!
+
+Transaction: ${result.txHash}
+
+Your winnings have been transferred to your wallet. Check your balance to confirm the transfer.`,
+    );
+  } catch (error) {
+    console.error("❌ Error claiming winnings:", error);
+    await conversation.send(
+      `❌ Failed to claim winnings: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
+}
+
+async function sendMegaPotActions(conversation: any) {
+  const actionsContent: ActionsContent = {
+    id: `megapot-actions-${Date.now()}`,
+    description: `🎰 Welcome to MegaPot Lottery Agent!
+
+I'm your lottery assistant on Base network. What would you like to do?`,
+    actions: [
+      {
+        id: "buy-1-ticket",
+        label: "🎫 Buy 1 Ticket",
+        style: "primary",
+      },
+      {
+        id: "buy-5-tickets",
+        label: "🎫 Buy 5 Tickets",
+        style: "primary",
+      },
+      {
+        id: "buy-10-tickets",
+        label: "🎫 Buy 10 Tickets",
+        style: "primary",
+      },
+      {
+        id: "check-stats",
+        label: "📊 Check Stats",
+        style: "secondary",
+      },
+      {
+        id: "jackpot-info",
+        label: "🎰 Jackpot Info",
+        style: "secondary",
+      },
+      {
+        id: "claim-winnings",
+        label: "💰 Claim Winnings",
+        style: "primary",
+      },
+      {
+        id: "show-help",
+        label: "❓ Help",
+        style: "secondary",
+      },
+    ],
+  };
+
+  console.log("🎯 Sending MegaPot inline actions");
+  await conversation.send(actionsContent, ContentTypeActions);
+}
+
+async function handleHelpIntent(conversation: any) {
+  const helpMessage = `🤖 MegaPot Agent Help
+
+I can help you with lottery tickets on Base network:
+
+🎫 Buying Tickets:
+• Use the action buttons below to buy 1, 5, or 10 tickets
+• I automatically handle USDC approval and purchase
+
+📊 Statistics:
+• "Check Stats" - View your lottery history
+• See tickets purchased, spending, and winnings
+
+🎰 Jackpot Info:
+• "Jackpot Info" - View current round details
+• See jackpot amount, ticket price, and time remaining
+
+💰 Winnings:
+• "Claim Winnings" - Claim any lottery prizes
+• I check for available winnings and handle the claim process
+
+🌐 Mini App:
+• Visit https://megapot.io for enhanced features
+• Real-time updates and advanced lottery tools
+
+⚠️ Important: You need USDC on Base network (not Ethereum mainnet)!
+
+Choose an action below:`;
+
+  await conversation.send(helpMessage);
+  await sendMegaPotActions(conversation);
 }
 
 // Message handler functions
@@ -964,23 +1377,23 @@ async function handleHelpRequest(ctx: any) {
 
 I can help you with lottery tickets on Base network:
 
-🎫 **Buying Tickets:**
+🎫 Buying Tickets:
 • Say "buy 5 tickets" or "purchase tickets"
 • I automatically handle USDC approval and purchase
 
-📊 **Statistics:**
+📊 Statistics:
 • Say "stats" or "my stats" to see your lottery history
 • View tickets purchased, spending, and winnings
 
-🎰 **Jackpot Info:**
+🎰 Jackpot Info:
 • Say "jackpot" or "prize" for current round details
 • See jackpot amount, ticket price, and time remaining
 
-💰 **Winnings:**
+💰 Winnings:
 • Say "claim winnings" to claim any lottery prizes
 • I check for available winnings and handle the claim process
 
-🚀 **Mini App:**
+🚀 Mini App:
 • Visit https://megapot.io for enhanced features
 • Real-time updates and advanced lottery tools
 
