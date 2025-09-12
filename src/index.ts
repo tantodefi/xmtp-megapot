@@ -314,10 +314,10 @@ async function main() {
                     );
                     // Continue to regular command processing
                   } else {
-                    const userAddress = userIdentifier.identifier as `0x${string}`;
+                    const userAddress = userIdentifier.identifier;
                     await handleTicketPurchaseIntent(
                       numTickets,
-                      userAddress,
+                      userAddress as `0x${string}`,
                       conversation,
                       megaPotManager,
                       agent,
@@ -625,7 +625,7 @@ async function handleTicketPurchaseStream(
       return;
     }
 
-    const userAddress = userIdentifier.identifier as `0x${string}`;
+    const userAddress = userIdentifier.identifier;
     console.log(`✅ User address: ${userAddress}`);
 
     // Prepare the ticket purchase transactions
@@ -634,7 +634,7 @@ async function handleTicketPurchaseStream(
     );
     const txData = await megaPotManager.prepareTicketPurchase(
       numTickets,
-      userAddress,
+      userAddress as `0x${string}`,
     );
 
     const totalCostUSDC = Number(txData.totalCostUSDC) / 1000000; // Convert from 6 decimals to readable USDC
@@ -751,7 +751,7 @@ async function handleStatsRequestStream(
         );
 
         if (userIdentifier) {
-          userAddress = userIdentifier.identifier as `0x${string}`;
+          userAddress = userIdentifier.identifier;
           console.log(`✅ User address for stats: ${userAddress}`);
         }
       }
@@ -936,7 +936,7 @@ async function handleIntentMessage(
       return;
     }
 
-    const userAddress = userIdentifier.identifier as `0x${string}`;
+    const userAddress = userIdentifier.identifier;
     console.log(`✅ User address: ${userAddress}`);
 
     // Handle different action types
@@ -948,7 +948,7 @@ async function handleIntentMessage(
         break;
       case "check-stats":
         await handleStatsIntent(
-          userAddress,
+          userAddress as `0x${string}`,
           conversation,
           megaPotManager,
           agent,
@@ -989,7 +989,7 @@ async function handleTicketPurchaseIntent(
     // Prepare the ticket purchase transactions
     const txData = await megaPotManager.prepareTicketPurchase(
       numTickets,
-      userAddress,
+      userAddress as `0x${string}`,
     );
 
     const totalCostUSDC = Number(txData.totalCostUSDC) / 1000000; // Convert from 6 decimals to readable USDC
