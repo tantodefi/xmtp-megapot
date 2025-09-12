@@ -20,7 +20,8 @@
     "gen:keys": "tsx src/generateKeys.ts",
     "lint": "cd ../.. && yarn eslint examples/xmtp-megapot",
     "start": "tsx src/index.ts",
-    "test": "tsx src/test.ts"
+    "test": "tsx src/test.ts",
+    "revoke-installations": "node revoke-installations.js"ny
   },
   "dependencies": {
     "@xmtp/agent-sdk": "^0.0.9",
