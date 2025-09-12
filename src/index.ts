@@ -256,11 +256,11 @@ async function main() {
             conversation instanceof Group ? "group" : "dm";
           const isGroupChat = conversation instanceof Group;
 
-          // In group chats, only respond to @megapot mentions
-          if (isGroupChat && !lowerContent.includes("@megapot")) {
-            console.log("🚫 Skipping group message without @megapot mention");
-            continue;
-          }
+          // Check for @megapot mentions (including variants)
+          const hasMention =
+            lowerContent.includes("@megapot") ||
+            lowerContent.includes("@megapot.base.eth") ||
+            lowerContent.includes("@megapot.eth");
 
           // Send money bag reaction to ALL messages
           try {
@@ -391,7 +391,14 @@ async function main() {
             }
           }
 
-          // Handle specific commands
+          // Handle specific commands (skip in group chats without mentions)
+          if (isGroupChat && !hasMention) {
+            console.log(
+              "🚫 Skipping command processing for group message without @megapot mention",
+            );
+            continue;
+          }
+
           try {
             if (lowerContent === "ping") {
               await handlePingRequestStream(message, conversation);
@@ -555,9 +562,12 @@ async function handleWelcomeMessageStream(message: any, conversation: any) {
     );
 
     // Send welcome message
-    await conversation.send(
-      "🎉 Welcome to MegaPot! 🎰 Your lottery assistant. Choose an action below:",
-    );
+    const isGroupChat = conversation instanceof Group;
+    const welcomeText = isGroupChat
+      ? "🎉 Hi! I'm MegaPot 🎰 - your lottery assistant! In group chats, mention me with @megapot to interact."
+      : "🎉 Welcome to MegaPot! 🎰 Your lottery assistant. Choose an action below:";
+
+    await conversation.send(welcomeText);
 
     // Send inline action buttons
     await sendMegaPotActions(conversation);
@@ -1194,6 +1204,11 @@ async function sendMegaPotActions(conversation: any) {
 }
 
 async function handleHelpIntent(conversation: any) {
+  const isGroupChat = conversation instanceof Group;
+  const mentionNote = isGroupChat
+    ? "\n\n📢 **Group Chat Note:** Mention me with @megapot to interact in groups!"
+    : "";
+
   const helpMessage = `🤖 MegaPot Lottery Assistant
 
 🎰 Your AI-powered lottery companion on Base network!
@@ -1206,7 +1221,7 @@ Commands:
 • 💰 "Claim Winnings" - Collect any lottery prizes
 
 🌐 Full experience: https://megapot.io
-⚠️ Need USDC on Base network for purchases`;
+⚠️ Need USDC on Base network for purchases${mentionNote}`;
 
   await conversation.send(helpMessage);
   await sendMegaPotActions(conversation);
