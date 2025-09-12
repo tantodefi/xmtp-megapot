@@ -32,6 +32,9 @@ const XMTP_ENV = process.env.XMTP_ENV || "dev";
 const MEGAPOT_DATA_API_KEY = process.env.MEGAPOT_DATA_API_KEY;
 const BASE_RPC_URL = process.env.BASE_RPC_URL || "https://sepolia.base.org";
 
+// State tracking for users waiting for ticket amounts
+const ticketAmountRequests = new Map<string, boolean>();
+
 // MegaPot Contract Configuration
 const MEGAPOT_CONTRACT_ADDRESS = process.env
   .MEGAPOT_CONTRACT_ADDRESS as `0x${string}`;
@@ -274,7 +277,118 @@ async function main() {
             );
             console.log("✅ Money bag reaction sent to message");
           } catch (reactionError) {
-            console.error("❌ Failed to send reaction:", reactionError);
+            console.error("Error: send reaction:", reactionError);
+          }
+
+          // Check if user is responding to ticket amount request (inline action flow)
+          if (ticketAmountRequests.has(message.senderInboxId)) {
+            const numTickets = parseInt(content.trim());
+            ticketAmountRequests.delete(message.senderInboxId); // Clear state
+
+            if (isNaN(numTickets) || numTickets < 1 || numTickets > 100) {
+              await conversation.send(
+                "Sorry, that's not a valid number. Please enter a number between 1 and 100.",
+              );
+              return;
+            }
+
+            // Get user's address and process purchase
+            try {
+              const inboxState =
+                await agent.client.preferences.inboxStateFromInboxIds([
+                  message.senderInboxId,
+                ]);
+
+              if (!inboxState || !inboxState[0]?.identifiers) {
+                await conversation.send(
+                  "Could not retrieve your wallet address. Please try again.",
+                );
+                return;
+              }
+
+              const userIdentifier = inboxState[0].identifiers.find(
+                (id: any) => id.identifierKind === 0,
+              );
+
+              if (!userIdentifier) {
+                await conversation.send(
+                  "Could not find your wallet address. Please try again.",
+                );
+                return;
+              }
+
+              const userAddress = userIdentifier.identifier as `0x${string}`;
+              await handleTicketPurchaseIntent(
+                numTickets,
+                userAddress,
+                conversation,
+                megaPotManager,
+                agent,
+              );
+            } catch (error) {
+              console.error("❌ Error processing ticket amount:", error);
+              await conversation.send(
+                "Error processing your request. Please try again.",
+              );
+            }
+            return; // Exit early, don't process as regular command
+          }
+
+          // Check for direct ticket purchase commands (e.g., "buy 5 tickets", "@megapot buy 10 tickets")
+          const buyTicketMatch = lowerContent.match(/buy\s+(\d+)\s+tickets?/i);
+          if (buyTicketMatch) {
+            const numTickets = parseInt(buyTicketMatch[1]);
+
+            if (numTickets < 1 || numTickets > 100) {
+              await conversation.send(
+                "Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
+              );
+              return;
+            }
+
+            // Get user's address and process purchase directly
+            try {
+              const inboxState =
+                await agent.client.preferences.inboxStateFromInboxIds([
+                  message.senderInboxId,
+                ]);
+
+              if (!inboxState || !inboxState[0]?.identifiers) {
+                await conversation.send(
+                  "Could not retrieve your wallet address. Please try again.",
+                );
+                return;
+              }
+
+              const userIdentifier = inboxState[0].identifiers.find(
+                (id: any) => id.identifierKind === 0,
+              );
+
+              if (!userIdentifier) {
+                await conversation.send(
+                  "Could not find your wallet address. Please try again.",
+                );
+                return;
+              }
+
+              const userAddress = userIdentifier.identifier as `0x${string}`;
+              await handleTicketPurchaseIntent(
+                numTickets,
+                userAddress,
+                conversation,
+                megaPotManager,
+                agent,
+              );
+            } catch (error) {
+              console.error(
+                "❌ Error processing direct ticket purchase:",
+                error,
+              );
+              await conversation.send(
+                "Error processing your request. Please try again.",
+              );
+            }
+            return; // Exit early, don't process as regular command
           }
 
           // Handle specific commands
@@ -292,17 +406,7 @@ async function main() {
               lowerContent.includes("hey")
             ) {
               await handleWelcomeMessageStream(message, conversation);
-            } else if (
-              lowerContent.includes("buy") ||
-              lowerContent.includes("ticket") ||
-              lowerContent.includes("purchase")
-            ) {
-              await handleTicketPurchaseStream(
-                message,
-                conversation,
-                megaPotManager,
-                agent,
-              );
+              // Ticket purchase commands are now handled above with specific parsing
             } else if (
               lowerContent.includes("stats") ||
               lowerContent.includes("status") ||
@@ -358,7 +462,7 @@ async function main() {
                 `Sorry, I encountered an error: ${handlerError instanceof Error ? handlerError.message : "Unknown error"}`,
               );
             } catch (sendError) {
-              console.error("❌ Failed to send error message:", sendError);
+              console.error("Error: send error message:", sendError);
             }
           }
         } catch (error) {
@@ -369,7 +473,7 @@ async function main() {
       console.error("❌ Message stream error:", error);
     });
   } catch (streamError) {
-    console.error("❌ Failed to set up message stream:", streamError);
+    console.error("Error: set up message stream:", streamError);
     throw streamError;
   }
 
@@ -396,7 +500,7 @@ async function main() {
       console.log("💓 Agent heartbeat - still running and listening...");
     }, 60000); // Every minute
   } catch (error) {
-    console.error("❌ Failed to start agent:", error);
+    console.error("Error: start agent:", error);
     console.error(
       "❌ Error details:",
       error instanceof Error ? error.stack : String(error),
@@ -438,7 +542,7 @@ async function handlePingRequestStream(message: any, conversation: any) {
     try {
       await conversation.send("error");
     } catch (sendError) {
-      console.error("❌ Failed to send error response:", sendError);
+      console.error("Error: send error response:", sendError);
     }
   }
 }
@@ -451,17 +555,9 @@ async function handleWelcomeMessageStream(message: any, conversation: any) {
     );
 
     // Send welcome message
-    await conversation.send(`🎉 Welcome to the MegaPot Agent! 🎰
-
-I'm your lottery assistant on Base network. I can help you:
-• Purchase MegaPot lottery tickets with USDC
-• Check your lottery statistics and winnings
-• View current jackpot information
-• Claim lottery winnings when you win!
-
-🌐 Mini App: https://megapot.io
-
-⚠️ Important: You need USDC on Base network (not Ethereum mainnet)!`);
+    await conversation.send(
+      "MegaPot lottery assistant. Choose an action below:",
+    );
 
     // Send inline action buttons
     await sendMegaPotActions(conversation);
@@ -479,7 +575,7 @@ I'm your lottery assistant on Base network. I can help you:
         "Sorry, I encountered an error sending the welcome message. Please try again.",
       );
     } catch (sendError) {
-      console.error("❌ Failed to send error message:", sendError);
+      console.error("Error: send error message:", sendError);
     }
   }
 }
@@ -588,21 +684,13 @@ async function handleTicketPurchaseStream(
       },
     };
 
-    await conversation.send(`🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
+    await conversation.send(`${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
 
-✅ Transaction Ready! Open your wallet to approve:
-1️⃣ USDC Approval - Allow spending $${totalCostUSDC.toFixed(2)}
-2️⃣ Ticket Purchase - Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
+Ready to purchase. Open wallet to approve:
+1. USDC approval for $${totalCostUSDC.toFixed(2)}
+2. Buy ${numTickets} ticket${numTickets > 1 ? "s" : ""}
 
-💡 Common Issues & Fixes:
-• "Insufficient funds": Need ~$0.01 ETH on Base for ~250k gas
-• Wrong network: Make sure wallet is on Base network (Chain ID: 8453)
-• Balance not updating: Refresh your wallet and check Base network specifically
-• Transaction stuck: Try approving each step separately in your wallet
-
-⚠️ Important: You need USDC on Base network, not Ethereum mainnet!
-
-Good luck! 🍀🎰`);
+Need USDC on Base network.`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
     await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
@@ -617,7 +705,7 @@ Good luck! 🍀🎰`);
     console.error("❌ Error preparing ticket purchase:", error);
 
     // Provide more user-friendly error messages
-    let errorMessage = "❌ Failed to prepare ticket purchase.";
+    let errorMessage = "Error: prepare ticket purchase.";
 
     if (error instanceof Error) {
       if (
@@ -631,7 +719,7 @@ Good luck! 🍀🎰`);
       ) {
         errorMessage = "❌ Transaction preparation was cancelled.";
       } else {
-        errorMessage = `❌ Failed to prepare purchase: ${error.message}`;
+        errorMessage = `Error: prepare purchase: ${error.message}`;
       }
     }
 
@@ -671,17 +759,12 @@ async function handleStatsRequestStream(
 
     const stats = await megaPotManager.getStats(userAddress);
 
-    let statsMessage = `📊 Your MegaPot Statistics:
+    let statsMessage = `Your stats:
+Tickets: ${stats.totalTicketsPurchased}
+Spent: ${megaPotManager.formatAmount(stats.totalSpent)}
+Won: ${megaPotManager.formatAmount(stats.totalWinnings)}
 
-Total Tickets Purchased: ${stats.totalTicketsPurchased}
-Total Spent: ${megaPotManager.formatAmount(stats.totalSpent)}
-Total Winnings: ${megaPotManager.formatAmount(stats.totalWinnings)}
-
-Current Round:
-• Jackpot: $${stats.jackpotPool || "0"}
-• Ticket Price: $${stats.ticketPrice || "1"}
-• Tickets Sold: ${stats.ticketsSoldRound || 0}
-• Active Players: ${stats.activePlayers || 0}`;
+Current round: $${stats.jackpotPool || "0"} jackpot`;
 
     if (stats.userOdds) {
       statsMessage += `\nYour Odds: 1 in ${stats.userOdds}`;
@@ -698,7 +781,7 @@ Current Round:
   } catch (error) {
     console.error("❌ Error fetching stats:", error);
     await conversation.send(
-      "❌ Failed to fetch your statistics. Please try again later.",
+      "Error: fetch your statistics. Please try again later.",
     );
   }
 }
@@ -711,23 +794,18 @@ async function handleJackpotInfoStream(
   try {
     const stats = await megaPotManager.getStats();
 
-    const jackpotMessage = `🎰 Current MegaPot Jackpot Information:
+    const jackpotMessage = `Jackpot: $${stats.jackpotPool || "0"}
+Price: $${stats.ticketPrice || "1"}
+Sold: ${stats.ticketsSoldRound || 0}
+Players: ${stats.activePlayers || 0}
 
-Current Jackpot: $${stats.jackpotPool || "0"}
-Ticket Price: $${stats.ticketPrice || "1"}
-Tickets Sold: ${stats.ticketsSoldRound || 0}
-Active Players: ${stats.activePlayers || 0}
-
-${stats.endTime ? `Round ends: ${stats.endTime.toLocaleString()}` : ""}
-${stats.isActive ? "Round is active" : "Round is not active"}
-
-Try the MegaPot Mini App for real-time updates: https://megapot.io`;
+${stats.isActive ? "Active round" : "Round ended"}`;
 
     await conversation.send(jackpotMessage);
   } catch (error) {
     console.error("❌ Error fetching jackpot info:", error);
     await conversation.send(
-      "❌ Failed to fetch jackpot information. Please try again later.",
+      "Error: fetch jackpot information. Please try again later.",
     );
   }
 }
@@ -760,7 +838,7 @@ Your winnings have been transferred to your wallet. Check your balance to confir
   } catch (error) {
     console.error("❌ Error claiming winnings:", error);
     await conversation.send(
-      `❌ Failed to claim winnings: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `Error: claim winnings: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
   }
 }
@@ -858,32 +936,10 @@ async function handleIntentMessage(
 
     // Handle different action types
     switch (intentContent.actionId) {
-      case "buy-1-ticket":
-        await handleTicketPurchaseIntent(
-          1,
-          userAddress,
-          conversation,
-          megaPotManager,
-          agent,
-        );
-        break;
-      case "buy-5-tickets":
-        await handleTicketPurchaseIntent(
-          5,
-          userAddress,
-          conversation,
-          megaPotManager,
-          agent,
-        );
-        break;
-      case "buy-10-tickets":
-        await handleTicketPurchaseIntent(
-          10,
-          userAddress,
-          conversation,
-          megaPotManager,
-          agent,
-        );
+      case "buy-tickets":
+        // Set state to expect ticket amount response
+        ticketAmountRequests.set(message.senderInboxId, true);
+        await conversation.send("How many tickets would you like to purchase?");
         break;
       case "check-stats":
         await handleStatsIntent(
@@ -967,21 +1023,13 @@ async function handleTicketPurchaseIntent(
       },
     };
 
-    await conversation.send(`🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
+    await conversation.send(`${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
 
-✅ Transaction Ready! Open your wallet to approve:
-1️⃣ USDC Approval - Allow spending $${totalCostUSDC.toFixed(2)}
-2️⃣ Ticket Purchase - Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
+Ready to purchase. Open wallet to approve:
+1. USDC approval for $${totalCostUSDC.toFixed(2)}
+2. Buy ${numTickets} ticket${numTickets > 1 ? "s" : ""}
 
-💡 Common Issues & Fixes:
-• "Insufficient funds": Need ~$0.01 ETH on Base for ~250k gas
-• Wrong network: Make sure wallet is on Base network (Chain ID: 8453)
-• Balance not updating: Refresh your wallet and check Base network specifically
-• Transaction stuck: Try approving each step separately in your wallet
-
-⚠️ Important: You need USDC on Base network, not Ethereum mainnet!
-
-Good luck! 🍀🎰`);
+Need USDC on Base network.`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
     await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
@@ -995,7 +1043,7 @@ Good luck! 🍀🎰`);
   } catch (error) {
     console.error("❌ Error preparing ticket purchase intent:", error);
 
-    let errorMessage = "❌ Failed to prepare ticket purchase.";
+    let errorMessage = "Error: prepare ticket purchase.";
     if (error instanceof Error) {
       if (
         error.message.includes("insufficient funds") ||
@@ -1003,7 +1051,7 @@ Good luck! 🍀🎰`);
       ) {
         errorMessage = `❌ Issue with contract data. Please try again later.`;
       } else {
-        errorMessage = `❌ Failed to prepare purchase: ${error.message}`;
+        errorMessage = `Error: prepare purchase: ${error.message}`;
       }
     }
 
@@ -1020,17 +1068,12 @@ async function handleStatsIntent(
   try {
     const stats = await megaPotManager.getStats(userAddress);
 
-    let statsMessage = `📊 Your MegaPot Statistics:
+    let statsMessage = `Your stats:
+Tickets: ${stats.totalTicketsPurchased}
+Spent: ${megaPotManager.formatAmount(stats.totalSpent)}
+Won: ${megaPotManager.formatAmount(stats.totalWinnings)}
 
-Total Tickets Purchased: ${stats.totalTicketsPurchased}
-Total Spent: ${megaPotManager.formatAmount(stats.totalSpent)}
-Total Winnings: ${megaPotManager.formatAmount(stats.totalWinnings)}
-
-Current Round:
-• Jackpot: $${stats.jackpotPool || "0"}
-• Ticket Price: $${stats.ticketPrice || "1"}
-• Tickets Sold: ${stats.ticketsSoldRound || 0}
-• Active Players: ${stats.activePlayers || 0}`;
+Current round: $${stats.jackpotPool || "0"} jackpot`;
 
     if (stats.userOdds) {
       statsMessage += `\nYour Odds: 1 in ${stats.userOdds}`;
@@ -1047,7 +1090,7 @@ Current Round:
   } catch (error) {
     console.error("❌ Error fetching stats:", error);
     await conversation.send(
-      "❌ Failed to fetch your statistics. Please try again later.",
+      "Error: fetch your statistics. Please try again later.",
     );
   }
 }
@@ -1059,23 +1102,18 @@ async function handleJackpotInfoIntent(
   try {
     const stats = await megaPotManager.getStats();
 
-    const jackpotMessage = `🎰 Current MegaPot Jackpot Information:
+    const jackpotMessage = `Jackpot: $${stats.jackpotPool || "0"}
+Price: $${stats.ticketPrice || "1"}
+Sold: ${stats.ticketsSoldRound || 0}
+Players: ${stats.activePlayers || 0}
 
-Current Jackpot: $${stats.jackpotPool || "0"}
-Ticket Price: $${stats.ticketPrice || "1"}
-Tickets Sold: ${stats.ticketsSoldRound || 0}
-Active Players: ${stats.activePlayers || 0}
-
-${stats.endTime ? `Round ends: ${stats.endTime.toLocaleString()}` : ""}
-${stats.isActive ? "Round is active" : "Round is not active"}
-
-Try the MegaPot Mini App for real-time updates: https://megapot.io`;
+${stats.isActive ? "Active round" : "Round ended"}`;
 
     await conversation.send(jackpotMessage);
   } catch (error) {
     console.error("❌ Error fetching jackpot info:", error);
     await conversation.send(
-      "❌ Failed to fetch jackpot information. Please try again later.",
+      "Error: fetch jackpot information. Please try again later.",
     );
   }
 }
@@ -1107,7 +1145,7 @@ Your winnings have been transferred to your wallet. Check your balance to confir
   } catch (error) {
     console.error("❌ Error claiming winnings:", error);
     await conversation.send(
-      `❌ Failed to claim winnings: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `Error: claim winnings: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
   }
 }
@@ -1115,43 +1153,31 @@ Your winnings have been transferred to your wallet. Check your balance to confir
 async function sendMegaPotActions(conversation: any) {
   const actionsContent: ActionsContent = {
     id: `megapot-actions-${Date.now()}`,
-    description: `🎰 Welcome to MegaPot Lottery Agent!
-
-I'm your lottery assistant on Base network. What would you like to do?`,
+    description: "MegaPot lottery assistant. Choose an action:",
     actions: [
       {
-        id: "buy-1-ticket",
-        label: "🎫 Buy 1 Ticket",
-        style: "primary",
-      },
-      {
-        id: "buy-5-tickets",
-        label: "🎫 Buy 5 Tickets",
-        style: "primary",
-      },
-      {
-        id: "buy-10-tickets",
-        label: "🎫 Buy 10 Tickets",
+        id: "buy-tickets",
+        label: "Buy Tickets",
         style: "primary",
       },
       {
         id: "check-stats",
-        label: "📊 Check Stats",
+        label: "Check Stats",
         style: "secondary",
       },
       {
         id: "jackpot-info",
-        label: "🎰 Jackpot Info",
+        label: "Jackpot Info",
         style: "secondary",
       },
       {
         id: "claim-winnings",
-        label: "💰 Claim Winnings",
+        label: "Claim Winnings",
         style: "primary",
       },
       {
         id: "show-help",
-        label: "❓ Help",
+        label: "Help",
         style: "secondary",
       },
     ],
@@ -1162,33 +1188,16 @@ I'm your lottery assistant on Base network. What would you like to do?`,
 }
 
 async function handleHelpIntent(conversation: any) {
-  const helpMessage = `🤖 MegaPot Agent Help
+  const helpMessage = `MegaPot lottery assistant.
 
-I can help you with lottery tickets on Base network:
-
-🎫 Buying Tickets:
-• Use the action buttons below to buy 1, 5, or 10 tickets
-• I automatically handle USDC approval and purchase
-
-📊 Statistics:
+Commands:
+• "Buy Tickets" button - Purchase lottery tickets
+• "buy X tickets" - Direct purchase (e.g., "buy 5 tickets")
 • "Check Stats" - View your lottery history
-• See tickets purchased, spending, and winnings
-
-🎰 Jackpot Info:
 • "Jackpot Info" - View current round details
-• See jackpot amount, ticket price, and time remaining
-
-💰 Winnings:
 • "Claim Winnings" - Claim any lottery prizes
-• I check for available winnings and handle the claim process
 
-🌐 Mini App:
-• Visit https://megapot.io for enhanced features
-• Real-time updates and advanced lottery tools
-
-⚠️ Important: You need USDC on Base network (not Ethereum mainnet)!
-
-Choose an action below:`;
+Need USDC on Base network.`;
 
   await conversation.send(helpMessage);
   await sendMegaPotActions(conversation);
@@ -1202,18 +1211,10 @@ async function handleWelcomeMessage(ctx: any) {
       ctx.message?.senderInboxId,
     );
 
-    const welcomeMessage = `🎉 Welcome to the MegaPot Agent! 🎰
-
-I'm your lottery assistant on Base network. I can help you:
-• Purchase MegaPot lottery tickets with USDC
-• Check your lottery statistics and winnings
-• View current jackpot information
-• Claim lottery winnings when you win!
-
-Try the MegaPot Mini App for the full experience: https://megapot.io
+    const welcomeMessage = `MegaPot lottery assistant.
 
 Commands:
-• "buy 5 tickets" - Purchase lottery tickets
+• "buy X tickets" - Purchase lottery tickets (e.g., "buy 5 tickets")
 • "stats" - View your statistics
 • "jackpot" - View jackpot information
 • "claim" - Claim winnings
@@ -1234,7 +1235,7 @@ Commands:
         "Sorry, I encountered an error sending the welcome message. Please try again.",
       );
     } catch (sendError) {
-      console.error("❌ Failed to send error message:", sendError);
+      console.error("Error: send error message:", sendError);
     }
   }
 }
@@ -1271,7 +1272,7 @@ Good luck! 🍀 Your tickets are now entered into the current lottery round.`,
   } catch (error) {
     console.error("❌ Error purchasing tickets:", error);
     await ctx.conversation.send(
-      `❌ Failed to purchase tickets: ${error instanceof Error ? error.message : "Unknown error"}
+      `Error: purchase tickets: ${error instanceof Error ? error.message : "Unknown error"}
 
 Please try again or contact support if the issue persists.`,
     );
@@ -1310,7 +1311,7 @@ async function handleStatsRequest(ctx: any, megaPotManager: MegaPotManager) {
   } catch (error) {
     console.error("❌ Error fetching stats:", error);
     await ctx.conversation.send(
-      "❌ Failed to fetch your statistics. Please try again later.",
+      "Error: fetch your statistics. Please try again later.",
     );
   }
 }
@@ -1335,7 +1336,7 @@ Try the MegaPot Mini App for real-time updates: https://megapot.io`;
   } catch (error) {
     console.error("❌ Error fetching jackpot info:", error);
     await ctx.conversation.send(
-      "❌ Failed to fetch jackpot information. Please try again later.",
+      "Error: fetch jackpot information. Please try again later.",
     );
   }
 }
@@ -1364,7 +1365,7 @@ Your winnings have been transferred to your wallet. Check your balance to confir
   } catch (error) {
     console.error("❌ Error claiming winnings:", error);
     await ctx.conversation.send(
-      `❌ Failed to claim winnings: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `Error: claim winnings: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
   }
 }
@@ -1409,7 +1410,7 @@ async function handlePingRequest(ctx: any) {
     try {
       await ctx.conversation.send("error");
     } catch (sendError) {
-      console.error("❌ Failed to send error response:", sendError);
+      console.error("Error: send error response:", sendError);
     }
   }
 }
