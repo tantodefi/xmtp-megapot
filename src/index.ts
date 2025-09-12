@@ -36,11 +36,9 @@ const BASE_RPC_URL = process.env.BASE_RPC_URL || "https://sepolia.base.org";
 const ticketAmountRequests = new Map<string, boolean>();
 
 // MegaPot Contract Configuration
-const MEGAPOT_CONTRACT_ADDRESS = process.env
-  .MEGAPOT_CONTRACT_ADDRESS as string;
+const MEGAPOT_CONTRACT_ADDRESS = process.env.MEGAPOT_CONTRACT_ADDRESS as string;
 const MEGAPOT_USDC_ADDRESS = process.env.MEGAPOT_USDC_ADDRESS as string;
-const MEGAPOT_REFERRER_ADDRESS = process.env
-  .MEGAPOT_REFERRER_ADDRESS as string;
+const MEGAPOT_REFERRER_ADDRESS = process.env.MEGAPOT_REFERRER_ADDRESS as string;
 
 // Validate environment variables
 console.log("🔍 Checking environment variables...");
@@ -78,9 +76,9 @@ if (!MEGAPOT_REFERRER_ADDRESS) {
 
 // MegaPot contract configuration using environment variables
 const MEGAPOT_CONFIG = {
-  contractAddress: MEGAPOT_CONTRACT_ADDRESS,
-  usdcAddress: MEGAPOT_USDC_ADDRESS,
-  referrerAddress: MEGAPOT_REFERRER_ADDRESS,
+  contractAddress: MEGAPOT_CONTRACT_ADDRESS as `0x${string}`,
+  usdcAddress: MEGAPOT_USDC_ADDRESS as `0x${string}`,
+  referrerAddress: MEGAPOT_REFERRER_ADDRESS as `0x${string}`,
 };
 
 // Create a signer for XMTP
@@ -88,7 +86,7 @@ function createSigner(privateKey: string): Signer {
   console.log("🔧 Creating signer with private key...");
 
   try {
-    const account = privateKeyToAccount(privateKey);
+    const account = privateKeyToAccount(privateKey as `0x${string}`);
     console.log("✅ Account created:", account.address);
 
     const wallet = createWalletClient({
@@ -129,7 +127,7 @@ async function main() {
   // Initialize MegaPot manager with environment variables
   const megaPotManager = new MegaPotManager(
     BASE_RPC_URL,
-    WALLET_KEY,
+    WALLET_KEY as `0x${string}`,
     MEGAPOT_CONFIG,
   );
 
@@ -148,7 +146,7 @@ async function main() {
   // Use in-memory database for testing (simpler)
   console.log("💾 Using in-memory database for testing...");
 
-  const agent = await Agent.create(signer, {
+  const agent = await Agent.create(signer as any, {
     env: XMTP_ENV as "dev" | "production",
     dbPath: null, // Use in-memory database
     codecs: [
@@ -370,6 +368,7 @@ async function main() {
                     // Continue to regular command processing
                   } else {
                     const userAddress = userIdentifier.identifier;
+                    await handleTicketPurchaseIntent(
                       numTickets,
                       userAddress,
                       conversation,
@@ -657,12 +656,12 @@ async function handleTicketPurchaseStream(
     const walletSendCalls: WalletSendCallsParams = {
       version: "1.0",
       chainId: `0x${base.id.toString(16)}`,
-      from: userAddress,
+      from: userAddress as `0x${string}`,
       calls: [
         {
-          to: txData.approveCall.to,
-          data: txData.approveCall.data,
-          value: txData.approveCall.value,
+          to: txData.approveCall.to as `0x${string}`,
+          data: txData.approveCall.data as `0x${string}`,
+          value: txData.approveCall.value as `0x${string}`,
           gas: "0xC350", // ~50,000 gas for ERC20 approval
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
@@ -670,9 +669,9 @@ async function handleTicketPurchaseStream(
           },
         },
         {
-          to: txData.purchaseCall.to,
-          data: txData.purchaseCall.data,
-          value: txData.purchaseCall.value,
+          to: txData.purchaseCall.to as `0x${string}`,
+          data: txData.purchaseCall.data as `0x${string}`,
+          value: txData.purchaseCall.value as `0x${string}`,
           gas: "0x30D40", // ~200,000 gas for contract call
           metadata: {
             description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
@@ -999,12 +998,12 @@ async function handleTicketPurchaseIntent(
     const walletSendCalls: WalletSendCallsParams = {
       version: "1.0",
       chainId: `0x${base.id.toString(16)}`,
-      from: userAddress,
+      from: userAddress as `0x${string}`,
       calls: [
         {
-          to: txData.approveCall.to,
-          data: txData.approveCall.data,
-          value: txData.approveCall.value,
+          to: txData.approveCall.to as `0x${string}`,
+          data: txData.approveCall.data as `0x${string}`,
+          value: txData.approveCall.value as `0x${string}`,
           gas: "0xC350", // ~50,000 gas for ERC20 approval
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
@@ -1012,9 +1011,9 @@ async function handleTicketPurchaseIntent(
           },
         },
         {
-          to: txData.purchaseCall.to,
-          data: txData.purchaseCall.data,
-          value: txData.purchaseCall.value,
+          to: txData.purchaseCall.to as `0x${string}`,
+          data: txData.purchaseCall.data as `0x${string}`,
+          value: txData.purchaseCall.value as `0x${string}`,
           gas: "0x30D40", // ~200,000 gas for contract call
           metadata: {
             description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,

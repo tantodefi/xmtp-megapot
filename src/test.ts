@@ -46,7 +46,7 @@ async function testMegaPotAgent() {
 
   // Initialize MegaPot manager
   const network = XMTP_ENV === "production" ? "mainnet" : "testnet";
-  const configType = MEGAPOT_DATA_API_KEY?.startsWith("test") ? "test" : "prod";
+  const configType = "prod"; // Always use prod config for testing
 
   console.log(`📊 Testing with network: ${network} (${configType})`);
 

@@ -15,13 +15,18 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "echo 'No build step needed - tsx handles TypeScript at runtime' && exit 0",
+    "build": "tsc && echo '✅ TypeScript compilation successful'",
+    "build:check": "tsc --noEmit",
+    "build:clean": "rm -rf dist && tsc",
     "dev": "tsx --watch src/index.ts",
     "gen:keys": "tsx src/generateKeys.ts",
     "lint": "cd ../.. && yarn eslint examples/xmtp-megapot",
+    "predeploy": "npm run build && npm run lint",
     "revoke-installations": "node revoke-installations.js",
     "start": "tsx src/index.ts",
-    "test": "tsx src/test.ts"
+    "start:prod": "node dist/index.js",
+    "test": "tsx src/test.ts",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@xmtp/agent-sdk": "^0.0.9",

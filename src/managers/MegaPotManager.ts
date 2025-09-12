@@ -267,7 +267,7 @@ export class MegaPotManager {
     this.client = createPublicClient({
       chain: base,
       transport: http(rpcUrl),
-    });
+    } as any);
 
     const account = privateKeyToAccount(walletKey);
     try {
@@ -277,7 +277,7 @@ export class MegaPotManager {
         transport: http(rpcUrl),
       });
       console.log(
-        `✅ MegaPotManager wallet initialized with address: ${this.wallet.account.address}`,
+        `✅ MegaPotManager wallet initialized with address: ${this.wallet.account?.address}`,
       );
     } catch (walletError) {
       console.error(
@@ -493,7 +493,7 @@ export class MegaPotManager {
       } catch (error) {
         console.warn(
           "⚠️ ticketPrice() failed, trying getCurrentDraw() fallback:",
-          error.message,
+          error instanceof Error ? error.message : String(error),
         );
         // Try fallback to getCurrentDraw function
         try {
@@ -507,7 +507,9 @@ export class MegaPotManager {
         } catch (fallbackError) {
           console.error(
             "❌ Both ticket price functions failed:",
-            fallbackError.message,
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : String(fallbackError),
           );
           console.log("⚠️ Using reasonable fallback ticket price (1 USDC)");
           ticketPrice = 1000000n; // 1 USDC in 6 decimals
@@ -534,7 +536,7 @@ export class MegaPotManager {
       // First, approve USDC spending
       const usdcContract = getContract({
         address: usdcAddress,
-        abi: USDC_ABI,
+        abi: USDC_ABI as unknown as any[],
         client: this.client,
       });
 
@@ -542,12 +544,15 @@ export class MegaPotManager {
         `🔄 Approving USDC spending: ${totalCostUSDC.toString()} USDC`,
       );
 
-      const approveData = encodeFunctionDataCall([...USDC_ABI], "approve", [
-        contractAddress,
-        totalCostUSDC,
-      ]);
+      const approveData = encodeFunctionDataCall(
+        USDC_ABI as unknown as any[],
+        "approve",
+        [contractAddress, totalCostUSDC],
+      );
 
       const approveHash = await this.wallet.sendTransaction({
+        account: this.wallet.account!,
+        chain: base,
         to: usdcAddress,
         data: approveData,
       });
@@ -577,7 +582,7 @@ export class MegaPotManager {
         console.log(
           `   • Value: ${totalCostUSDC.toString()} (6 decimals) = $${(Number(totalCostUSDC) / 1000000).toFixed(2)}`,
         );
-        console.log(`   • Recipient: ${userAddress}`);
+        console.log(`   • Recipient: ${this.wallet.account!.address}`);
 
         const purchaseData = encodeFunctionDataCall(
           [...MEGAPOT_ABI],
@@ -585,11 +590,13 @@ export class MegaPotManager {
           [
             this.contractConfig.referrerAddress, // referrer address from env
             totalCostUSDC, // total amount in USDC (6 decimals)
-            userAddress, // recipient (user) address
+            this.wallet.account!.address, // recipient (user) address
           ],
         );
 
         const purchaseTx = await this.wallet.sendTransaction({
+          account: this.wallet.account!,
+          chain: base,
           to: contractAddress,
           data: purchaseData,
         });
@@ -691,7 +698,7 @@ export class MegaPotManager {
       } catch (error) {
         console.warn(
           "⚠️ ticketPrice() failed, trying getCurrentDraw() fallback:",
-          error.message,
+          error instanceof Error ? error.message : String(error),
         );
         // Try fallback to getCurrentDraw function
         try {
@@ -705,7 +712,9 @@ export class MegaPotManager {
         } catch (fallbackError) {
           console.error(
             "❌ Both ticket price functions failed:",
-            fallbackError.message,
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : String(fallbackError),
           );
           console.log("⚠️ Using reasonable fallback ticket price (1 USDC)");
           ticketPrice = 1000000n; // 1 USDC in 6 decimals
@@ -738,10 +747,11 @@ export class MegaPotManager {
         `🔄 Preparing USDC approval: ${totalCostUSDC.toString()} USDC`,
       );
 
-      const approveData = encodeFunctionDataCall([...USDC_ABI], "approve", [
-        contractAddress,
-        totalCostUSDC,
-      ]);
+      const approveData = encodeFunctionDataCall(
+        USDC_ABI as unknown as any[],
+        "approve",
+        [contractAddress, totalCostUSDC],
+      );
 
       const approveCall = {
         to: usdcAddress,
@@ -925,7 +935,7 @@ export class MegaPotManager {
 
               // Check if this is a group purchase (recipient is agent's address)
               const isGroupPurchase =
-                purchase.recipient === this.wallet.account.address;
+                purchase.recipient === this.wallet.account?.address;
 
               if (isGroupPurchase) {
                 userGroupTickets += tickets;
@@ -939,7 +949,7 @@ export class MegaPotManager {
                   cost: "0", // We'll calculate this when we have ticket price
                   purchaseDate: new Date(),
                   purchaserInboxId: "unknown", // We don't have inbox ID from API
-                  source: "api",
+                  source: "manual",
                 };
                 localGroupPurchases.push(groupPurchase);
               } else {
@@ -1015,7 +1025,7 @@ export class MegaPotManager {
 
                 // Update group purchase cost if this was a group purchase
                 const isGroupPurchase =
-                  purchase.recipient === this.wallet.account.address;
+                  purchase.recipient === this.wallet.account?.address;
                 if (isGroupPurchase) {
                   const groupPurchase = localGroupPurchases.find((gp) =>
                     gp.id.includes(
@@ -1079,6 +1089,8 @@ export class MegaPotManager {
             const combinedStats: MegaPotStats = {
               totalTicketsPurchased:
                 userTotalTickets || localStats?.totalTicketsPurchased || 0,
+              individualTicketsPurchased: userIndividualTickets,
+              groupTicketsPurchased: localStats?.groupTicketsPurchased || 0,
               totalSpent:
                 userTotalSpent > 0
                   ? userTotalSpent.toString()
@@ -1161,6 +1173,8 @@ export class MegaPotManager {
         const combinedStats: MegaPotStats = {
           totalTicketsPurchased:
             userTotalTickets || localStats.totalTicketsPurchased || 0,
+          individualTicketsPurchased: userIndividualTickets,
+          groupTicketsPurchased: localStats.groupTicketsPurchased || 0,
           totalSpent:
             userTotalSpent > 0
               ? userTotalSpent.toString()
@@ -1258,9 +1272,7 @@ export class MegaPotManager {
         client: this.client,
       });
 
-      const wins = await contract.read.getUserWins([
-        this.wallet.account.address,
-      ]);
+      const wins = await contract.read.getUserWins();
       let totalWinnings: bigint = BigInt(0);
 
       for (const win of wins) {
@@ -1314,12 +1326,14 @@ export class MegaPotManager {
 
       // First claim winnings from contract
       const claimData = encodeFunctionDataCall(
-        MEGAPOT_ABI,
+        MEGAPOT_ABI as unknown as any[],
         "withdrawWinnings",
         [],
       );
 
       const claimHash = await this.wallet.sendTransaction({
+        account: this.wallet.account!,
+        chain: base,
         to: contractAddress,
         data: claimData,
       });
@@ -1398,9 +1412,7 @@ export class MegaPotManager {
         client: this.client,
       });
 
-      const wins = await contract.read.getUserWins([
-        this.wallet.account.address,
-      ]);
+      const wins = await contract.read.getUserWins();
 
       let totalWinnings: bigint = BigInt(0);
       for (const win of wins) {
@@ -1463,12 +1475,15 @@ export class MegaPotManager {
       const amountUSDC = BigInt(Math.floor(parseFloat(amount) * 10 ** 6));
 
       // First approve USDC spending for LP deposit
-      const approveData = encodeFunctionDataCall(USDC_ABI, "approve", [
-        contractAddress,
-        amountUSDC,
-      ]);
+      const approveData = encodeFunctionDataCall(
+        USDC_ABI as unknown as any[],
+        "approve",
+        [contractAddress, amountUSDC],
+      );
 
       const approveHash = await this.wallet.sendTransaction({
+        account: this.wallet.account!,
+        chain: base,
         to: usdcAddress,
         data: approveData,
       });
@@ -1486,6 +1501,8 @@ export class MegaPotManager {
       );
 
       const depositHash = await this.wallet.sendTransaction({
+        account: this.wallet.account!,
+        chain: base,
         to: contractAddress,
         data: depositData,
       });
@@ -1514,6 +1531,8 @@ export class MegaPotManager {
       );
 
       const hash = await this.wallet.sendTransaction({
+        account: this.wallet.account!,
+        chain: base,
         to: contractAddress,
         data: withdrawData,
       });
