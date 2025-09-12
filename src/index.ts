@@ -695,11 +695,7 @@ async function handleTicketPurchaseStream(
     };
 
     await conversation.send(`${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
-
-✅ Ready to purchase! Open wallet to approve:
-1️⃣ USDC approval for $${totalCostUSDC.toFixed(2)}
-2️⃣ Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
-
+✅ Open wallet to approve transaction
 ⚠️ Need USDC on Base network. Good luck! 🍀🎰`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
@@ -1037,11 +1033,7 @@ async function handleTicketPurchaseIntent(
     };
 
     await conversation.send(`${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
-
-✅ Ready to purchase! Open wallet to approve:
-1️⃣ USDC approval for $${totalCostUSDC.toFixed(2)}
-2️⃣ Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
-
+✅ Open wallet to approve transaction
 ⚠️ Need USDC on Base network. Good luck! 🍀🎰`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
