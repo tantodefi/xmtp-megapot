@@ -375,7 +375,8 @@ async function main() {
                       megaPotManager,
                       agent,
                     );
-                    // Don't return - let regular commands still work
+                    // Return after successful ticket purchase - don't continue to other commands
+                    return;
                   }
                 }
               } catch (error) {

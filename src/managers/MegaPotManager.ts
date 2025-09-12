@@ -613,25 +613,9 @@ export class MegaPotManager {
 
       // Cost already calculated above
 
-      // Update stats
-      const stats = await this.getStats();
-      stats.totalTicketsPurchased += numTickets;
-      stats.totalSpent = (parseFloat(stats.totalSpent) + costInUSDC).toString();
-
-      // Save stats to file
-      try {
-        const statsPath = path.join(".data", "megapot-stats.json");
-
-        // Ensure .data directory exists
-        const dataDir = ".data";
-        if (!fs.existsSync(dataDir)) {
-          fs.mkdirSync(dataDir, { recursive: true });
-        }
-
-        fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2));
-      } catch (error) {
-        console.error("Error saving MegaPot stats:", error);
-      }
+      // Skip stats update for direct purchases to avoid unnecessary API calls
+      // Stats will be updated when explicitly requested by user
+      console.log(`✅ Ticket purchase completed successfully`);
 
       console.log(
         `🎫 Purchased ${numTickets} MegaPot tickets for ${costInUSDC.toFixed(2)} USDC`,
