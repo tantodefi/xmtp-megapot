@@ -369,8 +369,7 @@ async function main() {
                     );
                     // Continue to regular command processing
                   } else {
-                    const userAddress = userIdentifier.identifier as `0x${string>`;
-                    await handleTicketPurchaseIntent(
+                    const userAddress = userIdentifier.identifier;
                       numTickets,
                       userAddress,
                       conversation,
