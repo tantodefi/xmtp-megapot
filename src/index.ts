@@ -96,14 +96,11 @@ function createSigner(privateKey: `0x${string}`): Signer {
     console.log("✅ Wallet client created");
 
     const signer = {
-      type: "SCW" as const,
+      type: "EOA" as const,
       getIdentifier: () => ({
-        identifierKind: "ethereum" as any,
+        identifierKind: 0, // IdentifierKind.Ethereum
         identifier: account.address.toLowerCase(),
       }),
-      getChainId: () => {
-        return BigInt(base.id);
-      },
       signMessage: async (message: string) => {
         console.log("🔏 Signing message:", message.substring(0, 50) + "...");
         const signature = await wallet.signMessage({
@@ -520,7 +517,7 @@ async function handleTicketPurchaseStream(
     }
 
     const userIdentifier = inboxState[0].identifiers.find(
-      (id: any) => id.identifierKind === "ethereum",
+      (id: any) => id.identifierKind === 0, // IdentifierKind.Ethereum
     );
 
     if (!userIdentifier) {
@@ -660,7 +657,7 @@ async function handleStatsRequestStream(
 
       if (inboxState && inboxState[0]?.identifiers) {
         const userIdentifier = inboxState[0].identifiers.find(
-          (id: { identifierKind: string }) => id.identifierKind === "ethereum",
+          (id: any) => id.identifierKind === 0, // IdentifierKind.Ethereum
         );
 
         if (userIdentifier) {
@@ -846,7 +843,7 @@ async function handleIntentMessage(
     }
 
     const userIdentifier = inboxState[0].identifiers.find(
-      (id: any) => id.identifierKind === "ethereum",
+      (id: any) => id.identifierKind === 0, // IdentifierKind.Ethereum
     );
 
     if (!userIdentifier) {
