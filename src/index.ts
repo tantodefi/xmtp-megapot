@@ -26,7 +26,7 @@ import {
 } from "./types/IntentContent.js";
 
 // Environment variables
-const WALLET_KEY = process.env.WALLET_KEY as `0x${string}`;
+const WALLET_KEY = process.env.WALLET_KEY as string;
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 const XMTP_ENV = process.env.XMTP_ENV || "dev";
 const MEGAPOT_DATA_API_KEY = process.env.MEGAPOT_DATA_API_KEY;
@@ -37,10 +37,10 @@ const ticketAmountRequests = new Map<string, boolean>();
 
 // MegaPot Contract Configuration
 const MEGAPOT_CONTRACT_ADDRESS = process.env
-  .MEGAPOT_CONTRACT_ADDRESS as `0x${string}`;
-const MEGAPOT_USDC_ADDRESS = process.env.MEGAPOT_USDC_ADDRESS as `0x${string}`;
+  .MEGAPOT_CONTRACT_ADDRESS as string;
+const MEGAPOT_USDC_ADDRESS = process.env.MEGAPOT_USDC_ADDRESS as string;
 const MEGAPOT_REFERRER_ADDRESS = process.env
-  .MEGAPOT_REFERRER_ADDRESS as `0x${string}`;
+  .MEGAPOT_REFERRER_ADDRESS as string;
 
 // Validate environment variables
 console.log("🔍 Checking environment variables...");
@@ -84,7 +84,7 @@ const MEGAPOT_CONFIG = {
 };
 
 // Create a signer for XMTP
-function createSigner(privateKey: `0x${string}`): Signer {
+function createSigner(privateKey: string): Signer {
   console.log("🔧 Creating signer with private key...");
 
   try {
@@ -317,7 +317,7 @@ async function main() {
                     const userAddress = userIdentifier.identifier;
                     await handleTicketPurchaseIntent(
                       numTickets,
-                      userAddress as `0x${string}`,
+                      userAddress,
                       conversation,
                       megaPotManager,
                       agent,
@@ -634,7 +634,7 @@ async function handleTicketPurchaseStream(
     );
     const txData = await megaPotManager.prepareTicketPurchase(
       numTickets,
-      userAddress as `0x${string}`,
+      userAddress,
     );
 
     const totalCostUSDC = Number(txData.totalCostUSDC) / 1000000; // Convert from 6 decimals to readable USDC
@@ -662,8 +662,8 @@ async function handleTicketPurchaseStream(
       calls: [
         {
           to: txData.approveCall.to,
-          data: txData.approveCall.data as `0x${string}`,
-          value: txData.approveCall.value as `0x${string}`,
+          data: txData.approveCall.data,
+          value: txData.approveCall.value,
           gas: "0xC350", // ~50,000 gas for ERC20 approval
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
@@ -672,8 +672,8 @@ async function handleTicketPurchaseStream(
         },
         {
           to: txData.purchaseCall.to,
-          data: txData.purchaseCall.data as `0x${string}`,
-          value: txData.purchaseCall.value as `0x${string}`,
+          data: txData.purchaseCall.data,
+          value: txData.purchaseCall.value,
           gas: "0x30D40", // ~200,000 gas for contract call
           metadata: {
             description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
@@ -738,7 +738,7 @@ async function handleStatsRequestStream(
   try {
     // Get the user's Ethereum address from their inbox ID for API stats
     console.log(`🔍 Getting user address for stats: ${message.senderInboxId}`);
-    let userAddress: `0x${string}` | undefined;
+    let userAddress: string | undefined;
 
     try {
       const inboxState = await agent.client.preferences.inboxStateFromInboxIds([
@@ -948,7 +948,7 @@ async function handleIntentMessage(
         break;
       case "check-stats":
         await handleStatsIntent(
-          userAddress as `0x${string}`,
+          userAddress,
           conversation,
           megaPotManager,
           agent,
@@ -976,7 +976,7 @@ async function handleIntentMessage(
 
 async function handleTicketPurchaseIntent(
   numTickets: number,
-  userAddress: `0x${string}`,
+  userAddress: string,
   conversation: any,
   megaPotManager: MegaPotManager,
   agent: any,
@@ -989,7 +989,7 @@ async function handleTicketPurchaseIntent(
     // Prepare the ticket purchase transactions
     const txData = await megaPotManager.prepareTicketPurchase(
       numTickets,
-      userAddress as `0x${string}`,
+      userAddress,
     );
 
     const totalCostUSDC = Number(txData.totalCostUSDC) / 1000000; // Convert from 6 decimals to readable USDC
@@ -1004,8 +1004,8 @@ async function handleTicketPurchaseIntent(
       calls: [
         {
           to: txData.approveCall.to,
-          data: txData.approveCall.data as `0x${string}`,
-          value: txData.approveCall.value as `0x${string}`,
+          data: txData.approveCall.data,
+          value: txData.approveCall.value,
           gas: "0xC350", // ~50,000 gas for ERC20 approval
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
@@ -1014,8 +1014,8 @@ async function handleTicketPurchaseIntent(
         },
         {
           to: txData.purchaseCall.to,
-          data: txData.purchaseCall.data as `0x${string}`,
-          value: txData.purchaseCall.value as `0x${string}`,
+          data: txData.purchaseCall.data,
+          value: txData.purchaseCall.value,
           gas: "0x30D40", // ~200,000 gas for contract call
           metadata: {
             description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
@@ -1065,7 +1065,7 @@ async function handleTicketPurchaseIntent(
 }
 
 async function handleStatsIntent(
-  userAddress: `0x${string}`,
+  userAddress: string,
   conversation: any,
   megaPotManager: MegaPotManager,
   agent: any,

@@ -648,17 +648,17 @@ export class MegaPotManager {
    */
   async prepareTicketPurchase(
     numTickets: number,
-    userAddress: `0x${string}`,
+    userAddress: string,
   ): Promise<{
     approveCall: {
-      to: `0x${string}`;
-      data: `0x${string}`;
-      value: `0x${string}`;
+      to: string;
+      data: string;
+      value: string;
     };
     purchaseCall: {
-      to: `0x${string}`;
-      data: `0x${string}`;
-      value: `0x${string}`;
+      to: string;
+      data: string;
+      value: string;
     };
     totalCostUSDC: string;
     ticketPriceUSDC: string;
@@ -745,8 +745,8 @@ export class MegaPotManager {
 
       const approveCall = {
         to: usdcAddress,
-        data: approveData as `0x${string}`,
-        value: "0x0" as const,
+        data: approveData,
+        value: "0x0",
       };
 
       // Prepare MegaPot ticket purchase transaction
@@ -766,8 +766,8 @@ export class MegaPotManager {
 
       const purchaseCall = {
         to: contractAddress,
-        data: purchaseData as `0x${string}`,
-        value: "0x0" as const,
+        data: purchaseData,
+        value: "0x0",
       };
 
       const referenceId = `megapot_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
