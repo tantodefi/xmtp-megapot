@@ -287,51 +287,52 @@ async function main() {
 
             if (isNaN(numTickets) || numTickets < 1 || numTickets > 100) {
               await conversation.send(
-                "Sorry, that's not a valid number. Please enter a number between 1 and 100.",
+                "❌ Sorry, that's not a valid number. Please enter a number between 1 and 100.",
               );
-              return;
-            }
+              // Continue to regular command processing instead of returning
+            } else {
+              // Get user's address and process purchase
+              try {
+                const inboxState =
+                  await agent.client.preferences.inboxStateFromInboxIds([
+                    message.senderInboxId,
+                  ]);
 
-            // Get user's address and process purchase
-            try {
-              const inboxState =
-                await agent.client.preferences.inboxStateFromInboxIds([
-                  message.senderInboxId,
-                ]);
+                if (!inboxState || !inboxState[0]?.identifiers) {
+                  await conversation.send(
+                    "❌ Could not retrieve your wallet address. Please try again.",
+                  );
+                  // Continue to regular command processing
+                } else {
+                  const userIdentifier = inboxState[0].identifiers.find(
+                    (id: any) => id.identifierKind === 0,
+                  );
 
-              if (!inboxState || !inboxState[0]?.identifiers) {
+                  if (!userIdentifier) {
+                    await conversation.send(
+                      "❌ Could not find your wallet address. Please try again.",
+                    );
+                    // Continue to regular command processing
+                  } else {
+                    const userAddress = userIdentifier.identifier as `0x${string}`;
+                    await handleTicketPurchaseIntent(
+                      numTickets,
+                      userAddress,
+                      conversation,
+                      megaPotManager,
+                      agent,
+                    );
+                    // Don't return here - let regular commands still work
+                  }
+                }
+              } catch (error) {
+                console.error("❌ Error processing ticket amount:", error);
                 await conversation.send(
-                  "Could not retrieve your wallet address. Please try again.",
+                  "❌ Error processing your request. Please try again.",
                 );
-                return;
+                // Continue to regular command processing
               }
-
-              const userIdentifier = inboxState[0].identifiers.find(
-                (id: any) => id.identifierKind === 0,
-              );
-
-              if (!userIdentifier) {
-                await conversation.send(
-                  "Could not find your wallet address. Please try again.",
-                );
-                return;
-              }
-
-              const userAddress = userIdentifier.identifier as `0x${string}`;
-              await handleTicketPurchaseIntent(
-                numTickets,
-                userAddress,
-                conversation,
-                megaPotManager,
-                agent,
-              );
-            } catch (error) {
-              console.error("❌ Error processing ticket amount:", error);
-              await conversation.send(
-                "Error processing your request. Please try again.",
-              );
             }
-            return; // Exit early, don't process as regular command
           }
 
           // Check for direct ticket purchase commands (e.g., "buy 5 tickets", "@megapot buy 10 tickets")
@@ -341,54 +342,55 @@ async function main() {
 
             if (numTickets < 1 || numTickets > 100) {
               await conversation.send(
-                "Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
+                "❌ Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
               );
-              return;
-            }
+              // Continue to regular command processing
+            } else {
+              // Get user's address and process purchase directly
+              try {
+                const inboxState =
+                  await agent.client.preferences.inboxStateFromInboxIds([
+                    message.senderInboxId,
+                  ]);
 
-            // Get user's address and process purchase directly
-            try {
-              const inboxState =
-                await agent.client.preferences.inboxStateFromInboxIds([
-                  message.senderInboxId,
-                ]);
+                if (!inboxState || !inboxState[0]?.identifiers) {
+                  await conversation.send(
+                    "❌ Could not retrieve your wallet address. Please try again.",
+                  );
+                  // Continue to regular command processing
+                } else {
+                  const userIdentifier = inboxState[0].identifiers.find(
+                    (id: any) => id.identifierKind === 0,
+                  );
 
-              if (!inboxState || !inboxState[0]?.identifiers) {
-                await conversation.send(
-                  "Could not retrieve your wallet address. Please try again.",
+                  if (!userIdentifier) {
+                    await conversation.send(
+                      "❌ Could not find your wallet address. Please try again.",
+                    );
+                    // Continue to regular command processing
+                  } else {
+                    const userAddress = userIdentifier.identifier as `0x${string>`;
+                    await handleTicketPurchaseIntent(
+                      numTickets,
+                      userAddress,
+                      conversation,
+                      megaPotManager,
+                      agent,
+                    );
+                    // Don't return - let regular commands still work
+                  }
+                }
+              } catch (error) {
+                console.error(
+                  "❌ Error processing direct ticket purchase:",
+                  error,
                 );
-                return;
-              }
-
-              const userIdentifier = inboxState[0].identifiers.find(
-                (id: any) => id.identifierKind === 0,
-              );
-
-              if (!userIdentifier) {
                 await conversation.send(
-                  "Could not find your wallet address. Please try again.",
+                  "❌ Error processing your request. Please try again.",
                 );
-                return;
+                // Continue to regular command processing
               }
-
-              const userAddress = userIdentifier.identifier as `0x${string}`;
-              await handleTicketPurchaseIntent(
-                numTickets,
-                userAddress,
-                conversation,
-                megaPotManager,
-                agent,
-              );
-            } catch (error) {
-              console.error(
-                "❌ Error processing direct ticket purchase:",
-                error,
-              );
-              await conversation.send(
-                "Error processing your request. Please try again.",
-              );
             }
-            return; // Exit early, don't process as regular command
           }
 
           // Handle specific commands
@@ -556,7 +558,7 @@ async function handleWelcomeMessageStream(message: any, conversation: any) {
 
     // Send welcome message
     await conversation.send(
-      "MegaPot lottery assistant. Choose an action below:",
+      "🎉 Welcome to MegaPot! 🎰 Your lottery assistant. Choose an action below:",
     );
 
     // Send inline action buttons
@@ -594,7 +596,7 @@ async function handleTicketPurchaseStream(
 
     if (numTickets < 1 || numTickets > 100) {
       await conversation.send(
-        "Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
+        "❌ Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
       );
       return;
     }
@@ -686,11 +688,11 @@ async function handleTicketPurchaseStream(
 
     await conversation.send(`${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
 
-Ready to purchase. Open wallet to approve:
-1. USDC approval for $${totalCostUSDC.toFixed(2)}
-2. Buy ${numTickets} ticket${numTickets > 1 ? "s" : ""}
+✅ Ready to purchase! Open wallet to approve:
+1️⃣ USDC approval for $${totalCostUSDC.toFixed(2)}
+2️⃣ Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
 
-Need USDC on Base network.`);
+⚠️ Need USDC on Base network. Good luck! 🍀🎰`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
     await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
@@ -759,12 +761,12 @@ async function handleStatsRequestStream(
 
     const stats = await megaPotManager.getStats(userAddress);
 
-    let statsMessage = `Your stats:
-Tickets: ${stats.totalTicketsPurchased}
-Spent: ${megaPotManager.formatAmount(stats.totalSpent)}
-Won: ${megaPotManager.formatAmount(stats.totalWinnings)}
+    let statsMessage = `📊 Your MegaPot Stats:
+🎫 Tickets purchased: ${stats.totalTicketsPurchased}
+💵 Total spent: ${megaPotManager.formatAmount(stats.totalSpent)}
+🎉 Total won: ${megaPotManager.formatAmount(stats.totalWinnings)}
 
-Current round: $${stats.jackpotPool || "0"} jackpot`;
+🎰 Current jackpot: $${stats.jackpotPool || "0"}`;
 
     if (stats.userOdds) {
       statsMessage += `\nYour Odds: 1 in ${stats.userOdds}`;
@@ -794,12 +796,15 @@ async function handleJackpotInfoStream(
   try {
     const stats = await megaPotManager.getStats();
 
-    const jackpotMessage = `Jackpot: $${stats.jackpotPool || "0"}
-Price: $${stats.ticketPrice || "1"}
-Sold: ${stats.ticketsSoldRound || 0}
-Players: ${stats.activePlayers || 0}
+    const jackpotMessage = `🎰 Current MegaPot Jackpot:
+💰 Jackpot pool: $${stats.jackpotPool || "0"}
+🎫 Ticket price: $${stats.ticketPrice || "1"}
+📈 Tickets sold: ${stats.ticketsSoldRound || 0}
+👥 Active players: ${stats.activePlayers || 0}
 
-${stats.isActive ? "Active round" : "Round ended"}`;
+${stats.isActive ? "✅ Round is active!" : "❌ Round has ended"}
+
+🌐 Full experience: https://megapot.io`;
 
     await conversation.send(jackpotMessage);
   } catch (error) {
@@ -1025,11 +1030,11 @@ async function handleTicketPurchaseIntent(
 
     await conversation.send(`${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
 
-Ready to purchase. Open wallet to approve:
-1. USDC approval for $${totalCostUSDC.toFixed(2)}
-2. Buy ${numTickets} ticket${numTickets > 1 ? "s" : ""}
+✅ Ready to purchase! Open wallet to approve:
+1️⃣ USDC approval for $${totalCostUSDC.toFixed(2)}
+2️⃣ Buy ${numTickets} lottery ticket${numTickets > 1 ? "s" : ""}
 
-Need USDC on Base network.`);
+⚠️ Need USDC on Base network. Good luck! 🍀🎰`);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
     await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
@@ -1068,12 +1073,12 @@ async function handleStatsIntent(
   try {
     const stats = await megaPotManager.getStats(userAddress);
 
-    let statsMessage = `Your stats:
-Tickets: ${stats.totalTicketsPurchased}
-Spent: ${megaPotManager.formatAmount(stats.totalSpent)}
-Won: ${megaPotManager.formatAmount(stats.totalWinnings)}
+    let statsMessage = `📊 Your MegaPot Stats:
+🎫 Tickets purchased: ${stats.totalTicketsPurchased}
+💵 Total spent: ${megaPotManager.formatAmount(stats.totalSpent)}
+🎉 Total won: ${megaPotManager.formatAmount(stats.totalWinnings)}
 
-Current round: $${stats.jackpotPool || "0"} jackpot`;
+🎰 Current jackpot: $${stats.jackpotPool || "0"}`;
 
     if (stats.userOdds) {
       statsMessage += `\nYour Odds: 1 in ${stats.userOdds}`;
@@ -1102,12 +1107,15 @@ async function handleJackpotInfoIntent(
   try {
     const stats = await megaPotManager.getStats();
 
-    const jackpotMessage = `Jackpot: $${stats.jackpotPool || "0"}
-Price: $${stats.ticketPrice || "1"}
-Sold: ${stats.ticketsSoldRound || 0}
-Players: ${stats.activePlayers || 0}
+    const jackpotMessage = `🎰 Current MegaPot Jackpot:
+💰 Jackpot pool: $${stats.jackpotPool || "0"}
+🎫 Ticket price: $${stats.ticketPrice || "1"}
+📈 Tickets sold: ${stats.ticketsSoldRound || 0}
+👥 Active players: ${stats.activePlayers || 0}
 
-${stats.isActive ? "Active round" : "Round ended"}`;
+${stats.isActive ? "✅ Round is active!" : "❌ Round has ended"}
+
+🌐 Full experience: https://megapot.io`;
 
     await conversation.send(jackpotMessage);
   } catch (error) {
@@ -1153,31 +1161,31 @@ Your winnings have been transferred to your wallet. Check your balance to confir
 async function sendMegaPotActions(conversation: any) {
   const actionsContent: ActionsContent = {
     id: `megapot-actions-${Date.now()}`,
-    description: "MegaPot lottery assistant. Choose an action:",
+    description: "🎰 MegaPot lottery assistant. Choose an action:",
     actions: [
       {
         id: "buy-tickets",
-        label: "Buy Tickets",
+        label: "🎫 Buy Tickets",
         style: "primary",
       },
       {
         id: "check-stats",
-        label: "Check Stats",
+        label: "📊 Check Stats",
         style: "secondary",
       },
       {
         id: "jackpot-info",
-        label: "Jackpot Info",
+        label: "🎰 Jackpot Info",
         style: "secondary",
       },
       {
         id: "claim-winnings",
-        label: "Claim Winnings",
+        label: "💰 Claim Winnings",
         style: "primary",
       },
       {
         id: "show-help",
-        label: "Help",
+        label: "❓ Help",
         style: "secondary",
       },
     ],
@@ -1188,16 +1196,19 @@ async function sendMegaPotActions(conversation: any) {
 }
 
 async function handleHelpIntent(conversation: any) {
-  const helpMessage = `MegaPot lottery assistant.
+  const helpMessage = `🤖 MegaPot Lottery Assistant
+
+🎰 Your AI-powered lottery companion on Base network!
 
 Commands:
-• "Buy Tickets" button - Purchase lottery tickets
-• "buy X tickets" - Direct purchase (e.g., "buy 5 tickets")
-• "Check Stats" - View your lottery history
-• "Jackpot Info" - View current round details
-• "Claim Winnings" - Claim any lottery prizes
+• 🎫 "Buy Tickets" button - Interactive ticket purchase
+• 🎫 "buy X tickets" - Quick purchase (e.g., "buy 5 tickets")
+• 📊 "Check Stats" - View your lottery history & winnings
+• 🎰 "Jackpot Info" - Current round details & prize pool
+• 💰 "Claim Winnings" - Collect any lottery prizes
 
-Need USDC on Base network.`;
+🌐 Full experience: https://megapot.io
+⚠️ Need USDC on Base network for purchases`;
 
   await conversation.send(helpMessage);
   await sendMegaPotActions(conversation);
@@ -1211,14 +1222,18 @@ async function handleWelcomeMessage(ctx: any) {
       ctx.message?.senderInboxId,
     );
 
-    const welcomeMessage = `MegaPot lottery assistant.
+    const welcomeMessage = `🎉 Welcome to MegaPot! 🎰
+
+Your lottery assistant on Base network. Try the full experience at: https://megapot.io
 
 Commands:
 • "buy X tickets" - Purchase lottery tickets (e.g., "buy 5 tickets")
-• "stats" - View your statistics
-• "jackpot" - View jackpot information
-• "claim" - Claim winnings
-• "help" - Show this help`;
+• "stats" - View your lottery statistics
+• "jackpot" - Check current jackpot info
+• "claim" - Claim any winnings
+• "help" - Show this help
+
+⚠️ Need USDC on Base network for purchases`;
 
     console.log("📤 Sending welcome message...");
     await ctx.conversation.send(welcomeMessage);
@@ -1249,7 +1264,7 @@ async function handleTicketPurchase(ctx: any, megaPotManager: MegaPotManager) {
 
     if (numTickets < 1 || numTickets > 100) {
       await ctx.conversation.send(
-        "Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
+        "❌ Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
       );
       return;
     }
