@@ -409,8 +409,12 @@ async function main() {
                       megaPotManager,
                       agent,
                     );
-                    // Return after successful ticket purchase - don't continue to other commands
-                    return;
+                    console.log(
+                      `✅ Ticket purchase processed successfully, continuing to next message`,
+                    );
+                    // IMPORTANT: Use 'continue' not 'return' here to avoid breaking the message processing loop
+                    // 'return' would exit the entire message stream, 'continue' moves to next message
+                    continue;
                   }
                 }
               } catch (error) {
@@ -515,6 +519,13 @@ async function main() {
           }
         } catch (error) {
           console.error("❌ Error processing message:", error);
+          console.error("❌ Message details:", {
+            senderInboxId: message.senderInboxId,
+            conversationId: message.conversationId,
+            contentType: message.contentType?.typeId,
+            content: message.content,
+          });
+          // Continue processing other messages even if one fails
         }
       }
     })().catch((error) => {
@@ -719,6 +730,17 @@ async function handleTicketPurchaseStream(
       version: "1.0",
       chainId: `0x${base.id.toString(16)}`,
       from: userAddress as `0x${string}`,
+      // Custom branding for MegaPot
+      capabilities: {
+        reference: txData.referenceId,
+        // Custom wallet interface branding
+        branding: {
+          name: "MegaPot",
+          icon: "/favicon.ico",
+          domain: "megapot.io",
+          description: "MegaPot Lottery Assistant",
+        },
+      },
       calls: [
         {
           to: txData.approveCall.to as `0x${string}`,
@@ -728,6 +750,10 @@ async function handleTicketPurchaseStream(
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
             transactionType: "erc20_approve",
+            // MegaPot branding
+            appName: "MegaPot",
+            appIcon: "/favicon.ico",
+            appDomain: "megapot.io",
           },
         },
         {
@@ -738,12 +764,13 @@ async function handleTicketPurchaseStream(
           metadata: {
             description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
             transactionType: "purchase_tickets",
+            // MegaPot branding
+            appName: "MegaPot",
+            appIcon: "/favicon.ico",
+            appDomain: "megapot.io",
           },
         },
       ],
-      capabilities: {
-        reference: txData.referenceId,
-      },
     };
 
     await conversation.send(`${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
@@ -1062,6 +1089,17 @@ async function handleTicketPurchaseIntent(
       version: "1.0",
       chainId: `0x${base.id.toString(16)}`,
       from: userAddress as `0x${string}`,
+      // Custom branding for MegaPot
+      capabilities: {
+        reference: txData.referenceId,
+        // Custom wallet interface branding
+        branding: {
+          name: "MegaPot",
+          icon: "/favicon.ico",
+          domain: "megapot.io",
+          description: "MegaPot Lottery Assistant",
+        },
+      },
       calls: [
         {
           to: txData.approveCall.to as `0x${string}`,
@@ -1071,6 +1109,10 @@ async function handleTicketPurchaseIntent(
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
             transactionType: "erc20_approve",
+            // MegaPot branding
+            appName: "MegaPot",
+            appIcon: "/favicon.ico",
+            appDomain: "megapot.io",
           },
         },
         {
@@ -1081,12 +1123,13 @@ async function handleTicketPurchaseIntent(
           metadata: {
             description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
             transactionType: "purchase_tickets",
+            // MegaPot branding
+            appName: "MegaPot",
+            appIcon: "/favicon.ico",
+            appDomain: "megapot.io",
           },
         },
       ],
-      capabilities: {
-        reference: txData.referenceId,
-      },
     };
 
     await conversation.send(`${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}
