@@ -256,11 +256,22 @@ async function main() {
             conversation instanceof Group ? "group" : "dm";
           const isGroupChat = conversation instanceof Group;
 
-          // Check for @megapot mentions (including variants)
+          // Check for @megapot mentions (including variants and wallet addresses)
           const hasMention =
             lowerContent.includes("@megapot") ||
             lowerContent.includes("@megapot.base.eth") ||
-            lowerContent.includes("@megapot.eth");
+            lowerContent.includes("@megapot.eth") ||
+            lowerContent.includes("@0x") ||
+            /@\w+\.\.\./.test(lowerContent); // Match @ followed by truncated address
+
+          console.log(
+            `📍 Conversation type: ${conversationType}, Message: "${content}"`,
+          );
+          if (isGroupChat) {
+            console.log(`👥 Group chat detected, hasMention: ${hasMention}`);
+          } else {
+            console.log(`💬 DM detected - will respond to all messages`);
+          }
 
           // Send money bag reaction to ALL messages
           try {
@@ -333,12 +344,35 @@ async function main() {
             }
           }
 
-          // Check for direct ticket purchase commands (e.g., "buy 5 tickets", "@megapot buy 10 tickets")
-          const buyTicketMatch = lowerContent.match(/buy\s+(\d+)\s+tickets?/i);
-          if (buyTicketMatch) {
-            const numTickets = parseInt(buyTicketMatch[1]);
+          // Check for direct ticket purchase commands with better validation
+          // Handle both numeric and word-based numbers
+          const buyTicketMatch = lowerContent.match(
+            /buy\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+tickets?/i,
+          );
+          const buyTicketNoNumberMatch = lowerContent.match(
+            /buy\s+(me\s+)?a?\s+ticket/i,
+          );
+          const purchaseTicketMatch = lowerContent.match(
+            /(purchase|get|want)\s+(me\s+)?a?\s+ticket/i,
+          );
 
-            if (numTickets < 1 || numTickets > 100) {
+          if (buyTicketNoNumberMatch || purchaseTicketMatch) {
+            // Handle cases like "buy me a ticket", "buy a ticket", "purchase a ticket", etc.
+            await conversation.send(
+              "🎫 Please specify how many tickets you'd like to buy!\n\n" +
+                "Examples:\n" +
+                "• 'buy 1 ticket'\n" +
+                "• 'buy 5 tickets'\n" +
+                "• 'buy ten tickets'\n" +
+                "• Or use the 'Buy Tickets' button for interactive purchase",
+            );
+            continue;
+          }
+
+          if (buyTicketMatch) {
+            const numTickets = parseTicketNumber(buyTicketMatch[1]);
+
+            if (!numTickets || numTickets < 1 || numTickets > 100) {
               await conversation.send(
                 "❌ Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
               );
@@ -462,6 +496,12 @@ async function main() {
               await handleMiniAppRequestStream(message, conversation);
             } else {
               console.log("📝 Message handled (no specific command matched)");
+              // In DMs, respond to unrecognized messages with help
+              if (!isGroupChat) {
+                await conversation.send(
+                  "🤖 Hi! I'm MegaPot, your lottery assistant. Try 'help' to see available commands, or 'buy X tickets' to purchase lottery tickets!",
+                );
+              }
             }
           } catch (handlerError) {
             console.error("❌ Error in message handler:", handlerError);
@@ -598,12 +638,23 @@ async function handleTicketPurchaseStream(
   agent: any,
 ) {
   try {
-    // Extract number of tickets from message
+    // Extract number of tickets from message with improved validation
     const content = message.content as string;
-    const ticketMatch = content.match(/(\d+)/);
-    const numTickets = ticketMatch ? parseInt(ticketMatch[1]) : 1;
+    const numTickets = parseTicketNumber(content);
 
-    if (numTickets < 1 || numTickets > 100) {
+    if (!numTickets) {
+      // No number found, prompt user for clarification
+      await conversation.send(
+        "🎫 I didn't see a number in your message!\n\n" +
+          "Please specify how many tickets you'd like:\n" +
+          "• Reply with just a number (e.g., '5')\n" +
+          "• Or say 'buy X tickets' (e.g., 'buy 5 tickets')\n" +
+          "• Or use the 'Buy Tickets' button",
+      );
+      return;
+    }
+
+    if (isNaN(numTickets) || numTickets < 1 || numTickets > 100) {
       await conversation.send(
         "❌ Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
       );
@@ -809,7 +860,7 @@ async function handleJackpotInfoStream(
 
 ${stats.isActive ? "✅ Round is active!" : "❌ Round has ended"}
 
-🌐 Full experience: https://megapot.io`;
+🌐 Full experience: https://frame.megapot.io`;
 
     await conversation.send(jackpotMessage);
   } catch (error) {
@@ -875,7 +926,7 @@ I can help you with lottery tickets on Base network:
 • I check for available winnings and handle the claim process
 
 🌐 Mini App:
-• Visit https://megapot.io for enhanced features
+• Visit https://frame.megapot.io for enhanced features
 • Real-time updates and advanced lottery tools
 
 ⚠️ Important: You need USDC on Base network (not Ethereum mainnet)!
@@ -893,7 +944,7 @@ async function handleMiniAppRequestStream(message: any, conversation: any) {
 
 You can access the MegaPot lottery directly through our mini app:
 
-https://megapot.io
+https://frame.megapot.io
 
 The mini app allows you:
 • View live lottery draws
@@ -964,6 +1015,11 @@ async function handleIntentMessage(
         break;
       case "claim-winnings":
         await handleClaimIntent(conversation, megaPotManager);
+        break;
+      case "view-past-results":
+        await conversation.send(
+          "📈 View past lottery results: https://stats.megapot.io",
+        );
         break;
       case "show-help":
         await handleHelpIntent(conversation);
@@ -1113,10 +1169,11 @@ async function handleJackpotInfoIntent(
 🎫 Ticket price: $${stats.ticketPrice || "1"}
 📈 Tickets sold: ${stats.ticketsSoldRound || 0}
 👥 Active players: ${stats.activePlayers || 0}
+📊 Total drawings since 2024: $170,000,000
 
 ${stats.isActive ? "✅ Round is active!" : "❌ Round has ended"}
 
-🌐 Full experience: https://megapot.io`;
+🌐 Full experience: https://frame.megapot.io`;
 
     await conversation.send(jackpotMessage);
   } catch (error) {
@@ -1171,7 +1228,7 @@ async function sendMegaPotActions(conversation: any) {
       },
       {
         id: "check-stats",
-        label: "📊 Check Stats",
+        label: "📊 My Tickets",
         style: "secondary",
       },
       {
@@ -1183,6 +1240,11 @@ async function sendMegaPotActions(conversation: any) {
         id: "claim-winnings",
         label: "💰 Claim Winnings",
         style: "primary",
+      },
+      {
+        id: "view-past-results",
+        label: "📈 View Past Results",
+        style: "secondary",
       },
       {
         id: "show-help",
@@ -1208,16 +1270,55 @@ async function handleHelpIntent(conversation: any) {
 
 Commands:
 • 🎫 "Buy Tickets" button - Interactive ticket purchase
-• 🎫 "buy X tickets" - Quick purchase (e.g., "buy 5 tickets")
-• 📊 "Check Stats" - View your lottery history & winnings
+• 🎫 "buy X tickets" - Quick purchase (e.g., "buy 5 tickets", "buy ten tickets")
+• 📊 "My Tickets" - View your lottery history & winnings
 • 🎰 "Jackpot Info" - Current round details & prize pool
+• 📈 "View Past Results" - See historical lottery results
 • 💰 "Claim Winnings" - Collect any lottery prizes
 
-🌐 Full experience: https://megapot.io
+Ticket Purchase Examples:
+• "buy 1 ticket" or "buy one ticket"
+• "buy 10 tickets" or "buy ten tickets"
+• "buy 25 tickets" (max 100)
+
+🌐 Full experience: https://frame.megapot.io
 ⚠️ Need USDC on Base network for purchases${mentionNote}`;
 
   await conversation.send(helpMessage);
   await sendMegaPotActions(conversation);
+}
+
+// Helper function to convert word numbers to digits
+function convertWordToNumber(word: string): number | null {
+  const wordToNumber: { [key: string]: number } = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+  };
+  return wordToNumber[word.toLowerCase()] || null;
+}
+
+// Helper function to parse ticket numbers from text with validation
+function parseTicketNumber(text: string): number | null {
+  const ticketMatch = text.match(
+    /(\d+|one|two|three|four|five|six|seven|eight|nine|ten)/i,
+  );
+  if (!ticketMatch) return null;
+
+  const ticketInput = ticketMatch[1].toLowerCase();
+  const wordNumber = convertWordToNumber(ticketInput);
+
+  if (wordNumber !== null) return wordNumber;
+
+  const parsedNumber = parseInt(ticketInput);
+  return isNaN(parsedNumber) ? null : parsedNumber;
 }
 
 // Message handler functions
@@ -1230,7 +1331,7 @@ async function handleWelcomeMessage(ctx: any) {
 
     const welcomeMessage = `🎉 Welcome to MegaPot! 🎰
 
-Your lottery assistant on Base network. Try the full experience at: https://megapot.io
+Your lottery assistant on Base network. Try the full experience at: https://frame.megapot.io
 
 Commands:
 • "buy X tickets" - Purchase lottery tickets (e.g., "buy 5 tickets")
@@ -1263,12 +1364,23 @@ Commands:
 
 async function handleTicketPurchase(ctx: any, megaPotManager: MegaPotManager) {
   try {
-    // Extract number of tickets from message
+    // Extract number of tickets from message with improved validation
     const content = ctx.message.content as string;
-    const ticketMatch = content.match(/(\d+)/);
-    const numTickets = ticketMatch ? parseInt(ticketMatch[1]) : 1;
+    const numTickets = parseTicketNumber(content);
 
-    if (numTickets < 1 || numTickets > 100) {
+    if (!numTickets) {
+      // No number found, prompt user for clarification
+      await ctx.conversation.send(
+        "🎫 I didn't see a number in your message!\n\n" +
+          "Please specify how many tickets you'd like:\n" +
+          "• Reply with just a number (e.g., '5')\n" +
+          "• Or say 'buy X tickets' (e.g., 'buy 5 tickets')\n" +
+          "• Or use the 'Buy Tickets' button",
+      );
+      return;
+    }
+
+    if (isNaN(numTickets) || numTickets < 1 || numTickets > 100) {
       await ctx.conversation.send(
         "❌ Please specify a valid number of tickets (1-100). For example: 'buy 5 tickets'",
       );
@@ -1351,7 +1463,7 @@ async function handleJackpotInfo(ctx: any, megaPotManager: MegaPotManager) {
 ${stats.endTime ? `⏰ Round ends: ${stats.endTime.toLocaleString()}` : ""}
 ${stats.isActive ? "✅ Round is active" : "⏸️ Round is not active"}
 
-Try the MegaPot Mini App for real-time updates: https://megapot.io`;
+Try the MegaPot Mini App for real-time updates: https://frame.megapot.io`;
 
     await ctx.conversation.send(jackpotMessage);
   } catch (error) {
@@ -1413,7 +1525,7 @@ I can help you with lottery tickets on Base network:
 • I check for available winnings and handle the claim process
 
 🚀 Mini App:
-• Visit https://megapot.io for enhanced features
+• Visit https://frame.megapot.io for enhanced features
 • Real-time updates and advanced lottery tools
 
 What would you like to do?`;
@@ -1438,7 +1550,7 @@ async function handlePingRequest(ctx: any) {
 
 async function handleMiniAppRequest(ctx: any) {
   await ctx.conversation.send(
-    `🎰 Launching MegaPot Mini App: https://megapot.io
+    `🎰 Launching MegaPot Mini App: https://frame.megapot.io
 
 This will open the full MegaPot experience where you can:
 • View live jackpot amounts
