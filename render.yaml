@@ -27,3 +27,4 @@ services:
     # Environment variables that need to be set in Render dashboard:
     # WALLET_KEY - Agent's private key
     # ENCRYPTION_KEY - XMTP database encryption key
+

@@ -1,31 +1,46 @@
-# XMTP MegaPot Agent
+# XMTP Smart MegaPot Agent
 
-A specialized XMTP agent for purchasing MegaPot lottery tickets on Base network with USDC payments. This agent uses proper transaction delegation where users execute transactions directly from their wallets.
+An AI-powered XMTP agent for MegaPot lottery with natural language understanding, contextual responses, and group pooled ticket purchases. This smart agent uses OpenAI GPT for intelligent message parsing and provides enhanced lottery experiences on Base network.
 
-## Features
+## 🤖 Smart Features
 
-🎰 **Lottery Ticket Purchasing**
-- Buy MegaPot tickets with USDC (users execute transactions)
-- Real-time jackpot information
-- Two-step transaction flow: USDC approval + ticket purchase
-- Referrer system integration
+**AI-Powered Message Understanding**
+- Natural language processing with OpenAI GPT-4o-mini
+- Context-aware responses using real-time lottery data
+- Intent recognition for ticket purchases, stats, help, and more
+- Conversational interface - ask questions naturally!
 
-📊 **Statistics & Analytics**
-- Track your lottery purchases
-- View winnings history
-- Real-time odds calculation
-- API integration for enhanced stats
+**Enhanced Data Integration**
+- Real-time lottery statistics from MegaPot API
+- All-time jackpot data ($179M+ total jackpots!)
+- Contextual responses with current jackpot and ticket info
+- Smart recommendations based on user history
 
-🎯 **Interactive Experience**
-- Inline transaction buttons using WalletSendCalls
-- Mini app integration at https://megapot.io
+**Group Chat Features**
+- Pooled ticket purchases in XMTP group chats
+- Collaborative lottery ticket buying with friends
+- Automatic contribution tracking and execution
+- Fair cost sharing and collective ownership
+
+## 🎰 Core Features
+
+**Smart Lottery Ticket Purchasing**
+- "I want to buy 5 lottery tickets" → AI understands and processes
+- USDC payments on Base network (user-executed transactions)
+- Real-time jackpot and pricing information
+- Referrer system integration with automatic rewards
+
+**Intelligent Statistics & Analytics**
+- "Show me my lottery stats" → Contextual response with your data
+- Track purchases, winnings, and odds
+- All-time platform statistics integration
+- Smart recommendations and insights
+
+**Interactive Experience**
+- Natural conversation flow with AI responses
+- Action buttons for quick access to features
+- Mini app integration at https://frame.megapot.io
 - Real-time updates and notifications
-
-⚡ **Event-Driven Architecture**
-- Agent-SDK event handling with proper content types
-- Message filtering and middleware
-- Money bag reactions to all messages
-- Proper XMTP conversation management
 
 ## Setup
 
@@ -43,7 +58,13 @@ A specialized XMTP agent for purchasing MegaPot lottery tickets on Base network 
 3. **Configure environment (optional):**
    You can edit the generated `.env` file to customize settings like network environment.
 
-4. **Start the agent:**
+4. **Configure OpenAI API:**
+   Add your OpenAI API key to the `.env` file:
+   ```bash
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
+
+5. **Start the agent:**
    ```bash
    yarn dev
    ```
@@ -55,9 +76,11 @@ A specialized XMTP agent for purchasing MegaPot lottery tickets on Base network 
 | `WALLET_KEY` | Private key for agent's wallet | Yes |
 | `ENCRYPTION_KEY` | Database encryption key | Yes |
 | `XMTP_ENV` | XMTP environment (dev/production) | Yes |
+| `OPENAI_API_KEY` | OpenAI API key for smart features | Yes (for smart agent) |
 | `MEGAPOT_CONTRACT_ADDRESS` | MegaPot contract address | Yes |
 | `MEGAPOT_USDC_ADDRESS` | USDC contract address | Yes |
 | `MEGAPOT_REFERRER_ADDRESS` | Referrer wallet address | Yes |
+| `JACKPOT_POOL_CONTRACT_ADDRESS` | JackpotPool contract for group purchases | Yes |
 | `MEGAPOT_DATA_API_KEY` | MegaPot API key for enhanced stats | No |
 | `BASE_RPC_URL` | Base network RPC URL | No |
 
@@ -67,6 +90,7 @@ A specialized XMTP agent for purchasing MegaPot lottery tickets on Base network 
 ```bash
 MEGAPOT_CONTRACT_ADDRESS=0xbEDd4F2beBE9E3E636161E644759f3cbe3d51B95
 MEGAPOT_USDC_ADDRESS=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+JACKPOT_POOL_CONTRACT_ADDRESS=0xfb324c09c16b5f437ff612a4e8bc95b8fd6e6d5a
 ```
 
 **Testnet:**
@@ -77,7 +101,26 @@ MEGAPOT_USDC_ADDRESS=0xA4253E7C13525287C56550b8708100f93E60509f
 
 ## Usage
 
-The agent uses event-driven message handling with XMTP's Agent-SDK and streams messages in real-time. Send messages to the agent at its XMTP inbox address.
+The smart agent uses AI-powered natural language understanding combined with XMTP's Agent-SDK for real-time message processing. Simply chat with the agent naturally!
+
+### 🤖 Smart Conversation Examples
+
+**Natural Ticket Purchasing:**
+- "I want to buy 5 lottery tickets"
+- "Can I purchase ten tickets please?"
+- "Buy me some lottery tickets" → Agent asks how many
+
+**Information Requests:**
+- "What's the current jackpot?"
+- "Show me my lottery history"
+- "How much have I spent on tickets?"
+- "What are my odds of winning?"
+
+**Group Chat Pooled Purchases:**
+- "Let's pool together for 20 tickets"
+- "pool 10 tickets" → Starts group purchase
+- "contribute $5" → Join the pool
+- "I'll chip in $10" → Add to group purchase
 
 ### Transaction Flow
 
@@ -143,8 +186,8 @@ The agent supports MegaPot's referrer system through the `MEGAPOT_REFERRER_ADDRE
 
 ## Commands
 
-- `yarn dev` - Start development server with hot reload
-- `yarn start` - Start production server
+- `yarn dev` - Start smart AI-powered agent with hot reload
+- `yarn start` - Start agent in production
 - `yarn build` - Build TypeScript
 - `yarn gen:keys` - Generate new wallet and encryption keys
 - `yarn lint` - Run linter
@@ -169,11 +212,17 @@ For enhanced statistics, set the `MEGAPOT_DATA_API_KEY`:
 
 ```
 src/
-├── index.ts                    # Main agent entry point with event-driven message handling
+├── index.ts                    # Main smart agent entry point with AI and pooled purchases
+├── handlers/
+│   ├── smartHandler.ts        # AI-powered message processing with OpenAI
+│   └── poolHandler.ts         # Group pooled ticket purchase management
 ├── managers/
 │   └── MegaPotManager.ts      # Lottery management logic and transaction preparation
 ├── helpers/
 │   └── client.ts              # Helper functions for client management
+├── types/
+│   ├── ActionsContent.ts      # Action button content types
+│   └── IntentContent.ts       # Intent message content types
 └── generateKeys.ts            # Key generation script
 ```
 

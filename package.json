@@ -37,6 +37,7 @@
     "@xmtp/content-type-wallet-send-calls": "^1.0.1",
     "@xmtp/node-sdk": "^2.0.2",
     "axios": "^1.6.0",
+    "openai": "^4.67.1",
     "uint8arrays": "^5.1.0",
     "viem": "^2.22.17"
   },
