@@ -95,25 +95,69 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving Basename for address: ${address}`);
 
-    // Use simple viem approach for Basename resolution
+    // Use Base L2 resolver contract for Basename resolution
     try {
-      // Try to get ENS name from Base chain
-      const ensName = await publicClient.getEnsName({
-        address: address as `0x${string}`,
+      // Base L2 Resolver contract address
+      const BASE_L2_RESOLVER = "0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA";
+
+      // Try direct contract call to Base L2 resolver
+      const resolverData = await publicClient.readContract({
+        address: BASE_L2_RESOLVER as `0x${string}`,
+        abi: [
+          {
+            inputs: [{ name: "addr", type: "address" }],
+            name: "name",
+            outputs: [{ name: "", type: "string" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "name",
+        args: [address as `0x${string}`],
       });
 
-      if (ensName && ensName.endsWith(".base.eth")) {
-        console.log(`✅ Resolved ${address} via Base viem: ${ensName}`);
-        return ensName;
-      } else if (ensName) {
-        console.log(`✅ Resolved ${address} via viem: ${ensName}`);
-        return ensName;
+      if (
+        resolverData &&
+        typeof resolverData === "string" &&
+        resolverData.endsWith(".base.eth")
+      ) {
+        console.log(
+          `✅ Resolved ${address} via Base L2 resolver: ${resolverData}`,
+        );
+        return resolverData;
       }
-    } catch (viemError) {
-      console.log(`⚠️ Viem ENS resolution failed for ${address}:`, viemError);
+    } catch (resolverError) {
+      console.log(`⚠️ Base L2 resolver failed for ${address}:`, resolverError);
     }
 
-    // Try direct Basename API call
+    // Try Basename API as fallback
+    try {
+      const response = await fetch(
+        `https://resolver-api.basename.app/v1/reverse-lookup?address=${address}`,
+        {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "MegaPot-Agent/1.0",
+          },
+        },
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.name && data.name.endsWith(".base.eth")) {
+          console.log(`✅ Resolved ${address} via Basename API: ${data.name}`);
+          return data.name;
+        }
+      } else {
+        console.log(
+          `⚠️ Basename API returned ${response.status} for ${address}`,
+        );
+      }
+    } catch (apiError) {
+      console.log(`⚠️ Basename API failed for ${address}:`, apiError);
+    }
+
+    // Try Base.org API as final fallback
     try {
       const response = await fetch(
         `https://www.base.org/api/v1/reverse/${address}`,
@@ -128,14 +172,16 @@ async function resolveBasename(address: string): Promise<string | null> {
       if (response.ok) {
         const data = await response.json();
         if (data.name && data.name.endsWith(".base.eth")) {
-          console.log(`✅ Resolved ${address} via Base API: ${data.name}`);
+          console.log(`✅ Resolved ${address} via Base.org API: ${data.name}`);
           return data.name;
         }
       } else {
-        console.log(`⚠️ Base API returned ${response.status} for ${address}`);
+        console.log(
+          `⚠️ Base.org API returned ${response.status} for ${address}`,
+        );
       }
     } catch (apiError) {
-      console.log(`⚠️ Base API failed for ${address}:`, apiError);
+      console.log(`⚠️ Base.org API failed for ${address}:`, apiError);
     }
 
     console.log(`⚠️ No Basename found for ${address}`);

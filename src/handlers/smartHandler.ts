@@ -575,7 +575,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         return `${baseResponse}\n\n🎰 Jackpot: $${lotteryStats.jackpotPool || "0"} | Tickets sold: ${lotteryStats.ticketsSoldRound || 0}`;
 
       case "pooled_purchase":
-        return `${baseResponse}\n\n👥 In group chats, members can buy pool tickets together to increase collective winning chances!`;
+        return `👍\n\n👥 In group chats, members can buy pool tickets together to increase collective winning chances!`;
 
       case "greeting":
         if (userAddress) {

@@ -1040,6 +1040,21 @@ async function handleSmartTextMessage(
             `🎯 Processing pool choice for ${pendingTicketCount} tickets`,
           );
 
+          // In DMs, convert pool requests to individual purchases
+          if (!isGroupChat) {
+            console.log(
+              "🔄 Converting pool request to individual purchase in DM",
+            );
+            await handleTicketPurchaseIntent(
+              pendingTicketCount,
+              userAddress,
+              conversation,
+              megaPotManager,
+              agent,
+            );
+            return;
+          }
+
           poolContextHandler.setPendingPoolPurchase(
             conversation.id,
             message.senderInboxId,
@@ -1059,10 +1074,24 @@ async function handleSmartTextMessage(
           intent.extractedData?.clearIntent &&
           userAddress
         ) {
-          // Clear pool intent - prepare transaction immediately
+          // Clear pool intent - but check if we're in a group first
           console.log(
-            `🎯 Clear pool intent detected: ${intent.extractedData.ticketCount} tickets - preparing pool transaction directly`,
+            `🎯 Clear pool intent detected: ${intent.extractedData.ticketCount} tickets - checking conversation type`,
           );
+
+          if (!isGroupChat) {
+            console.log(
+              "🔄 Converting clear pool intent to individual purchase in DM",
+            );
+            await handleTicketPurchaseIntent(
+              intent.extractedData.ticketCount,
+              userAddress,
+              conversation,
+              megaPotManager,
+              agent,
+            );
+            return;
+          }
 
           const poolResult = await poolHandler.processPooledTicketPurchase(
             conversation.id,
@@ -1081,7 +1110,22 @@ async function handleSmartTextMessage(
             );
           }
         } else if (intent.extractedData?.ticketCount && userAddress) {
-          // Universal pool system - works in both DMs and groups
+          // Check if we're in a group chat for pool purchases
+          if (!isGroupChat) {
+            console.log(
+              "🔄 Converting pool request to individual purchase in DM",
+            );
+            await handleTicketPurchaseIntent(
+              intent.extractedData.ticketCount,
+              userAddress,
+              conversation,
+              megaPotManager,
+              agent,
+            );
+            return;
+          }
+
+          // Universal pool system - works in groups
           const ticketCount = intent.extractedData.ticketCount;
           const displayName = await getDisplayName(userAddress);
 
@@ -1090,10 +1134,6 @@ async function handleSmartTextMessage(
           );
 
           // Set pending pool confirmation context
-          const poolContextHandler = smartHandler.getContextHandler();
-          console.log(
-            `🔧 Setting pending pool purchase context: ${ticketCount} tickets for ${userAddress}`,
-          );
           poolContextHandler.setPendingPoolPurchase(
             conversation.id,
             message.senderInboxId,
@@ -1101,20 +1141,19 @@ async function handleSmartTextMessage(
             userAddress,
           );
 
-          // Verify context was set
-          const verifyContext = poolContextHandler.getPendingConfirmation(
-            conversation.id,
-            message.senderInboxId,
-          );
-          console.log(`✅ Verified context set:`, verifyContext);
-
           await conversation.send(
             `🎯 Daily Pool Purchase\n\n${displayName}, you want to buy ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for the daily pool for $${ticketCount} USDC.\n\n💡 How the daily pool works:\n• One shared pool runs each day\n• All pool tickets increase collective winning chances\n• Winnings distributed proportionally based on risk exposure\n• Available in both DMs and group chats\n\nShall I prepare the pool purchase transaction?`,
           );
         } else {
-          await conversation.send(
-            "🎯 Daily Pool Purchase\n\nHow many tickets would you like to buy for today's pool? (e.g., '5 pool tickets')\n\n💡 The daily pool:\n• Increases collective winning chances\n• Winnings shared proportionally\n• Available everywhere - DMs and groups",
-          );
+          if (!isGroupChat) {
+            await conversation.send(
+              "🎫 Pool purchases work best in group chats! In DMs, I can help you buy individual tickets.\n\nWould you like to buy individual tickets instead? Just tell me how many (e.g., '3 tickets').",
+            );
+          } else {
+            await conversation.send(
+              "🎯 Daily Pool Purchase\n\nHow many tickets would you like to buy for today's pool? (e.g., '5 pool tickets')\n\n💡 The daily pool:\n• Increases collective winning chances\n• Winnings shared proportionally\n• Available in group chats",
+            );
+          }
         }
         break;
 
