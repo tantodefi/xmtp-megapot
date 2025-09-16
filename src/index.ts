@@ -164,6 +164,25 @@ async function main() {
   // Initialize pooled purchase handler
   const poolHandler = new PoolHandler(megaPotManager);
 
+  // Message deduplication - track processed message IDs
+  const processedMessages = new Set<string>();
+
+  // Clean up old message IDs every 10 minutes to prevent memory leak
+  setInterval(
+    () => {
+      if (processedMessages.size > 1000) {
+        console.log(
+          `🧹 Cleaning up old message IDs (${processedMessages.size} -> 500)`,
+        );
+        const messageArray = Array.from(processedMessages);
+        processedMessages.clear();
+        // Keep only the most recent 500 messages
+        messageArray.slice(-500).forEach((id) => processedMessages.add(id));
+      }
+    },
+    10 * 60 * 1000,
+  ); // 10 minutes
+
   console.log("🤖 Smart MegaPot Agent initialized");
   console.log(`📊 Using Mainnet Contract: ${MEGAPOT_CONTRACT_ADDRESS}`);
   console.log(`💰 Using USDC: ${MEGAPOT_USDC_ADDRESS}`);
@@ -299,6 +318,13 @@ async function main() {
             console.log("🚫 Skipping message from self");
             continue;
           }
+
+          // Message deduplication - skip if already processed
+          if (processedMessages.has(message.id)) {
+            console.log(`🚫 Skipping already processed message: ${message.id}`);
+            continue;
+          }
+          processedMessages.add(message.id);
 
           // Get the conversation for responding first
           const conversation =

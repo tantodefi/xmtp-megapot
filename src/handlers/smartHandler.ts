@@ -107,9 +107,19 @@ export class SmartHandler {
         }
       }
 
-      // Fetch current lottery data for context
-      const lotteryStats = await this.megaPotManager.getStats(userAddress);
-      const allTimeStats = await this.fetchAllTimeStats();
+      // For simple greetings, skip expensive API calls to improve response time
+      const isSimpleGreeting = /^(gm|good morning|hello|hi|hey)$/i.test(
+        message.trim(),
+      );
+
+      let lotteryStats = null;
+      let allTimeStats = null;
+
+      if (!isSimpleGreeting) {
+        // Only fetch data for non-greeting messages to improve performance
+        lotteryStats = await this.megaPotManager.getStats(userAddress);
+        allTimeStats = await this.fetchAllTimeStats();
+      }
 
       // Create context for the LLM
       const contextPrompt = this.buildContextPrompt(
@@ -200,18 +210,26 @@ export class SmartHandler {
 4. EXTRACT numerical data when users mention ticket quantities
 
 CURRENT LOTTERY DATA:
-- Jackpot: $${lotteryStats.jackpotPool || "0"}
+${
+  lotteryStats
+    ? `- Jackpot: $${lotteryStats.jackpotPool || "0"}
 - Ticket Price: $${lotteryStats.ticketPrice || "1.00"} USDC
 - Tickets Sold: ${lotteryStats.ticketsSoldRound || 0}
 - Active Players: ${lotteryStats.activePlayers || 0}
 - User's Total Tickets: ${lotteryStats.totalTicketsPurchased || 0}
-- User's Spending: ${lotteryStats.totalSpent || "$0"}
+- User's Spending: ${lotteryStats.totalSpent || "$0"}`
+    : "- Data will be fetched when needed for specific requests"
+}
 
 ALL-TIME STATS:
-- Total Jackpots: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179,816,793"}
+${
+  allTimeStats
+    ? `- Total Jackpots: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179,816,793"}
 - Total Players: ${allTimeStats?.total_players?.toLocaleString() || "14,418"}
 - Total Tickets: ${allTimeStats?.total_tickets?.toLocaleString() || "282,495"}
-- Total Winners: ${allTimeStats?.total_won || "19"}
+- Total Winners: ${allTimeStats?.total_won || "19"}`
+    : "- Stats available on request"
+}
 
 ${groupChatInfo}
 
