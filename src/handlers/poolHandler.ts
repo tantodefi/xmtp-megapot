@@ -239,22 +239,18 @@ To participate:
       ).toFixed(2);
 
       const userDisplayName = await getDisplayName(userAddress);
-      const successMessage = `✅ Pool Purchase Successful!
+      const preparingMessage = `🎯 Pool Purchase Transaction Prepared!
 
-🎫 ${userDisplayName} purchased: ${numTickets} tickets for $${totalCost.toFixed(2)}
-📊 Your pool share: ${memberShare}% (${member.ticketsPurchased}/${pool.totalTickets} tickets)
-💰 Your risk exposure: $${member.amountContributed.toFixed(2)}
+🎫 ${userDisplayName}: ${numTickets} tickets for $${totalCost.toFixed(2)}
+📊 Pool share: ${memberShare}% (${member.ticketsPurchased}/${pool.totalTickets} tickets)
+💰 Risk exposure: $${member.amountContributed.toFixed(2)}
 
-Pool Status:
-👥 Active members: ${pool.members.size}
-🎫 Total pool tickets: ${pool.totalTickets}
-💰 Total pool value: $${pool.totalContributed.toFixed(2)}
-
-🎰 Pool increases winning chances! Prizes distributed proportionally to risk exposure.`;
+✅ Open wallet to approve pool purchase transaction
+🎰 Pool increases winning chances! Prizes shared proportionally.`;
 
       return {
         success: true,
-        message: successMessage,
+        message: preparingMessage,
         transactionData: txData,
       };
     } catch (error) {
@@ -310,12 +306,12 @@ Pool Status:
       chainId: `0x${base.id.toString(16)}`,
       from: userAddress as `0x${string}`,
       capabilities: {
-        reference: `pool_purchase_${Date.now()}`,
-        app: "MegaPot Pool",
+        reference: `megapot_pool_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        app: "MegaPot Lottery",
         icon: "https://megapot.io/favicon.ico",
         domain: "megapot.io",
-        name: "MegaPot Group Pool",
-        description: "Pooled lottery ticket purchase",
+        name: "MegaPot Pool Purchase",
+        description: `Pool purchase: ${numTickets} tickets for $${totalCost.toFixed(2)} USDC`,
       },
       calls: [
         {
