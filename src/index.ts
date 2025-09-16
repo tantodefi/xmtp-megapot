@@ -648,8 +648,20 @@ async function handleSmartTextMessage(
       `🎯 AI detected intent: ${intent.type} (confidence: ${intent.confidence})`,
     );
 
-    // Send the AI-generated response
-    await conversation.send(intent.response);
+    // Send the AI-generated response (skip for standalone numbers that need solo/pool choice)
+    const isStandaloneNumber =
+      /^\d+$/.test(content.trim()) ||
+      /^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)$/i.test(
+        content.trim(),
+      );
+
+    if (!isStandaloneNumber) {
+      await conversation.send(intent.response);
+    } else {
+      console.log(
+        `🔇 Skipping AI response for standalone number: "${content}" - main handler will ask for solo/pool choice`,
+      );
+    }
 
     // Check if AI response contains confirmation request and extract ticket count
     const aiResponseLower = intent.response.toLowerCase();
@@ -700,8 +712,14 @@ async function handleSmartTextMessage(
           );
         } else {
           // For numbers without "pool" context, ask user to choose solo or pool
-          if (/^\d+$/.test(content.trim())) {
-            // User provided just a number, ask for purchase type
+          const isStandaloneNumber =
+            /^\d+$/.test(content.trim()) ||
+            /^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)$/i.test(
+              content.trim(),
+            );
+
+          if (isStandaloneNumber) {
+            // User provided just a number (digit or word), ask for purchase type
             const displayName = await getDisplayName(userAddress);
             await conversation.send(
               `${displayName}, looks like you want to buy ${ticketCount} tickets. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,

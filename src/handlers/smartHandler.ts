@@ -249,7 +249,7 @@ IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity
 
 CRITICAL: If user provides a number followed by "tickets" or "ticket", this is ALWAYS a buy_tickets intent, even without the word "buy".
 
-BUY TICKETS: When user wants to buy tickets, provide minimal response like "👍" or "Processing..." - the main handler will send the detailed confirmation message.
+BUY TICKETS: When user wants to buy tickets with explicit "buy" or "tickets" words, provide minimal response like "👍". For standalone numbers (like "5" or "five"), provide NO RESPONSE - let the main handler ask for solo/pool choice.
 
 POOL TICKETS: When user mentions "pool tickets", detect as pooled_purchase intent. Provide minimal response like "👍" or "Processing..." - the main handler will send the detailed message.
 
@@ -614,8 +614,15 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         "nine",
         "ten",
       ];
+
+      // Check if message is just a word number (in ticket context)
       for (const word of wordNumbers) {
-        if (
+        if (lowerMessage.trim() === word) {
+          // Standalone word number - treat as ticket count
+          isBuyIntent = true;
+          ticketCount = this.parseNumberFromText(word);
+          break;
+        } else if (
           lowerMessage.includes(word) &&
           (lowerMessage.includes("ticket") ||
             lowerMessage.includes("buy") ||
