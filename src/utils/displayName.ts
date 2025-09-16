@@ -4,19 +4,23 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Get display name for a wallet address
- * Tries multiple resolution methods: Basename, Farcaster, then fallback
+ * Tries multiple resolution methods: Farcaster first, then Basename, then ENS, then fallback
  */
 export async function getDisplayName(address: string): Promise<string> {
   try {
+    console.log(`🔍 Starting name resolution for address: ${address}`);
+
     // Check cache first
     const cached = displayNameCache.get(address.toLowerCase());
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log(`📋 Using cached name for ${address}: ${cached.name}`);
       return cached.name;
     }
 
     let resolvedName = null;
 
     // Try Farcaster resolution first (preferred for social interactions)
+    console.log(`🎭 Attempting Farcaster resolution for ${address}...`);
     try {
       resolvedName = await resolveFarcaster(address);
       if (resolvedName) {
@@ -30,6 +34,7 @@ export async function getDisplayName(address: string): Promise<string> {
 
     // If no Farcaster, try Basename
     if (!resolvedName) {
+      console.log(`🏷️ Attempting Basename resolution for ${address}...`);
       try {
         resolvedName = await resolveBasename(address);
         if (resolvedName) {
@@ -44,6 +49,7 @@ export async function getDisplayName(address: string): Promise<string> {
 
     // If no Basename, try ENS reverse resolution
     if (!resolvedName) {
+      console.log(`🌐 Attempting ENS resolution for ${address}...`);
       try {
         resolvedName = await resolveENS(address);
         if (resolvedName) {
@@ -58,6 +64,7 @@ export async function getDisplayName(address: string): Promise<string> {
 
     // Fallback to formatted address
     const finalName = resolvedName || formatFallbackName(address);
+    console.log(`🏁 Final resolved name for ${address}: ${finalName}`);
 
     // Cache the result
     displayNameCache.set(address.toLowerCase(), {
@@ -127,14 +134,32 @@ async function resolveBasename(address: string): Promise<string | null> {
         address: address as `0x${string}`,
       });
 
-      if (ensName && ensName.endsWith(".base.eth")) {
-        console.log(`✅ Resolved ${address} to Basename: ${ensName}`);
-        return ensName;
-      } else if (ensName) {
-        console.log(`✅ Resolved ${address} to ENS: ${ensName}`);
+      if (ensName) {
+        console.log(`✅ Resolved ${address} to name: ${ensName}`);
         return ensName;
       } else {
         console.log(`⚠️ No Basename found for ${address}`);
+
+        // Also try direct Basename API as fallback
+        try {
+          const basenameResponse = await fetch(
+            `https://api.basename.app/v1/name/${address}`,
+          );
+          if (basenameResponse.ok) {
+            const basenameData = await basenameResponse.json();
+            if (basenameData.name && basenameData.name.endsWith(".base.eth")) {
+              console.log(
+                `✅ Resolved ${address} via Basename API: ${basenameData.name}`,
+              );
+              return basenameData.name;
+            }
+          }
+        } catch (apiError) {
+          console.log(
+            `⚠️ Basename API fallback failed for ${address}:`,
+            apiError,
+          );
+        }
       }
     } catch (ensError) {
       console.log(
@@ -160,16 +185,19 @@ async function resolveFarcaster(address: string): Promise<string | null> {
       return null;
     }
 
-    // Use the proper Neynar SDK approach from working example
-    const { NeynarAPIClient } = await import("@neynar/nodejs-sdk");
+    // Use the correct Neynar SDK configuration pattern
+    const { NeynarAPIClient, Configuration } = await import(
+      "@neynar/nodejs-sdk"
+    );
 
-    const client = new NeynarAPIClient({
+    const config = new Configuration({
       apiKey: neynarApiKey,
     });
+    const client = new NeynarAPIClient(config);
 
-    // Use the fetchBulkUsersByEthOrSolAddress method for address lookup
     console.log(`🔍 Neynar SDK: Looking up user by address ${address}`);
 
+    // Use fetchBulkUsersByEthOrSolAddress as documented
     const response = await client.fetchBulkUsersByEthOrSolAddress({
       addresses: [address],
     });
@@ -179,7 +207,7 @@ async function resolveFarcaster(address: string): Promise<string | null> {
       JSON.stringify(response, null, 2),
     );
 
-    // Check if we found any users for this address (bulk-by-address returns object with address as key)
+    // Check response structure - it should be an object with address as key
     if (response && response[address.toLowerCase()]) {
       const users = response[address.toLowerCase()];
       if (users && users.length > 0) {
