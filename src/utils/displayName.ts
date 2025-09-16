@@ -4,8 +4,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Get display name for a wallet address
- * For now, uses a simple fallback approach until Neynar integration is properly configured
- * Falls back to formatted address
+ * Tries multiple resolution methods: Basename, Farcaster, then fallback
  */
 export async function getDisplayName(address: string): Promise<string> {
   try {
@@ -15,21 +14,63 @@ export async function getDisplayName(address: string): Promise<string> {
       return cached.name;
     }
 
-    // TODO: Implement Neynar API integration when properly configured
-    // For now, try to create a more friendly name from the address
-    const formattedName = formatFallbackName(address);
+    let resolvedName = null;
+
+    // Try Basename resolution first
+    try {
+      resolvedName = await resolveBasename(address);
+      if (resolvedName) {
+        console.log(`✅ Resolved ${address} to Basename: ${resolvedName}`);
+      }
+    } catch (error) {
+      console.log(`⚠️ Basename resolution failed for ${address}`);
+    }
+
+    // If no Basename, try Farcaster (future implementation)
+    if (!resolvedName) {
+      // TODO: Add Farcaster resolution via Neynar API
+      // resolvedName = await resolveFarcaster(address);
+    }
+
+    // Fallback to formatted address
+    const finalName = resolvedName || formatFallbackName(address);
 
     // Cache the result
     displayNameCache.set(address.toLowerCase(), {
-      name: formattedName,
+      name: finalName,
       timestamp: Date.now(),
     });
 
-    return formattedName;
+    return finalName;
   } catch (error) {
     console.warn(`Failed to resolve display name for ${address}:`, error);
     return formatFallbackName(address);
   }
+}
+
+/**
+ * Resolve Basename for a wallet address
+ */
+async function resolveBasename(address: string): Promise<string | null> {
+  try {
+    // Use Base's public resolver to check for Basename
+    const response = await fetch(`https://api.basenames.org/v1/name/${address}`, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.name && data.name.endsWith('.base.eth')) {
+        return data.name;
+      }
+    }
+  } catch (error) {
+    // Basename resolution failed, will fallback
+  }
+  
+  return null;
 }
 
 /**

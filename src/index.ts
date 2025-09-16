@@ -293,6 +293,10 @@ async function main() {
           // Check if this is a group chat
           const isGroupChat = conversation instanceof Group;
           console.log(`📍 Conversation type: ${isGroupChat ? "group" : "dm"}`);
+          console.log(`🔍 Conversation ID: ${conversation.id}`);
+          console.log(
+            `🔍 Conversation constructor: ${conversation.constructor.name}`,
+          );
 
           // Get user address for context
           let userAddress: string | undefined;
@@ -326,8 +330,13 @@ async function main() {
           }
 
           // Handle different content types
-          if (message.contentType?.typeId === "text") {
-            console.log("📝 Processing text message with smart handler");
+          if (
+            message.contentType?.typeId === "text" ||
+            message.contentType?.typeId === "reply"
+          ) {
+            console.log(
+              `📝 Processing ${message.contentType?.typeId} message with smart handler`,
+            );
             await handleSmartTextMessage(
               message,
               conversation,
@@ -885,13 +894,8 @@ async function handleSmartTextMessage(
 
       case "greeting":
         console.log("👋 Sending welcome message");
-        if (userAddress) {
-          const personalizedGreeting =
-            await getPersonalizedGreeting(userAddress);
-          await conversation.send(
-            `${personalizedGreeting} Welcome to the lottery system. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`,
-          );
-        }
+        // Don't send another greeting message - the AI already sent one
+        // Just send the action buttons
         await sendMegaPotActions(conversation);
         break;
 
@@ -915,6 +919,21 @@ async function handleSmartTextMessage(
             "👥 Group pool purchases are only available in group chats! Add me to a group to buy tickets through a shared pool.",
           );
         }
+        break;
+
+      case "general_inquiry":
+        console.log("❓ Processing general inquiry");
+        // Check if user is claiming to be in a group chat
+        const lowerContent = content.toLowerCase();
+        if (
+          lowerContent.includes("group chat") ||
+          lowerContent.includes("this is a group")
+        ) {
+          await conversation.send(
+            `🔍 I'm detecting this as a Direct Message (DM), not a group chat.\n\n📱 Current conversation type: ${isGroupChat ? "Group" : "Direct Message"}\n\n👥 To access group pool features:\n• Create or join a group chat\n• Add me to the group\n• Use pool purchase commands there\n\n🎫 In DMs, you can buy individual tickets that you keep 100% ownership of.`,
+          );
+        }
+        // AI response should be sufficient for other inquiries
         break;
 
       default:

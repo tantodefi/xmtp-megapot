@@ -475,6 +475,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return { type: "general_inquiry", confidence: 0.7 };
     }
 
+    // Special case: user claims to be in group chat
+    if (lowerMessage.includes("group chat") || lowerMessage.includes("this is a group")) {
+      return { type: "general_inquiry", confidence: 0.8 };
+    }
+
     return { type: "unknown", confidence: 0.3 };
   }
 
@@ -501,8 +506,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         return `${baseResponse}\n\n👥 In group chats, members can buy pool tickets together to increase collective winning chances!`;
 
       case "greeting":
-        // Don't format greeting response here - let the main handler handle it
-        return baseResponse;
+        if (userAddress) {
+          const personalizedGreeting = await getPersonalizedGreeting(userAddress);
+          return `${personalizedGreeting} Welcome to the lottery system. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`;
+        }
+        return `${baseResponse}\n\n🌐 Try the full experience: https://frame.megapot.io`;
 
       default:
         return baseResponse;
