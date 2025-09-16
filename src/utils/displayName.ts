@@ -84,35 +84,9 @@ export async function getDisplayName(address: string): Promise<string> {
  */
 async function resolveENS(address: string): Promise<string | null> {
   try {
-    // Try Ethereum mainnet ENS resolution using public APIs
-    const endpoints = [
-      `https://api.ensdata.net/${address}`,
-      `https://api.ens.domains/name/${address}/reverse`,
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await fetch(endpoint, {
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const ensName = data.name || data.ens || data.reverse;
-          if (ensName && ensName.endsWith(".eth")) {
-            console.log(
-              `✅ Resolved ${address} to ENS: ${ensName} via ${endpoint}`,
-            );
-            return ensName;
-          }
-        }
-      } catch (endpointError) {
-        console.log(`⚠️ ENS endpoint ${endpoint} failed:`, endpointError);
-        continue; // Try next endpoint
-      }
-    }
+    // Skip ENS resolution in production due to network restrictions
+    // Focus on Farcaster and Basename which are more relevant for Base users
+    console.log(`⚠️ ENS resolution skipped in production environment`);
   } catch (error) {
     console.log(`⚠️ ENS resolution error for ${address}:`, error);
   }
@@ -136,33 +110,42 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving Basename for address: ${address}`);
 
-    // Try direct Basename API (more reliable than viem ENS on Base)
-    try {
-      const basenameResponse = await fetch(
-        `https://api.basename.app/v1/name/${address}`,
-        {
+    // Try multiple Basename resolution methods
+    const basenameEndpoints = [
+      `https://api.basename.app/v1/name/${address}`,
+      `https://basename.app/api/name/${address}`,
+      `https://www.basename.app/api/v1/reverse/${address}`,
+    ];
+
+    for (const endpoint of basenameEndpoints) {
+      try {
+        const basenameResponse = await fetch(endpoint, {
           method: "GET",
           headers: {
             Accept: "application/json",
+            "User-Agent": "MegaPot-Agent/1.0",
           },
-        },
-      );
+        });
 
-      if (basenameResponse.ok) {
-        const basenameData = await basenameResponse.json();
-        if (basenameData.name && basenameData.name.endsWith(".base.eth")) {
+        if (basenameResponse.ok) {
+          const basenameData = await basenameResponse.json();
+          const basename =
+            basenameData.name || basenameData.basename || basenameData.reverse;
+          if (basename && basename.endsWith(".base.eth")) {
+            console.log(
+              `✅ Resolved ${address} via Basename: ${basename} (${endpoint})`,
+            );
+            return basename;
+          }
+        } else {
           console.log(
-            `✅ Resolved ${address} via Basename API: ${basenameData.name}`,
+            `⚠️ Basename endpoint ${endpoint} returned ${basenameResponse.status}`,
           );
-          return basenameData.name;
         }
-      } else {
-        console.log(
-          `⚠️ Basename API returned ${basenameResponse.status}: ${basenameResponse.statusText}`,
-        );
+      } catch (apiError) {
+        console.log(`⚠️ Basename endpoint ${endpoint} failed:`, apiError);
+        continue; // Try next endpoint
       }
-    } catch (apiError) {
-      console.log(`⚠️ Basename API failed for ${address}:`, apiError);
     }
 
     console.log(`⚠️ No Basename found for ${address}`);

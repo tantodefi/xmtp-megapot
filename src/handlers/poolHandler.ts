@@ -5,7 +5,7 @@ import { base } from "viem/chains";
 import { MegaPotManager } from "../managers/MegaPotManager.js";
 import { getDisplayName, getMentionName } from "../utils/displayName.js";
 
-// JackpotPool contract ABI
+// JackpotPool contract ABI - based on actual contract functions
 const JACKPOT_POOL_ABI = [
   {
     inputs: [
@@ -32,25 +32,25 @@ const JACKPOT_POOL_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
-  // Pool stats functions
+  // Actual functions from the JackpotPool contract
   {
     inputs: [],
-    name: "totalTickets",
+    name: "poolTicketsPurchasedBps",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
-    name: "totalValue",
+    name: "pendingPoolWinnings",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ name: "participant", type: "address" }],
-    name: "participantTickets",
-    outputs: [{ name: "", type: "uint256" }],
+    inputs: [],
+    name: "jackpot",
+    outputs: [{ name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
   },
@@ -113,32 +113,39 @@ export class PoolHandler {
         `📊 Loading pool data from contract: ${pool.poolContractAddress}`,
       );
 
-      // Read total tickets and value from the jackpot pool contract
+      // Read pool data from the jackpot pool contract using correct functions
       try {
-        const totalTickets = await this.client.readContract({
+        const poolTicketsBps = await this.client.readContract({
           address: pool.poolContractAddress as `0x${string}`,
           abi: JACKPOT_POOL_ABI,
-          functionName: "totalTickets",
+          functionName: "poolTicketsPurchasedBps",
         });
 
-        const totalValue = await this.client.readContract({
+        const pendingWinnings = await this.client.readContract({
           address: pool.poolContractAddress as `0x${string}`,
           abi: JACKPOT_POOL_ABI,
-          functionName: "totalValue",
+          functionName: "pendingPoolWinnings",
         });
+
+        // Convert BPS to actual ticket count (10000 BPS = 1 ticket after fees)
+        const totalTickets = Number(poolTicketsBps) / 7000; // 7000 BPS per ticket after 30% fees
+        const winningsUSDC = Number(pendingWinnings) / 1000000; // Convert from 6 decimals
 
         console.log(
-          `📊 Contract stats: ${totalTickets} tickets, $${Number(totalValue) / 1000000} USDC total`,
+          `📊 Pool stats: ${totalTickets.toFixed(2)} tickets (${poolTicketsBps} BPS), $${winningsUSDC} pending winnings`,
         );
 
         // Update pool with contract data
-        pool.totalTickets = Number(totalTickets);
-        pool.totalContributed = Number(totalValue) / 1000000; // Convert from 6 decimals
+        pool.totalTickets = totalTickets;
+        pool.totalContributed = totalTickets; // Each ticket costs $1
       } catch (contractError) {
         console.log(
-          `⚠️ Could not read contract stats (functions may not exist):`,
+          `⚠️ Could not read pool stats from contract:`,
           contractError,
         );
+        // Use default values
+        pool.totalTickets = 0;
+        pool.totalContributed = 0;
       }
 
       console.log(`✅ Pool initialized for group ${pool.groupId}`);
