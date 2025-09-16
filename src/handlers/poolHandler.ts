@@ -32,6 +32,28 @@ const JACKPOT_POOL_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  // Pool stats functions
+  {
+    inputs: [],
+    name: "totalTickets",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalValue",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "participant", type: "address" }],
+    name: "participantTickets",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 // USDC ABI for approval
@@ -91,9 +113,33 @@ export class PoolHandler {
         `📊 Loading pool data from contract: ${pool.poolContractAddress}`,
       );
 
-      // Note: The JackpotPool contract doesn't have public getters for total stats
-      // We'll track locally and sync with events if needed
-      // For now, we start with empty data and build as users interact
+      // Read total tickets and value from the jackpot pool contract
+      try {
+        const totalTickets = await this.client.readContract({
+          address: pool.poolContractAddress as `0x${string}`,
+          abi: JACKPOT_POOL_ABI,
+          functionName: "totalTickets",
+        });
+
+        const totalValue = await this.client.readContract({
+          address: pool.poolContractAddress as `0x${string}`,
+          abi: JACKPOT_POOL_ABI,
+          functionName: "totalValue",
+        });
+
+        console.log(
+          `📊 Contract stats: ${totalTickets} tickets, $${Number(totalValue) / 1000000} USDC total`,
+        );
+
+        // Update pool with contract data
+        pool.totalTickets = Number(totalTickets);
+        pool.totalContributed = Number(totalValue) / 1000000; // Convert from 6 decimals
+      } catch (contractError) {
+        console.log(
+          `⚠️ Could not read contract stats (functions may not exist):`,
+          contractError,
+        );
+      }
 
       console.log(`✅ Pool initialized for group ${pool.groupId}`);
     } catch (error) {

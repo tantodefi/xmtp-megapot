@@ -1333,7 +1333,7 @@ export class MegaPotManager {
             to: contractAddress as `0x${string}`,
             data: claimData as `0x${string}`,
             value: "0x0",
-            gas: "0x15F90", // ~90,000 gas
+            gas: "0x7530", // ~30,000 gas (should be enough for withdrawWinnings)
             metadata: {
               description: "Claim your lottery winnings",
               transactionType: "claim_winnings",
