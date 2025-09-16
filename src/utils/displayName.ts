@@ -19,13 +19,18 @@ export async function getDisplayName(address: string): Promise<string> {
 
     let resolvedName = null;
 
-    // Skip API resolution in production due to network restrictions
-    // Focus on clean address formatting for reliability
-    console.log(`🔍 Using production-safe name resolution for ${address}`);
-
-    // In production, external APIs are unreliable due to network restrictions
-    // The logs show consistent failures: Neynar 404, Basename 530/402, ENS network errors
-    // Better to provide consistent, fast experience with clean address formatting
+    // Try Basename resolution for smart contract wallets (they often have .base.eth names)
+    console.log(`🏷️ Attempting Basename resolution for ${address}...`);
+    try {
+      resolvedName = await resolveBasename(address);
+      if (resolvedName) {
+        console.log(`✅ Resolved ${address} to Basename: ${resolvedName}`);
+      } else {
+        console.log(`⚠️ No Basename found for ${address}`);
+      }
+    } catch (error) {
+      console.log(`⚠️ Basename resolution failed for ${address}:`, error);
+    }
 
     // Fallback to formatted address
     const finalName = resolvedName || formatFallbackName(address);
@@ -75,11 +80,28 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving Basename for address: ${address}`);
 
-    // Try multiple Basename resolution methods
+    // Try Base blockchain ENS resolution first (most reliable for .base.eth names)
+    try {
+      const ensName = await publicClient.getEnsName({
+        address: address as `0x${string}`,
+      });
+
+      if (ensName && ensName.endsWith(".base.eth")) {
+        console.log(`✅ Resolved ${address} via Base ENS: ${ensName}`);
+        return ensName;
+      } else if (ensName) {
+        console.log(`✅ Resolved ${address} via ENS: ${ensName}`);
+        return ensName;
+      }
+    } catch (ensError) {
+      console.log(`⚠️ Base ENS resolution failed for ${address}:`, ensError);
+    }
+
+    // Try multiple Basename API endpoints as fallback
     const basenameEndpoints = [
       `https://api.basename.app/v1/name/${address}`,
       `https://basename.app/api/name/${address}`,
-      `https://www.basename.app/api/v1/reverse/${address}`,
+      `https://resolver.base.org/reverse/${address}`,
     ];
 
     for (const endpoint of basenameEndpoints) {

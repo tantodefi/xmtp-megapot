@@ -856,6 +856,11 @@ async function handleSmartTextMessage(
           message.senderInboxId,
         );
 
+        console.log(
+          `🔍 Solo choice check: content="${content.toLowerCase().trim()}", context=`,
+          currentContext,
+        );
+
         if (
           content.toLowerCase().trim() === "solo" &&
           currentContext?.lastIntent === "standalone_number" &&
@@ -864,19 +869,16 @@ async function handleSmartTextMessage(
           // User chose solo for a previously provided number
           const pendingTicketCount = currentContext.pendingTicketCount || 1;
           console.log(
-            `🎫 Processing solo choice for ${pendingTicketCount} tickets`,
+            `🎫 Processing solo choice for ${pendingTicketCount} tickets - preparing transaction directly`,
           );
 
-          buyContextHandler.setPendingTicketPurchase(
-            conversation.id,
-            message.senderInboxId,
+          // Directly call the ticket purchase handler (skip confirmation for clear choice)
+          await handleTicketPurchaseIntent(
             pendingTicketCount,
             userAddress,
-            isGroupChat,
-          );
-
-          await conversation.send(
-            `Perfect! You'd like to buy ${pendingTicketCount} tickets for $${pendingTicketCount} USDC. Shall I proceed with the solo purchase?`,
+            conversation,
+            megaPotManager,
+            agent,
           );
           return;
         }
