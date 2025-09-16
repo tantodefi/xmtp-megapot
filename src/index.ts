@@ -849,9 +849,83 @@ async function handleSmartTextMessage(
         break;
 
       case "buy_tickets":
+        // Check if this is a solo choice response to a previous number
+        const buyContextHandler = smartHandler.getContextHandler();
+        const currentContext = buyContextHandler.getContext(
+          conversation.id,
+          message.senderInboxId,
+        );
+
+        if (
+          content.toLowerCase().trim() === "solo" &&
+          currentContext?.lastIntent === "standalone_number" &&
+          userAddress
+        ) {
+          // User chose solo for a previously provided number
+          const pendingTicketCount = currentContext.pendingTicketCount || 1;
+          console.log(
+            `🎫 Processing solo choice for ${pendingTicketCount} tickets`,
+          );
+
+          buyContextHandler.setPendingTicketPurchase(
+            conversation.id,
+            message.senderInboxId,
+            pendingTicketCount,
+            userAddress,
+            isGroupChat,
+          );
+
+          await conversation.send(
+            `Perfect! You'd like to buy ${pendingTicketCount} tickets for $${pendingTicketCount} USDC. Shall I proceed with the solo purchase?`,
+          );
+          return;
+        }
+
         if (intent.extractedData?.askForQuantity) {
           await conversation.send(
             "🎫 How many tickets would you like to purchase? (e.g., '5 tickets')",
+          );
+        } else if (
+          intent.extractedData?.askForPurchaseType &&
+          intent.extractedData?.ticketCount &&
+          userAddress
+        ) {
+          // Ambiguous intent - ask for solo/pool choice
+          const displayName = await getDisplayName(userAddress);
+          await conversation.send(
+            `${displayName}, looks like you want to buy ${intent.extractedData.ticketCount} ticket${intent.extractedData.ticketCount > 1 ? "s" : ""}. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,
+          );
+
+          // Save context for later
+          const buyContextHandler = smartHandler.getContextHandler();
+          buyContextHandler.updateContext(
+            conversation.id,
+            message.senderInboxId,
+            {
+              pendingTicketCount: intent.extractedData.ticketCount,
+              lastIntent: "standalone_number",
+              awaitingConfirmation: false,
+              isGroupChat: isGroupChat,
+              userAddress: userAddress,
+            },
+          );
+        } else if (
+          intent.extractedData?.ticketCount &&
+          intent.extractedData?.clearIntent &&
+          userAddress
+        ) {
+          // Clear solo intent - prepare transaction immediately
+          console.log(
+            `🎫 Clear solo intent detected: ${intent.extractedData.ticketCount} tickets - preparing transaction directly`,
+          );
+
+          // Directly call the ticket purchase handler (same as confirmation flow)
+          await handleTicketPurchaseIntent(
+            intent.extractedData.ticketCount,
+            userAddress,
+            conversation,
+            megaPotManager,
+            agent,
           );
         } else if (intent.extractedData?.ticketCount) {
           console.log(
@@ -928,7 +1002,66 @@ async function handleSmartTextMessage(
 
       case "pooled_purchase":
         console.log("🎯 Processing pooled purchase intent");
-        if (intent.extractedData?.ticketCount && userAddress) {
+
+        // Check if this is a pool choice response to a previous number
+        const poolContextHandler = smartHandler.getContextHandler();
+        const poolCurrentContext = poolContextHandler.getContext(
+          conversation.id,
+          message.senderInboxId,
+        );
+
+        if (
+          content.toLowerCase().trim() === "pool" &&
+          poolCurrentContext?.lastIntent === "standalone_number" &&
+          userAddress
+        ) {
+          // User chose pool for a previously provided number
+          const pendingTicketCount = poolCurrentContext.pendingTicketCount || 1;
+          console.log(
+            `🎯 Processing pool choice for ${pendingTicketCount} tickets`,
+          );
+
+          poolContextHandler.setPendingPoolPurchase(
+            conversation.id,
+            message.senderInboxId,
+            pendingTicketCount,
+            userAddress,
+          );
+
+          const displayName = await getDisplayName(userAddress);
+          await conversation.send(
+            `🎯 Daily Pool Purchase\n\n${displayName}, you want to buy ${pendingTicketCount} ticket${pendingTicketCount > 1 ? "s" : ""} for the daily pool for $${pendingTicketCount} USDC.\n\n💡 How the daily pool works:\n• One shared pool runs each day\n• All pool tickets increase collective winning chances\n• Winnings distributed proportionally based on risk exposure\n• Available in both DMs and group chats\n\nShall I prepare the pool purchase transaction?`,
+          );
+          return;
+        }
+
+        if (
+          intent.extractedData?.ticketCount &&
+          intent.extractedData?.clearIntent &&
+          userAddress
+        ) {
+          // Clear pool intent - prepare transaction immediately
+          console.log(
+            `🎯 Clear pool intent detected: ${intent.extractedData.ticketCount} tickets - preparing pool transaction directly`,
+          );
+
+          const poolResult = await poolHandler.processPooledTicketPurchase(
+            conversation.id,
+            message.senderInboxId,
+            userAddress,
+            intent.extractedData.ticketCount,
+            conversation,
+            agent.client,
+          );
+
+          await conversation.send(poolResult.message);
+          if (poolResult.success && poolResult.transactionData) {
+            await conversation.send(
+              poolResult.transactionData,
+              ContentTypeWalletSendCalls,
+            );
+          }
+        } else if (intent.extractedData?.ticketCount && userAddress) {
           // Universal pool system - works in both DMs and groups
           const ticketCount = intent.extractedData.ticketCount;
           const displayName = await getDisplayName(userAddress);
@@ -1072,6 +1205,20 @@ async function handleSmartTextMessage(
           }
 
           if (ticketCount && ticketCount > 0 && ticketCount <= 100) {
+            // Save the ticket count in context while waiting for solo/pool choice
+            const contextHandler = smartHandler.getContextHandler();
+            contextHandler.updateContext(
+              conversation.id,
+              message.senderInboxId,
+              {
+                pendingTicketCount: ticketCount,
+                lastIntent: "standalone_number",
+                awaitingConfirmation: false,
+                isGroupChat: isGroupChat,
+                userAddress: userAddress,
+              },
+            );
+
             const displayName = await getDisplayName(userAddress);
             await conversation.send(
               `${displayName}, looks like you want to buy ${ticketCount} ticket${ticketCount > 1 ? "s" : ""}. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,
@@ -1431,61 +1578,32 @@ async function handleClaimIntent(
 async function handleHelpIntent(conversation: any) {
   const isGroupChat = conversation instanceof Group;
 
-  const groupPoolFeatures = isGroupChat
-    ? `
+  const helpMessage = `🎰 MegaPot Lottery Agent
 
-👥 Group Pool Features:
-• "buy 5 tickets for group pool" - Purchase through jackpot pool
-• "pool status" - Check active group pools
-• "explain ticket types" - Learn solo vs pool differences
-• Pool purchases increase winning chances, prizes shared proportionally
-• Use "Buy for Group Pool" button for pool purchases`
-    : `
+💸 Buy lottery tickets with USDC on Base network
 
-🎫 Solo Ticket Features:
-• Individual purchases with 100% ownership
-• "buy X tickets" - Purchase solo tickets
-• Join a group chat to access pool purchase options`;
+📝 Simple Commands:
+• "buy 3 solo tickets" → Get transaction immediately
+• "buy 2 pool tickets" → Join daily pool
+• "4" → Choose solo or pool purchase
+• "stats" → View your ticket history
+• "jackpot" → See current prize
+• "claim" → Withdraw winnings
 
-  const smartFeatures = `
+${
+  isGroupChat
+    ? `👥 Group Features:
+• Pool tickets combine chances with other members
+• Winnings shared based on contribution`
+    : `🎫 Solo Features:
+• Keep 100% of any winnings
+• Join groups for pool options`
+}
 
-🤖 Enhanced AI Features:
-• Natural conversation understanding
-• Context-aware responses and confirmations
-• Multi-step purchase flow with confirmations
-• Intelligent number parsing ("seven", "a ticket", etc.)
-• Remembers your intent between messages
+💰 Current jackpot: Check buttons below
+⚡ Instant transactions when intent is clear
 
-💬 Smart Examples:
-• "I want to buy some lottery tickets" → AI asks how many
-• "Seven" → AI understands you want 7 tickets  
-• "Yes" → Confirms pending purchase
-• "buy me a ticket" → AI infers 1 ticket
-• "Continue with purchase" → Processes confirmation`;
-
-  const helpMessage = `🤖 Smart MegaPot Lottery Agent
-
-🎰 AI-powered lottery assistant with advanced natural language understanding!${smartFeatures}${groupPoolFeatures}
-
-🎯 Quick Commands:
-🎫 "buy X tickets" - Purchase individual tickets
-📊 "stats" or "my stats" - View your statistics
-🎰 "jackpot" or "prize info" - Current round details  
-💰 "claim" or "winnings" - Claim any prizes
-🎯 "explain ticket types" - Learn about solo vs pool options
-❓ "help" - Show this help message
-
-🔄 Transaction Flow:
-1. Tell me how many tickets you want
-2. I'll ask for confirmation with cost details
-3. Say "yes" or "approve" to proceed
-4. Open your wallet to complete the transaction
-
-⚠️ Requirements:
-• USDC on Base network for purchases
-• Connected wallet for transaction approval
-
-🌐 Full web experience: https://frame.megapot.io`;
+🌐 Full experience: https://frame.megapot.io`;
 
   await conversation.send(helpMessage);
   await sendMegaPotActions(conversation);

@@ -19,48 +19,13 @@ export async function getDisplayName(address: string): Promise<string> {
 
     let resolvedName = null;
 
-    // Try Farcaster resolution first (preferred for social interactions)
-    console.log(`🎭 Attempting Farcaster resolution for ${address}...`);
-    try {
-      resolvedName = await resolveFarcaster(address);
-      if (resolvedName) {
-        console.log(`✅ Resolved ${address} to Farcaster: ${resolvedName}`);
-      } else {
-        console.log(`⚠️ No Farcaster username found for ${address}`);
-      }
-    } catch (error) {
-      console.log(`⚠️ Farcaster resolution failed for ${address}:`, error);
-    }
+    // Skip API resolution in production due to network restrictions
+    // Focus on clean address formatting for reliability
+    console.log(`🔍 Using production-safe name resolution for ${address}`);
 
-    // If no Farcaster, try Basename
-    if (!resolvedName) {
-      console.log(`🏷️ Attempting Basename resolution for ${address}...`);
-      try {
-        resolvedName = await resolveBasename(address);
-        if (resolvedName) {
-          console.log(`✅ Resolved ${address} to Basename: ${resolvedName}`);
-        } else {
-          console.log(`⚠️ No Basename found for ${address}`);
-        }
-      } catch (error) {
-        console.log(`⚠️ Basename resolution failed for ${address}:`, error);
-      }
-    }
-
-    // If no Basename, try ENS reverse resolution
-    if (!resolvedName) {
-      console.log(`🌐 Attempting ENS resolution for ${address}...`);
-      try {
-        resolvedName = await resolveENS(address);
-        if (resolvedName) {
-          console.log(`✅ Resolved ${address} to ENS: ${resolvedName}`);
-        } else {
-          console.log(`⚠️ No ENS name found for ${address}`);
-        }
-      } catch (error) {
-        console.log(`⚠️ ENS resolution failed for ${address}:`, error);
-      }
-    }
+    // In production, external APIs are unreliable due to network restrictions
+    // The logs show consistent failures: Neynar 404, Basename 530/402, ENS network errors
+    // Better to provide consistent, fast experience with clean address formatting
 
     // Fallback to formatted address
     const finalName = resolvedName || formatFallbackName(address);

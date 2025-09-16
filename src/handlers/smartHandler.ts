@@ -28,6 +28,7 @@ export interface MessageIntent {
     askForPurchaseType?: boolean;
     isConfirmation?: boolean;
     isCancellation?: boolean;
+    clearIntent?: boolean;
   };
   response: string;
 }
@@ -420,40 +421,40 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       }
     }
 
-    // FIRST: Check for pool purchase detection (higher priority than regular buy)
-    const poolKeywords = [
-      "pool",
-      "group",
-      "together",
-      "shared",
-      "collective",
-      "join",
-      "participate",
-      "with others",
-      "with friends",
-      "with everyone",
-    ];
-
-    const hasPoolContext = poolKeywords.some(
-      (keyword) =>
-        lowerMessage.includes(keyword) ||
-        (lowerMessage.includes("ticket") && lowerMessage.includes(keyword)),
-    );
-
-    if (hasPoolContext) {
+    // FIRST: Check for explicit solo purchase (clear intent - no confirmation needed)
+    const hasSoloKeywords =
+      lowerMessage.includes("solo") || lowerMessage.includes("individual");
+    if (hasSoloKeywords && (isBuyIntent || lowerMessage.includes("ticket"))) {
       return {
-        type: "pooled_purchase",
-        confidence: 0.9,
+        type: "buy_tickets",
+        confidence: 0.95,
         extractedData: {
-          pooledRequest: true,
           ticketCount,
-          askForPurchaseType:
-            !lowerMessage.includes("pool") && !lowerMessage.includes("group"),
+          clearIntent: true, // Skip confirmation for clear intent
         },
       };
     }
 
-    // SECOND: Check for regular buy tickets (after pool check)
+    // SECOND: Check for explicit pool purchase (clear intent - no confirmation needed)
+    const poolKeywords = ["pool", "group", "together", "shared", "collective"];
+
+    const hasPoolContext = poolKeywords.some((keyword) =>
+      lowerMessage.includes(keyword),
+    );
+
+    if (hasPoolContext && (isBuyIntent || lowerMessage.includes("ticket"))) {
+      return {
+        type: "pooled_purchase",
+        confidence: 0.95,
+        extractedData: {
+          pooledRequest: true,
+          ticketCount,
+          clearIntent: true, // Skip confirmation for clear intent
+        },
+      };
+    }
+
+    // THIRD: Check for ambiguous buy tickets (needs solo/pool choice)
     if (
       isBuyIntent ||
       (lowerMessage.includes("buy") &&
@@ -471,7 +472,10 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "buy_tickets",
         confidence: 0.9,
-        extractedData: { ticketCount },
+        extractedData: {
+          ticketCount,
+          askForPurchaseType: true, // Need to ask solo or pool
+        },
       };
     }
 
@@ -876,46 +880,33 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         ? await getPersonalizedGreeting(userAddress)
         : "Hello!";
 
-      return `🎰 Smart MegaPot Lottery Assistant
+      return `🎰 MegaPot Lottery
 
-${greeting} Here's your lottery dashboard:
+${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}
 
-📊 Current Round:
-• Jackpot: $${lotteryStats.jackpotPool || "0"}
-• Ticket Price: $${lotteryStats.ticketPrice || "1.00"} USDC
-• Your Total Tickets: ${lotteryStats.totalTicketsPurchased || 0}
-• Solo Tickets: ${lotteryStats.individualTicketsPurchased || 0}
-• Pool Tickets: ${lotteryStats.groupTicketsPurchased || 0}
+📝 Commands:
+• "buy 3 solo tickets" → Instant transaction
+• "buy 2 pool tickets" → Join daily pool
+• "5" → Choose solo or pool
+• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)
+• "claim" → Withdraw winnings
 
-💬 Smart Commands:
-• "buy X tickets" - Purchase individual tickets
-• "stats" or "my stats" - View your statistics  
-• "jackpot" or "prize info" - Current round details
-• "claim" or "winnings" - Claim any prizes
-• "help" - Show this help message${smartFeatures}${groupInfo}
+${isGroupChat ? `👥 Pool: Combine chances with group` : `🎫 Solo: Keep 100% winnings`}
 
-🏆 All-Time Performance:
-• Total Jackpots Won: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
-• Lucky Winners: ${allTimeStats?.total_won || "19"} players
-• Total Tickets Sold: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}
-
-⚠️ Requirements:
-• USDC on Base network for purchases
-• Connected wallet for transactions
-
-🌐 Full experience: https://frame.megapot.io`;
+⚡ Just tell me what you want - I understand natural language
+🌐 Full site: https://frame.megapot.io`;
     } catch (error) {
       console.error("Error generating contextual help:", error);
-      return `🎰 Smart MegaPot Lottery Assistant
+      return `🎰 MegaPot Lottery
 
-I'm an AI-powered lottery assistant that can help you:
-• Buy tickets with natural language
-• Check your statistics and history  
-• View jackpot information
-• Claim winnings
-• Understand solo vs pool ticket options
+Quick Commands:
+• "buy 3 solo tickets" → Instant transaction
+• "buy pool tickets" → Join daily pool
+• "stats" → Your history
+• "claim" → Withdraw winnings
 
-Use the action buttons below or just ask me naturally!`;
+⚡ Natural language supported
+🌐 Full site: https://frame.megapot.io`;
     }
   }
 
