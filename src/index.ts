@@ -489,7 +489,18 @@ async function handleSmartTextMessage(
   userAddress?: string,
 ) {
   try {
-    const content = message.content as string;
+    // Handle different message content types
+    let content: string;
+    if (typeof message.content === "string") {
+      content = message.content;
+    } else if (message.content && typeof message.content.content === "string") {
+      // Reply messages have nested content structure
+      content = message.content.content;
+    } else {
+      console.log(`⚠️ Unsupported content structure:`, message.content);
+      return;
+    }
+
     const lowerContent = content.toLowerCase();
 
     console.log(`🤖 Processing message with AI: "${content}"`);
@@ -718,19 +729,23 @@ async function handleSmartTextMessage(
 
         if (
           pendingConfirmation &&
-          pendingConfirmation.ticketCount &&
+          (pendingConfirmation.ticketCount ||
+            pendingConfirmation.poolTicketCount) &&
           userAddress
         ) {
           if (pendingConfirmation.flow === "pool_purchase") {
+            const poolTicketCount = (pendingConfirmation.poolTicketCount ||
+              pendingConfirmation.ticketCount ||
+              1) as number;
             console.log(
-              `🎫 Executing pool purchase: ${pendingConfirmation.ticketCount} tickets`,
+              `🎫 Executing pool purchase: ${poolTicketCount} tickets`,
             );
             // Handle pool purchase confirmation
             const poolResult = await poolHandler.processPooledTicketPurchase(
               conversation.id,
               message.senderInboxId,
               userAddress,
-              pendingConfirmation.ticketCount,
+              poolTicketCount,
               conversation,
               agent.client,
             );
@@ -742,12 +757,15 @@ async function handleSmartTextMessage(
               );
             }
           } else {
+            const soloTicketCount = (pendingConfirmation.ticketCount ||
+              pendingConfirmation.poolTicketCount ||
+              1) as number;
             console.log(
-              `🎫 Executing solo purchase: ${pendingConfirmation.ticketCount} tickets`,
+              `🎫 Executing solo purchase: ${soloTicketCount} tickets`,
             );
             // Handle solo ticket purchase confirmation
             await handleTicketPurchaseIntent(
-              pendingConfirmation.ticketCount,
+              soloTicketCount,
               userAddress,
               conversation,
               megaPotManager,

@@ -249,7 +249,7 @@ IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity
 
 CRITICAL: If user provides a number followed by "tickets" or "ticket", this is ALWAYS a buy_tickets intent, even without the word "buy".
 
-POOL TICKETS: When user mentions "pool tickets", detect as pooled_purchase intent but don't provide a detailed response - let the main handler prepare the appropriate transaction.
+POOL TICKETS: When user mentions "pool tickets", detect as pooled_purchase intent. Provide minimal response like "I'll help you with pool tickets" - let the main handler do the detailed transaction preparation.
 
 CONTEXT AWARENESS:
 - Pay attention to conversation flow and pending confirmations
