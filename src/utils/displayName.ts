@@ -80,21 +80,22 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving Basename for address: ${address}`);
 
-    // Try Base blockchain ENS resolution first (most reliable for .base.eth names)
+    // Try Base L2 resolver directly using the correct contract address
     try {
       const ensName = await publicClient.getEnsName({
         address: address as `0x${string}`,
+        universalResolverAddress: "0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA", // Base L2Resolver from GitHub
       });
 
       if (ensName && ensName.endsWith(".base.eth")) {
-        console.log(`✅ Resolved ${address} via Base ENS: ${ensName}`);
+        console.log(`✅ Resolved ${address} via Base L2 resolver: ${ensName}`);
         return ensName;
       } else if (ensName) {
-        console.log(`✅ Resolved ${address} via ENS: ${ensName}`);
+        console.log(`✅ Resolved ${address} via Base resolver: ${ensName}`);
         return ensName;
       }
     } catch (ensError) {
-      console.log(`⚠️ Base ENS resolution failed for ${address}:`, ensError);
+      console.log(`⚠️ Base L2 resolver failed for ${address}:`, ensError);
     }
 
     // Try multiple Basename API endpoints as fallback
@@ -154,7 +155,7 @@ async function resolveFarcaster(address: string): Promise<string | null> {
       return null;
     }
 
-    // Use the correct Neynar SDK configuration pattern
+    // Use the working Neynar SDK pattern
     const { NeynarAPIClient, Configuration } = await import(
       "@neynar/nodejs-sdk"
     );
@@ -166,7 +167,7 @@ async function resolveFarcaster(address: string): Promise<string | null> {
 
     console.log(`🔍 Neynar SDK: Looking up user by address ${address}`);
 
-    // Use fetchBulkUsersByEthOrSolAddress as documented
+    // Use fetchBulkUsersByEthOrSolAddress (working method)
     const response = await client.fetchBulkUsersByEthOrSolAddress({
       addresses: [address],
     });
@@ -176,7 +177,7 @@ async function resolveFarcaster(address: string): Promise<string | null> {
       JSON.stringify(response, null, 2),
     );
 
-    // Check response structure - it should be an object with address as key
+    // Check response structure - fetchBulkUsersByEthOrSolAddress returns object with address as key
     if (response && response[address.toLowerCase()]) {
       const users = response[address.toLowerCase()];
       if (users && users.length > 0) {

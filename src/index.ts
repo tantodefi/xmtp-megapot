@@ -1191,6 +1191,10 @@ async function handleSmartTextMessage(
             content.trim(),
           );
 
+        console.log(
+          `🔍 Unknown case: isStandaloneNumber=${isStandaloneNumberUnknown}, content="${content.trim()}", userAddress=${userAddress}`,
+        );
+
         if (isStandaloneNumberUnknown && userAddress) {
           // Parse the number
           let ticketCount: number | undefined;
@@ -1223,9 +1227,13 @@ async function handleSmartTextMessage(
             ticketCount = wordToNumber[content.trim().toLowerCase()];
           }
 
+          console.log(`🔍 Parsed ticket count: ${ticketCount}`);
+
           if (ticketCount && ticketCount > 0 && ticketCount <= 100) {
             // Save the ticket count in context while waiting for solo/pool choice
             const contextHandler = smartHandler.getContextHandler();
+            console.log(`🔧 Saving context for ${ticketCount} tickets...`);
+
             contextHandler.updateContext(
               conversation.id,
               message.senderInboxId,
@@ -1236,6 +1244,16 @@ async function handleSmartTextMessage(
                 isGroupChat: isGroupChat,
                 userAddress: userAddress,
               },
+            );
+
+            // Verify context was saved
+            const savedContext = contextHandler.getContext(
+              conversation.id,
+              message.senderInboxId,
+            );
+            console.log(
+              `✅ Context saved:`,
+              JSON.stringify(savedContext, null, 2),
             );
 
             const displayName = await getDisplayName(userAddress);
