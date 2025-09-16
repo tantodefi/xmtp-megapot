@@ -31,6 +31,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@neynar/nodejs-sdk": "^2.46.0",
     "@xmtp/agent-sdk": "^0.0.9",
     "@xmtp/content-type-primitives": "^2.0.2",
     "@xmtp/content-type-reaction": "^1.1.8",

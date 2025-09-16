@@ -699,17 +699,27 @@ async function handleSmartTextMessage(
             `✅ Set pending INDIVIDUAL confirmation context for ${ticketCount} tickets (converted from pool request in DM)`,
           );
         } else {
-          // Regular individual purchase
-          aiContextHandler.setPendingTicketPurchase(
-            conversation.id,
-            message.senderInboxId,
-            ticketCount,
-            userAddress,
-            isGroupChat,
-          );
-          console.log(
-            `✅ Set pending confirmation context for ${ticketCount} tickets`,
-          );
+          // For numbers without "pool" context, ask user to choose solo or pool
+          if (/^\d+$/.test(content.trim())) {
+            // User provided just a number, ask for purchase type
+            const displayName = await getDisplayName(userAddress);
+            await conversation.send(
+              `${displayName}, looks like you want to buy ${ticketCount} tickets. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,
+            );
+            return; // Don't set pending context yet, wait for choice
+          } else {
+            // Regular individual purchase
+            aiContextHandler.setPendingTicketPurchase(
+              conversation.id,
+              message.senderInboxId,
+              ticketCount,
+              userAddress,
+              isGroupChat,
+            );
+            console.log(
+              `✅ Set pending confirmation context for ${ticketCount} tickets`,
+            );
+          }
         }
       }
     }

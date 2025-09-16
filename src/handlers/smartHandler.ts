@@ -249,7 +249,7 @@ IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity
 
 CRITICAL: If user provides a number followed by "tickets" or "ticket", this is ALWAYS a buy_tickets intent, even without the word "buy".
 
-POOL TICKETS: When user mentions "pool tickets", detect as pooled_purchase intent. Provide minimal response like "I'll help you with pool tickets" - let the main handler do the detailed transaction preparation.
+POOL TICKETS: When user mentions "pool tickets", detect as pooled_purchase intent. Provide very brief response like "Processing pool purchase..." - the main handler will send the detailed confirmation message.
 
 CONTEXT AWARENESS:
 - Pay attention to conversation flow and pending confirmations
@@ -505,6 +505,14 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return { type: "general_inquiry", confidence: 0.8 };
     }
 
+    // Handle solo/pool choice responses
+    if (/^(solo|individual)$/i.test(originalMessage.trim())) {
+      return { type: "buy_tickets", confidence: 0.9 };
+    }
+    if (/^(pool|group)$/i.test(originalMessage.trim())) {
+      return { type: "pooled_purchase", confidence: 0.9 };
+    }
+
     return { type: "unknown", confidence: 0.3 };
   }
 
@@ -534,7 +542,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         if (userAddress) {
           const personalizedGreeting =
             await getPersonalizedGreeting(userAddress);
-          return `${personalizedGreeting} Welcome to the lottery system. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`;
+          return `${personalizedGreeting} Welcome to the megapot lottery agent. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`;
         }
         return `${baseResponse}\n\n🌐 Try the full experience: https://frame.megapot.io`;
 
