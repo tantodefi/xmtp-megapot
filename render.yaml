@@ -3,8 +3,8 @@ services:
     name: xmtp-megapot-agent
     env: node
     plan: starter
-    buildCommand: yarn install --immutable
-    startCommand: yarn start
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
     disk:
       name: megapot-agent-data
       mountPath: /app/data
@@ -22,9 +22,11 @@ services:
         value: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
       - key: MEGAPOT_REFERRER_ADDRESS
         value: 0xa14ce36e7b135b66c3e3cb2584e777f32b15f5dc
+      - key: JACKPOT_POOL_CONTRACT_ADDRESS
+        value: 0xfb324c09c16b5f437ff612a4e8bc95b8fd6e6d5a
       - key: MEGAPOT_DATA_API_KEY
         value: YOUR_API_KEY_HERE
     # Environment variables that need to be set in Render dashboard:
     # WALLET_KEY - Agent's private key
     # ENCRYPTION_KEY - XMTP database encryption key
-
+    # OPENAI_API_KEY - OpenAI API key for smart features

@@ -80,14 +80,12 @@ export class SmartHandler {
     } catch (error) {
       console.error("❌ Error parsing message intent:", error);
 
-      // Fallback to rule-based parsing
-      const fallbackIntent = this.fallbackIntentParsing(message);
-      return {
-        ...fallbackIntent,
-        response:
-          "I'm having trouble processing your request right now, but I can still help! " +
-          fallbackIntent.response,
-      };
+        // Fallback to rule-based parsing
+        const fallbackIntent = this.fallbackIntentParsing(message);
+        return {
+          ...fallbackIntent,
+          response: "I'm having trouble processing your request right now, but I can still help! Try using the action buttons or ask about buying tickets, checking stats, or jackpot info.",
+        };
     }
   }
 

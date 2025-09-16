@@ -69,7 +69,7 @@ export interface GroupPool {
 export class PoolHandler {
   private groupPools = new Map<string, GroupPool>();
   private megaPotManager: MegaPotManager;
-  private client: ReturnType<typeof createPublicClient>;
+  private client: any; // Simplified type to avoid viem version conflicts
 
   constructor(megaPotManager: MegaPotManager) {
     this.megaPotManager = megaPotManager;
@@ -289,7 +289,7 @@ export class PoolHandler {
       args: [
         referrerAddress, // referrer address
         totalCostUSDC, // value in USDC (6 decimals)
-        userAddress, // recipient gets credit for the tickets
+        userAddress as `0x${string}`, // recipient gets credit for the tickets
       ],
     });
 
@@ -298,7 +298,7 @@ export class PoolHandler {
       abi: USDC_ABI,
       functionName: "approve",
       args: [
-        poolContractAddress, // spender (the pool contract)
+        poolContractAddress as `0x${string}`, // spender (the pool contract)
         totalCostUSDC, // amount to approve
       ],
     });
@@ -319,7 +319,7 @@ export class PoolHandler {
         {
           // First approve USDC spending to the pool contract
           to: usdcAddress,
-          data: approveCallData,
+          data: approveCallData as `0x${string}`,
           value: "0x0",
           gas: "0xC350", // ~50,000 gas
           metadata: {
@@ -329,8 +329,8 @@ export class PoolHandler {
         },
         {
           // Then call the real JackpotPool contract
-          to: poolContractAddress,
-          data: poolPurchaseCallData,
+          to: poolContractAddress as `0x${string}`,
+          data: poolPurchaseCallData as `0x${string}`,
           value: "0x0",
           gas: "0x30D40", // ~200,000 gas
           metadata: {
@@ -441,8 +441,8 @@ If the pool wins $1,000, you get ${sharePercentage}% = $${((parseFloat(sharePerc
       },
       calls: [
         {
-          to: poolContractAddress,
-          data: claimCallData,
+          to: poolContractAddress as `0x${string}`,
+          data: claimCallData as `0x${string}`,
           value: "0x0",
           gas: "0x15F90", // ~90,000 gas
           metadata: {

@@ -188,9 +188,14 @@ The agent supports MegaPot's referrer system through the `MEGAPOT_REFERRER_ADDRE
 
 - `yarn dev` - Start smart AI-powered agent with hot reload
 - `yarn start` - Start agent in production
-- `yarn build` - Build TypeScript
+- `npm run build` - Build TypeScript (recommended - yarn build has issues)
 - `yarn gen:keys` - Generate new wallet and encryption keys
 - `yarn lint` - Run linter
+
+### Build Notes
+- Use `npm run build` for compilation (yarn build has workspace conflicts)
+- Development with `yarn dev` works perfectly
+- Production deployment uses npm commands in render.yaml
 
 ## Network Support
 

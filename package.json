@@ -15,9 +15,10 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsc && echo '✅ TypeScript compilation successful'",
+    "build": "npx tsc && echo '✅ TypeScript compilation successful'",
     "build:check": "tsc --noEmit",
-    "build:clean": "rm -rf dist && tsc",
+    "build:clean": "rm -rf dist && npx tsc",
+    "build:npm": "npm run build",
     "dev": "tsx --watch src/index.ts",
     "gen:keys": "tsx src/generateKeys.ts",
     "lint": "cd ../.. && yarn eslint examples/xmtp-megapot",
