@@ -197,9 +197,25 @@ async function main() {
       );
 
       try {
-        // Import and run the revoke function
+        // Extract inbox ID from error message
+        const inboxIdMatch = error.message.match(
+          /InboxID (\w+) has already registered/,
+        );
+        const inboxId = inboxIdMatch ? inboxIdMatch[1] : null;
+
+        if (!inboxId) {
+          throw new Error("Could not extract inbox ID from error message");
+        }
+
+        console.log(`📋 Inbox ID: ${inboxId}`);
+
+        // Import and run the revoke function with inbox ID
         const { execSync } = await import("child_process");
-        execSync("npm run revoke-installations", { stdio: "inherit" });
+        console.log(`🔄 Running: node revoke-installations.js ${inboxId}`);
+        execSync(`node revoke-installations.js ${inboxId}`, {
+          stdio: "inherit",
+          cwd: process.cwd(),
+        });
 
         console.log("✅ Installations revoked. Retrying agent creation...");
 
