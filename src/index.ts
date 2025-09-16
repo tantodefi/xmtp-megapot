@@ -608,19 +608,53 @@ async function handleSmartTextMessage(
         `🔧 Detected confirmation request in AI response for ${ticketCount} tickets`,
       );
 
+      // Check if this was originally a pool request
+      const originalMessageLower = content.toLowerCase();
+      const isPoolRequest =
+        originalMessageLower.includes("pool") ||
+        originalMessageLower.includes("group") ||
+        aiResponseLower.includes("pooled") ||
+        aiResponseLower.includes("pool");
+
       // Set pending confirmation context
       const aiContextHandler = smartHandler.getContextHandler();
       if (userAddress && ticketCount > 0) {
-        aiContextHandler.setPendingTicketPurchase(
-          conversation.id,
-          message.senderInboxId,
-          ticketCount,
-          userAddress,
-          isGroupChat,
-        );
-        console.log(
-          `✅ Set pending confirmation context for ${ticketCount} tickets`,
-        );
+        if (isPoolRequest && isGroupChat) {
+          // Set as pool purchase
+          aiContextHandler.setPendingPoolPurchase(
+            conversation.id,
+            message.senderInboxId,
+            ticketCount,
+            userAddress,
+          );
+          console.log(
+            `✅ Set pending POOL confirmation context for ${ticketCount} tickets`,
+          );
+        } else if (isPoolRequest && !isGroupChat) {
+          // Convert pool request to individual in DMs
+          aiContextHandler.setPendingTicketPurchase(
+            conversation.id,
+            message.senderInboxId,
+            ticketCount,
+            userAddress,
+            isGroupChat,
+          );
+          console.log(
+            `✅ Set pending INDIVIDUAL confirmation context for ${ticketCount} tickets (converted from pool request in DM)`,
+          );
+        } else {
+          // Regular individual purchase
+          aiContextHandler.setPendingTicketPurchase(
+            conversation.id,
+            message.senderInboxId,
+            ticketCount,
+            userAddress,
+            isGroupChat,
+          );
+          console.log(
+            `✅ Set pending confirmation context for ${ticketCount} tickets`,
+          );
+        }
       }
     }
 
@@ -1363,7 +1397,14 @@ async function sendMegaPotActions(conversation: any) {
     actions,
   };
 
-  console.log("🎯 Sending Smart MegaPot inline actions");
+  console.log(
+    `🎯 Sending Smart MegaPot inline actions (${isGroupChat ? "GROUP" : "DM"} - ${actions.length} buttons)`,
+  );
+  if (isGroupChat) {
+    console.log(
+      "👥 Group-specific buttons included: Buy for Group Pool, Pool Status",
+    );
+  }
   await conversation.send(actionsContent, ContentTypeActions);
 }
 

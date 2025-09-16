@@ -1,7 +1,10 @@
 import OpenAI from "openai";
 import { MegaPotManager } from "../managers/MegaPotManager.js";
+import {
+  getDisplayName,
+  getPersonalizedGreeting,
+} from "../utils/displayName.js";
 import { ContextHandler } from "./contextHandler.js";
-import { getPersonalizedGreeting, getDisplayName } from "../utils/displayName.js";
 
 export interface MessageIntent {
   type:
@@ -156,7 +159,12 @@ export class SmartHandler {
 
       return {
         ...intent,
-        response: await this.formatResponse(response, intent.type, lotteryStats, userAddress),
+        response: await this.formatResponse(
+          response,
+          intent.type,
+          lotteryStats,
+          userAddress,
+        ),
       };
     } catch (error) {
       console.error("❌ Error parsing message intent:", error);
@@ -356,10 +364,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       }
     }
 
-    // Also check if we found a ticket count - that's likely a buy intent
-    if (!isBuyIntent && ticketCount && ticketCount > 0) {
-      isBuyIntent = true;
-    }
+    // Don't automatically set isBuyIntent based on ticket count alone
+    // Let pool detection happen first
 
     // Try to extract ticket count from LLM response if not found in original message
     if (!ticketCount && lowerResponse) {
@@ -372,29 +378,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       }
     }
 
-    // Determine intent based on enhanced patterns
-    if (
-      isBuyIntent ||
-      (lowerMessage.includes("buy") &&
-        (lowerMessage.includes("ticket") || ticketCount))
-    ) {
-      // If no ticket count found but singular "ticket", default to 1
-      if (
-        !ticketCount &&
-        /\bticket\b/.test(lowerMessage) &&
-        !/\btickets\b/.test(lowerMessage)
-      ) {
-        ticketCount = 1;
-      }
-
-      return {
-        type: "buy_tickets",
-        confidence: 0.9,
-        extractedData: { ticketCount },
-      };
-    }
-
-    // Enhanced pool purchase detection
+    // FIRST: Check for pool purchase detection (higher priority than regular buy)
     const poolKeywords = [
       "pool",
       "group",
@@ -424,6 +408,28 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           askForPurchaseType:
             !lowerMessage.includes("pool") && !lowerMessage.includes("group"),
         },
+      };
+    }
+
+    // SECOND: Check for regular buy tickets (after pool check)
+    if (
+      isBuyIntent ||
+      (lowerMessage.includes("buy") &&
+        (lowerMessage.includes("ticket") || ticketCount))
+    ) {
+      // If no ticket count found but singular "ticket", default to 1
+      if (
+        !ticketCount &&
+        /\bticket\b/.test(lowerMessage) &&
+        !/\btickets\b/.test(lowerMessage)
+      ) {
+        ticketCount = 1;
+      }
+
+      return {
+        type: "buy_tickets",
+        confidence: 0.9,
+        extractedData: { ticketCount },
       };
     }
 
@@ -495,11 +501,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         return `${baseResponse}\n\n👥 In group chats, members can buy pool tickets together to increase collective winning chances!`;
 
       case "greeting":
-        if (userAddress) {
-          const personalizedGreeting = await getPersonalizedGreeting(userAddress);
-          return `${personalizedGreeting} Welcome to the lottery system. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`;
-        }
-        return `${baseResponse}\n\n🌐 Try the full experience: https://frame.megapot.io`;
+        // Don't format greeting response here - let the main handler handle it
+        return baseResponse;
 
       default:
         return baseResponse;
@@ -586,6 +589,25 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     if (!isBuyIntent && /\b(a|me\s+a)\s+ticket\b/i.test(message)) {
       isBuyIntent = true;
       ticketCount = 1;
+    }
+
+    // Check for pool context BEFORE returning buy_tickets
+    const poolKeywords = ["pool", "group", "together", "shared", "collective"];
+    const hasPoolContext = poolKeywords.some((keyword) =>
+      lowerMessage.includes(keyword),
+    );
+
+    if (hasPoolContext && (isBuyIntent || ticketCount)) {
+      return {
+        type: "pooled_purchase",
+        confidence: 0.8,
+        extractedData: {
+          pooledRequest: true,
+          ticketCount,
+          askForPurchaseType:
+            !lowerMessage.includes("pool") && !lowerMessage.includes("group"),
+        },
+      };
     }
 
     if (isBuyIntent) {
@@ -781,8 +803,10 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
 • Confirmation flow - "Yes" to approve purchases
 • Intelligent responses to "7", "buy me a ticket", etc.`;
 
-      const greeting = userAddress ? await getPersonalizedGreeting(userAddress) : "Hello!";
-      
+      const greeting = userAddress
+        ? await getPersonalizedGreeting(userAddress)
+        : "Hello!";
+
       return `🎰 Smart MegaPot Lottery Assistant
 
 ${greeting} Here's your lottery dashboard:

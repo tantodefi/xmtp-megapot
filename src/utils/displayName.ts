@@ -18,11 +18,11 @@ export async function getDisplayName(address: string): Promise<string> {
     // TODO: Implement Neynar API integration when properly configured
     // For now, try to create a more friendly name from the address
     const formattedName = formatFallbackName(address);
-    
+
     // Cache the result
     displayNameCache.set(address.toLowerCase(), {
       name: formattedName,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return formattedName;
@@ -40,21 +40,25 @@ function formatFallbackName(address: string): string {
   if (!address || address.length < 8) {
     return "User";
   }
-  
-  // For now, use a simple but friendly format
-  // Future: Integrate with Neynar API for real display names
-  // Example: 0x1234...5678 becomes "User 1234"
-  const shortAddress = address.slice(2, 6); // Remove 0x and take next 4 chars
-  return `User ${shortAddress}`;
+
+  // Try to create a Basename-style name or use truncated address
+  // Future: Integrate with Basename API and Neynar for real display names
+  const shortAddress = address.slice(2, 6).toLowerCase(); // Remove 0x and take next 4 chars
+
+  // Create a more friendly format: first 4 + last 4 chars
+  const friendlyAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
+  return friendlyAddress;
 }
 
 /**
  * Get greeting with display name
  */
-export async function getPersonalizedGreeting(address: string): Promise<string> {
+export async function getPersonalizedGreeting(
+  address: string,
+): Promise<string> {
   try {
     const displayName = await getDisplayName(address);
-    
+
     // Use the friendly display name for greeting
     if (displayName && displayName !== "User") {
       return `Good morning, ${displayName}!`;
@@ -73,7 +77,7 @@ export async function getPersonalizedGreeting(address: string): Promise<string> 
 export async function getMentionName(address: string): Promise<string> {
   try {
     const displayName = await getDisplayName(address);
-    
+
     // Format as mention
     if (displayName && displayName !== "User") {
       return `@${displayName}`;
@@ -90,15 +94,17 @@ export async function getMentionName(address: string): Promise<string> {
 /**
  * Batch resolve multiple addresses to display names
  */
-export async function getDisplayNames(addresses: string[]): Promise<Map<string, string>> {
+export async function getDisplayNames(
+  addresses: string[],
+): Promise<Map<string, string>> {
   const nameMap = new Map<string, string>();
-  
+
   // Resolve names in parallel for better performance
   const promises = addresses.map(async (address) => {
     const name = await getDisplayName(address);
     nameMap.set(address.toLowerCase(), name);
   });
-  
+
   await Promise.all(promises);
   return nameMap;
 }
