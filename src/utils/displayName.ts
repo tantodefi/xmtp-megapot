@@ -19,17 +19,32 @@ export async function getDisplayName(address: string): Promise<string> {
 
     let resolvedName = null;
 
-    // Try Basename resolution for smart contract wallets (they often have .base.eth names)
-    console.log(`🏷️ Attempting Basename resolution for ${address}...`);
+    // Try Farcaster resolution first (preferred for social interactions)
+    console.log(`🎭 Attempting Farcaster resolution for ${address}...`);
     try {
-      resolvedName = await resolveBasename(address);
+      resolvedName = await resolveFarcaster(address);
       if (resolvedName) {
-        console.log(`✅ Resolved ${address} to Basename: ${resolvedName}`);
+        console.log(`✅ Resolved ${address} to Farcaster: ${resolvedName}`);
       } else {
-        console.log(`⚠️ No Basename found for ${address}`);
+        console.log(`⚠️ No Farcaster username found for ${address}`);
       }
     } catch (error) {
-      console.log(`⚠️ Basename resolution failed for ${address}:`, error);
+      console.log(`⚠️ Farcaster resolution failed for ${address}:`, error);
+    }
+
+    // If no Farcaster, try Basename resolution
+    if (!resolvedName) {
+      console.log(`🏷️ Attempting Basename resolution for ${address}...`);
+      try {
+        resolvedName = await resolveBasename(address);
+        if (resolvedName) {
+          console.log(`✅ Resolved ${address} to Basename: ${resolvedName}`);
+        } else {
+          console.log(`⚠️ No Basename found for ${address}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Basename resolution failed for ${address}:`, error);
+      }
     }
 
     // Fallback to formatted address
@@ -80,47 +95,47 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving Basename for address: ${address}`);
 
-    // Skip complex contract calls for now - focus on working API resolution
-    console.log(
-      `🔍 Skipping Base contract resolution due to complexity - focusing on API fallbacks`,
-    );
+    // Use simple viem approach for Basename resolution
+    try {
+      // Try to get ENS name from Base chain
+      const ensName = await publicClient.getEnsName({
+        address: address as `0x${string}`,
+      });
 
-    // Try multiple Basename API endpoints as fallback
-    const basenameEndpoints = [
-      `https://api.basename.app/v1/name/${address}`,
-      `https://basename.app/api/name/${address}`,
-      `https://resolver.base.org/reverse/${address}`,
-    ];
+      if (ensName && ensName.endsWith(".base.eth")) {
+        console.log(`✅ Resolved ${address} via Base viem: ${ensName}`);
+        return ensName;
+      } else if (ensName) {
+        console.log(`✅ Resolved ${address} via viem: ${ensName}`);
+        return ensName;
+      }
+    } catch (viemError) {
+      console.log(`⚠️ Viem ENS resolution failed for ${address}:`, viemError);
+    }
 
-    for (const endpoint of basenameEndpoints) {
-      try {
-        const basenameResponse = await fetch(endpoint, {
-          method: "GET",
+    // Try direct Basename API call
+    try {
+      const response = await fetch(
+        `https://www.base.org/api/v1/reverse/${address}`,
+        {
           headers: {
             Accept: "application/json",
             "User-Agent": "MegaPot-Agent/1.0",
           },
-        });
+        },
+      );
 
-        if (basenameResponse.ok) {
-          const basenameData = await basenameResponse.json();
-          const basename =
-            basenameData.name || basenameData.basename || basenameData.reverse;
-          if (basename && basename.endsWith(".base.eth")) {
-            console.log(
-              `✅ Resolved ${address} via Basename: ${basename} (${endpoint})`,
-            );
-            return basename;
-          }
-        } else {
-          console.log(
-            `⚠️ Basename endpoint ${endpoint} returned ${basenameResponse.status}`,
-          );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.name && data.name.endsWith(".base.eth")) {
+          console.log(`✅ Resolved ${address} via Base API: ${data.name}`);
+          return data.name;
         }
-      } catch (apiError) {
-        console.log(`⚠️ Basename endpoint ${endpoint} failed:`, apiError);
-        continue; // Try next endpoint
+      } else {
+        console.log(`⚠️ Base API returned ${response.status} for ${address}`);
       }
+    } catch (apiError) {
+      console.log(`⚠️ Base API failed for ${address}:`, apiError);
     }
 
     console.log(`⚠️ No Basename found for ${address}`);

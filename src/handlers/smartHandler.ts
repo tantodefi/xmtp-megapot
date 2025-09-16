@@ -158,14 +158,29 @@ export class SmartHandler {
         userInboxId,
       );
 
-      // Update context with the detected intent
+      // Update context with the detected intent (but preserve standalone_number context)
       if (conversationId && userInboxId) {
-        this.contextHandler.updateLastIntent(
+        const currentContext = this.contextHandler.getContext(
           conversationId,
           userInboxId,
-          intent.type,
-          intent.confidence,
         );
+
+        // Don't overwrite lastIntent if we're in a solo/pool choice flow
+        if (
+          currentContext?.lastIntent !== "standalone_number" ||
+          (intent.type !== "buy_tickets" && intent.type !== "pooled_purchase")
+        ) {
+          this.contextHandler.updateLastIntent(
+            conversationId,
+            userInboxId,
+            intent.type,
+            intent.confidence,
+          );
+        } else {
+          console.log(
+            `🔒 Preserving standalone_number context, not updating to ${intent.type}`,
+          );
+        }
       }
 
       return {
