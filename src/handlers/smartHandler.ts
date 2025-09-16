@@ -18,6 +18,7 @@ export interface MessageIntent {
     amount?: number;
     pooledRequest?: boolean;
     askForQuantity?: boolean;
+    askForPurchaseType?: boolean;
   };
   response: string;
 }
@@ -253,15 +254,36 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       };
     }
 
-    if (
-      lowerMessage.includes("pool") ||
-      lowerMessage.includes("group") ||
-      lowerMessage.includes("together")
-    ) {
+    // Enhanced pool purchase detection
+    const poolKeywords = [
+      "pool",
+      "group",
+      "together",
+      "shared",
+      "collective",
+      "join",
+      "participate",
+      "with others",
+      "with friends",
+      "with everyone",
+    ];
+
+    const hasPoolContext = poolKeywords.some(
+      (keyword) =>
+        lowerMessage.includes(keyword) ||
+        (lowerMessage.includes("ticket") && lowerMessage.includes(keyword)),
+    );
+
+    if (hasPoolContext) {
       return {
         type: "pooled_purchase",
-        confidence: 0.8,
-        extractedData: { pooledRequest: true, ticketCount },
+        confidence: 0.9,
+        extractedData: {
+          pooledRequest: true,
+          ticketCount,
+          askForPurchaseType:
+            !lowerMessage.includes("pool") && !lowerMessage.includes("group"),
+        },
       };
     }
 
@@ -459,8 +481,53 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "buy_tickets",
         confidence: 0.9,
-        extractedData: { askForQuantity: true },
+        extractedData: {
+          askForQuantity: true,
+          askForPurchaseType: true,
+        },
       };
+    }
+
+    // Handle numeric words as standalone ticket counts
+    const numericWords = [
+      "twenty",
+      "thirty",
+      "forty",
+      "fifty",
+      "sixty",
+      "seventy",
+      "eighty",
+      "ninety",
+      "one",
+      "two",
+      "three",
+      "four",
+      "five",
+      "six",
+      "seven",
+      "eight",
+      "nine",
+      "ten",
+      "eleven",
+      "twelve",
+      "thirteen",
+      "fourteen",
+      "fifteen",
+      "sixteen",
+      "seventeen",
+      "eighteen",
+      "nineteen",
+    ];
+
+    if (numericWords.includes(lowerMessage)) {
+      const ticketCount = this.parseNumberFromText(lowerMessage);
+      if (ticketCount) {
+        return {
+          type: "buy_tickets",
+          confidence: 0.9,
+          extractedData: { ticketCount },
+        };
+      }
     }
 
     return { type: "unknown", confidence: 0.5 };

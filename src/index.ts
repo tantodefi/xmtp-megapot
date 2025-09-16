@@ -670,9 +670,19 @@ async function handleSmartTextMessage(
 
       case "pooled_purchase":
         if (isGroupChat) {
-          await conversation.send(
-            `👥 Group Pool Purchases\n\nBuy tickets through the group pool to benefit from collective winnings!\n\nCommands:\n• "buy 5 tickets for group pool" - Purchase through pool\n• "pool status" - Check pool statistics\n• "my pool share" - See your contribution\n\n💡 Your winnings are proportional to your ticket contributions!`,
-          );
+          if (intent.extractedData?.askForPurchaseType) {
+            await conversation.send(
+              "Would you like to buy tickets individually or through the group pool?\n\n" +
+                "🎫 Individual Purchase: You keep all potential winnings\n" +
+                "👥 Group Pool: Share costs and winnings with the group - your share is proportional to your contribution\n\n" +
+                "Reply with 'individual' or 'pool', or use the action buttons below.",
+            );
+            await sendMegaPotActions(conversation);
+          } else {
+            await conversation.send(
+              `👥 Group Pool Purchases\n\nBuy tickets through the group pool to benefit from collective winnings!\n\nCommands:\n• "buy 5 tickets for group pool" - Purchase through pool\n• "pool status" - Check group pool statistics\n• "my pool share" - See your contribution\n\n💡 Your winnings are proportional to your ticket contributions!`,
+            );
+          }
         } else {
           await conversation.send(
             "👥 Group pool purchases are only available in group chats! Add me to a group to buy tickets through a shared pool.",
@@ -739,9 +749,19 @@ async function handleIntentMessage(
     // Handle different action types
     switch (intentContent.actionId) {
       case "buy-tickets":
-        await conversation.send(
-          "🎫 How many tickets would you like to purchase? (e.g., '5 tickets')",
-        );
+        if (conversation instanceof Group) {
+          await conversation.send(
+            "Would you like to buy tickets individually or through the group pool?\n\n" +
+              "🎫 Individual Purchase: You keep all potential winnings\n" +
+              "👥 Group Pool: Share costs and winnings with the group - your share is proportional to your contribution\n\n" +
+              "Reply with 'individual' or 'pool', or use the action buttons below.",
+          );
+          await sendMegaPotActions(conversation);
+        } else {
+          await conversation.send(
+            "🎫 How many tickets would you like to purchase? (e.g., '5 tickets')",
+          );
+        }
         break;
       case "buy-pool-tickets":
         if (conversation instanceof Group) {
@@ -1049,12 +1069,21 @@ async function sendMegaPotActions(conversation: any) {
     },
   ];
 
-  // Add group pool purchase button for group chats
+  // Always show group pool button in group chats
   if (isGroupChat) {
     actions.splice(1, 0, {
       id: "buy-pool-tickets",
       label: "🎯 Buy for Group Pool",
       style: "primary" as const,
+    });
+  }
+
+  // Add pool status button in group chats
+  if (isGroupChat) {
+    actions.splice(2, 0, {
+      id: "pool-status",
+      label: "📊 Pool Status",
+      style: "secondary" as const,
     });
   }
 
