@@ -857,7 +857,7 @@ async function handleSmartTextMessage(
               );
 
               await conversation.send(
-                `❌ Pool tickets are only available in group chats!\n\n🎫 Converting to individual purchase:\nI can buy you ${intent.extractedData.ticketCount} individual ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for $${intent.extractedData.ticketCount} USDC instead. You'll keep 100% of any winnings.\n\nShall I proceed with the individual purchase?\n\n👥 To buy pool tickets: Add me to a group chat!`,
+                `❌ Pool tickets are only available in group chats!\n\n🎫 Alternative: Individual Purchase\nI can buy you ${intent.extractedData.ticketCount} individual ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for $${intent.extractedData.ticketCount} USDC instead. You'll keep 100% of any winnings.\n\nWould you like to proceed with individual tickets instead?\n\n👥 For pool tickets: Create or join a group chat and add me there!`,
               );
             } else {
               await conversation.send(
@@ -866,7 +866,7 @@ async function handleSmartTextMessage(
             }
           } else {
             await conversation.send(
-              "❌ Pool tickets are only available in group chats!\n\n🎫 In DMs, I can help you buy individual tickets instead.\n\nTell me how many individual tickets you'd like (e.g., '5 tickets') and you'll keep 100% of any winnings.\n\n👥 To buy pool tickets: Add me to a group chat where you can organize shared purchases with friends!",
+              "❌ Pool tickets are only available in group chats!\n\n🎫 In DMs, I can help you buy individual tickets instead.\n\nTell me how many individual tickets you'd like (e.g., '5 tickets') and you'll keep 100% of any winnings.\n\n👥 For pool tickets: Create or join a group chat and add me there!",
             );
           }
         }
@@ -927,10 +927,11 @@ async function handleSmartTextMessage(
         const lowerContent = content.toLowerCase();
         if (
           lowerContent.includes("group chat") ||
-          lowerContent.includes("this is a group")
+          lowerContent.includes("this is a group") ||
+          lowerContent.includes("pool ticket")
         ) {
           await conversation.send(
-            `🔍 I'm detecting this as a Direct Message (DM), not a group chat.\n\n📱 Current conversation type: ${isGroupChat ? "Group" : "Direct Message"}\n\n👥 To access group pool features:\n• Create or join a group chat\n• Add me to the group\n• Use pool purchase commands there\n\n🎫 In DMs, you can buy individual tickets that you keep 100% ownership of.`,
+            `🔍 Conversation Analysis:\n📱 Type: ${isGroupChat ? "Group Chat" : "Direct Message (DM)"}\n🆔 ID: ${conversation.id.slice(0, 8)}...\n🏗️ Constructor: ${conversation.constructor.name}\n\n${isGroupChat ? "✅ Pool tickets ARE available here!" : "❌ Pool tickets are NOT available in DMs"}\n\n👥 For pool ticket features:\n• Create or join a group chat\n• Add me to that group\n• Pool purchases will be available there\n\n🎫 In DMs: Individual tickets only (you keep 100% ownership)`,
           );
         }
         // AI response should be sufficient for other inquiries

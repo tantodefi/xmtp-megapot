@@ -249,6 +249,8 @@ IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity
 
 CRITICAL: If user provides a number followed by "tickets" or "ticket", this is ALWAYS a buy_tickets intent, even without the word "buy".
 
+POOL TICKETS IN DMS: If user mentions "pool tickets" in a DM, respond clearly: "Pool tickets are only available in group chats. In DMs, I can help you buy individual tickets instead. Would you like me to buy [X] individual tickets for $[X] USDC?"
+
 CONTEXT AWARENESS:
 - Pay attention to conversation flow and pending confirmations
 - If user says "yes", "approve", "continue" after being asked to confirm a purchase, treat as confirmation
@@ -476,7 +478,10 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     }
 
     // Special case: user claims to be in group chat
-    if (lowerMessage.includes("group chat") || lowerMessage.includes("this is a group")) {
+    if (
+      lowerMessage.includes("group chat") ||
+      lowerMessage.includes("this is a group")
+    ) {
       return { type: "general_inquiry", confidence: 0.8 };
     }
 
@@ -507,7 +512,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
 
       case "greeting":
         if (userAddress) {
-          const personalizedGreeting = await getPersonalizedGreeting(userAddress);
+          const personalizedGreeting =
+            await getPersonalizedGreeting(userAddress);
           return `${personalizedGreeting} Welcome to the lottery system. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`;
         }
         return `${baseResponse}\n\n🌐 Try the full experience: https://frame.megapot.io`;
