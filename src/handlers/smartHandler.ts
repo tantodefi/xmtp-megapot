@@ -282,7 +282,17 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       );
 
       if (hasPending) {
-        if (this.contextHandler.isConfirmationMessage(originalMessage)) {
+        // Only treat simple confirmation words as confirmations, NOT ticket purchase requests
+        const isSimpleConfirmation =
+          /^(yes|yeah|yep|ok|okay|confirm|proceed|continue|approve)$/i.test(
+            originalMessage.trim(),
+          );
+        const isSimpleCancellation =
+          /^(no|nope|cancel|stop|abort|nevermind)$/i.test(
+            originalMessage.trim(),
+          );
+
+        if (isSimpleConfirmation) {
           const pendingConfirmation =
             this.contextHandler.getPendingConfirmation(
               conversationId,
@@ -299,12 +309,22 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
               pooledRequest: pendingConfirmation?.flow === "pool_purchase",
             },
           };
-        } else if (this.contextHandler.isCancellationMessage(originalMessage)) {
+        } else if (isSimpleCancellation) {
           return {
             type: "cancellation",
             confidence: 0.95,
             extractedData: { isCancellation: true },
           };
+        } else {
+          // If there's a pending purchase but this isn't a simple confirmation/cancellation,
+          // treat it as a new purchase request and clear the old context
+          console.log(
+            `🔄 Clearing old pending context for new purchase request: "${originalMessage}"`,
+          );
+          this.contextHandler.clearPendingConfirmation(
+            conversationId,
+            userInboxId,
+          );
         }
       }
     }

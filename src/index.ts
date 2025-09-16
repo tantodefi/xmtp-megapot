@@ -694,6 +694,9 @@ async function handleSmartTextMessage(
           message.senderInboxId,
         );
 
+        console.log(`🔍 Pending confirmation:`, pendingConfirmation);
+        console.log(`🔍 User address: ${userAddress}`);
+
         if (
           pendingConfirmation &&
           pendingConfirmation.ticketCount &&
@@ -845,12 +848,22 @@ async function handleSmartTextMessage(
 
           // Set pending pool confirmation context
           const poolContextHandler = smartHandler.getContextHandler();
+          console.log(
+            `🔧 Setting pending pool purchase context: ${ticketCount} tickets for ${userAddress}`,
+          );
           poolContextHandler.setPendingPoolPurchase(
             conversation.id,
             message.senderInboxId,
             ticketCount,
             userAddress,
           );
+
+          // Verify context was set
+          const verifyContext = poolContextHandler.getPendingConfirmation(
+            conversation.id,
+            message.senderInboxId,
+          );
+          console.log(`✅ Verified context set:`, verifyContext);
 
           await conversation.send(
             `🎯 Daily Pool Purchase\n\n${displayName}, you want to buy ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for the daily pool for $${ticketCount} USDC.\n\n💡 How the daily pool works:\n• One shared pool runs each day\n• All pool tickets increase collective winning chances\n• Winnings distributed proportionally based on risk exposure\n• Available in both DMs and group chats\n\nShall I prepare the pool purchase transaction?`,

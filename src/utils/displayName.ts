@@ -21,9 +21,11 @@ export async function getDisplayName(address: string): Promise<string> {
       resolvedName = await resolveBasename(address);
       if (resolvedName) {
         console.log(`✅ Resolved ${address} to Basename: ${resolvedName}`);
+      } else {
+        console.log(`⚠️ No Basename found for ${address}`);
       }
     } catch (error) {
-      console.log(`⚠️ Basename resolution failed for ${address}`);
+      console.log(`⚠️ Basename resolution failed for ${address}:`, error);
     }
 
     // If no Basename, try Farcaster
@@ -32,9 +34,11 @@ export async function getDisplayName(address: string): Promise<string> {
         resolvedName = await resolveFarcaster(address);
         if (resolvedName) {
           console.log(`✅ Resolved ${address} to Farcaster: ${resolvedName}`);
+        } else {
+          console.log(`⚠️ No Farcaster username found for ${address}`);
         }
       } catch (error) {
-        console.log(`⚠️ Farcaster resolution failed for ${address}`);
+        console.log(`⚠️ Farcaster resolution failed for ${address}:`, error);
       }
     }
 
