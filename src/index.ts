@@ -1005,8 +1005,57 @@ async function handleSmartTextMessage(
         // AI response should be sufficient for other inquiries
         break;
 
+      case "unknown":
+        // Handle standalone numbers that AI couldn't categorize
+        const isStandaloneNumberUnknown =
+          /^\d+$/.test(content.trim()) ||
+          /^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)$/i.test(
+            content.trim(),
+          );
+
+        if (isStandaloneNumberUnknown && userAddress) {
+          // Parse the number
+          let ticketCount: number | undefined;
+          if (/^\d+$/.test(content.trim())) {
+            ticketCount = parseInt(content.trim());
+          } else {
+            // Parse word number
+            const wordToNumber: Record<string, number> = {
+              one: 1,
+              two: 2,
+              three: 3,
+              four: 4,
+              five: 5,
+              six: 6,
+              seven: 7,
+              eight: 8,
+              nine: 9,
+              ten: 10,
+              eleven: 11,
+              twelve: 12,
+              thirteen: 13,
+              fourteen: 14,
+              fifteen: 15,
+              sixteen: 16,
+              seventeen: 17,
+              eighteen: 18,
+              nineteen: 19,
+              twenty: 20,
+            };
+            ticketCount = wordToNumber[content.trim().toLowerCase()];
+          }
+
+          if (ticketCount && ticketCount > 0 && ticketCount <= 100) {
+            const displayName = await getDisplayName(userAddress);
+            await conversation.send(
+              `${displayName}, looks like you want to buy ${ticketCount} ticket${ticketCount > 1 ? "s" : ""}. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,
+            );
+          }
+        }
+        break;
+
       default:
-        // For unknown intents, the AI response should be sufficient
+        // For other unknown intents, the AI response should be sufficient
         break;
     }
   } catch (error) {

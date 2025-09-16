@@ -16,16 +16,30 @@ export async function getDisplayName(address: string): Promise<string> {
 
     let resolvedName = null;
 
-    // Try Basename resolution first
+    // Try Farcaster resolution first (preferred for social interactions)
     try {
-      resolvedName = await resolveBasename(address);
+      resolvedName = await resolveFarcaster(address);
       if (resolvedName) {
-        console.log(`✅ Resolved ${address} to Basename: ${resolvedName}`);
+        console.log(`✅ Resolved ${address} to Farcaster: ${resolvedName}`);
       } else {
-        console.log(`⚠️ No Basename found for ${address}`);
+        console.log(`⚠️ No Farcaster username found for ${address}`);
       }
     } catch (error) {
-      console.log(`⚠️ Basename resolution failed for ${address}:`, error);
+      console.log(`⚠️ Farcaster resolution failed for ${address}:`, error);
+    }
+
+    // If no Farcaster, try Basename
+    if (!resolvedName) {
+      try {
+        resolvedName = await resolveBasename(address);
+        if (resolvedName) {
+          console.log(`✅ Resolved ${address} to Basename: ${resolvedName}`);
+        } else {
+          console.log(`⚠️ No Basename found for ${address}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Basename resolution failed for ${address}:`, error);
+      }
     }
 
     // If no Basename, try ENS reverse resolution
@@ -39,20 +53,6 @@ export async function getDisplayName(address: string): Promise<string> {
         }
       } catch (error) {
         console.log(`⚠️ ENS resolution failed for ${address}:`, error);
-      }
-    }
-
-    // If no ENS, try Farcaster
-    if (!resolvedName) {
-      try {
-        resolvedName = await resolveFarcaster(address);
-        if (resolvedName) {
-          console.log(`✅ Resolved ${address} to Farcaster: ${resolvedName}`);
-        } else {
-          console.log(`⚠️ No Farcaster username found for ${address}`);
-        }
-      } catch (error) {
-        console.log(`⚠️ Farcaster resolution failed for ${address}:`, error);
       }
     }
 
@@ -110,22 +110,38 @@ async function resolveENS(address: string): Promise<string | null> {
  */
 async function resolveBasename(address: string): Promise<string | null> {
   try {
-    // Skip API calls in production due to network restrictions
-    // Use hardcoded mappings for known addresses
-    const knownBasenames: Record<string, string> = {
-      "0x6529b0f882b209a1918fa6935a40c224611cc510": "6529.base.eth",
-      // Add more known mappings here
-    };
+    // Use viem to resolve basename from Base blockchain
+    const { createPublicClient, http } = await import("viem");
+    const { base } = await import("viem/chains");
 
-    const lowerAddress = address.toLowerCase();
-    if (knownBasenames[lowerAddress]) {
+    const publicClient = createPublicClient({
+      chain: base,
+      transport: http("https://mainnet.base.org"),
+    });
+
+    console.log(`🔍 Resolving Basename for address: ${address}`);
+
+    // Use viem's built-in ENS resolution for Base names
+    try {
+      const ensName = await publicClient.getEnsName({
+        address: address as `0x${string}`,
+      });
+
+      if (ensName && ensName.endsWith(".base.eth")) {
+        console.log(`✅ Resolved ${address} to Basename: ${ensName}`);
+        return ensName;
+      } else if (ensName) {
+        console.log(`✅ Resolved ${address} to ENS: ${ensName}`);
+        return ensName;
+      } else {
+        console.log(`⚠️ No Basename found for ${address}`);
+      }
+    } catch (ensError) {
       console.log(
-        `✅ Found known Basename: ${knownBasenames[lowerAddress]} for ${address}`,
+        `⚠️ ENS/Basename resolution failed for ${address}:`,
+        ensError,
       );
-      return knownBasenames[lowerAddress];
     }
-
-    console.log(`⚠️ No known Basename mapping for ${address}`);
   } catch (error) {
     console.log(`⚠️ Basename resolution error for ${address}:`, error);
   }
@@ -138,38 +154,20 @@ async function resolveBasename(address: string): Promise<string | null> {
  */
 async function resolveFarcaster(address: string): Promise<string | null> {
   try {
-    // Use hardcoded mappings for known Farcaster users
-    const knownFarcasterUsers: Record<string, string> = {
-      "0x6529b0f882b209a1918fa6935a40c224611cc510": "6529",
-      // Add more known mappings here
-    };
-
-    const lowerAddress = address.toLowerCase();
-    if (knownFarcasterUsers[lowerAddress]) {
-      console.log(
-        `✅ Found known Farcaster user: ${knownFarcasterUsers[lowerAddress]} for ${address}`,
-      );
-      return knownFarcasterUsers[lowerAddress];
-    }
-
     const neynarApiKey = process.env.NEYNAR_API_KEY;
     if (!neynarApiKey) {
       console.log(`⚠️ No NEYNAR_API_KEY set for Farcaster resolution`);
       return null;
     }
 
-    // Use the proper Neynar SDK approach from documentation
-    const { NeynarAPIClient, Configuration } = await import(
-      "@neynar/nodejs-sdk"
-    );
+    // Use the proper Neynar SDK approach from working example
+    const { NeynarAPIClient } = await import("@neynar/nodejs-sdk");
 
-    const config = new Configuration({
+    const client = new NeynarAPIClient({
       apiKey: neynarApiKey,
     });
 
-    const client = new NeynarAPIClient(config);
-
-    // Use the bulk-by-address method as shown in documentation
+    // Use the fetchBulkUsersByEthOrSolAddress method for address lookup
     console.log(`🔍 Neynar SDK: Looking up user by address ${address}`);
 
     const response = await client.fetchBulkUsersByEthOrSolAddress({
@@ -181,21 +179,41 @@ async function resolveFarcaster(address: string): Promise<string | null> {
       JSON.stringify(response, null, 2),
     );
 
-    // Check if we found any users for this address
+    // Check if we found any users for this address (bulk-by-address returns object with address as key)
     if (response && response[address.toLowerCase()]) {
       const users = response[address.toLowerCase()];
-      if (users && users.length > 0 && users[0].username) {
-        return users[0].username;
+      if (users && users.length > 0) {
+        const user = users[0];
+        console.log(`👤 Found user data:`, JSON.stringify(user, null, 2));
+
+        if (user.display_name && user.display_name.trim()) {
+          console.log(`✅ Using Farcaster display_name: ${user.display_name}`);
+          return user.display_name;
+        } else if (user.username && user.username.trim()) {
+          console.log(`✅ Using Farcaster username: ${user.username}`);
+          return user.username;
+        } else {
+          console.log(
+            `⚠️ User found but no display_name or username available`,
+          );
+        }
       }
     }
 
     // Also try the address as-is (case sensitive)
     if (response && response[address]) {
       const users = response[address];
-      if (users && users.length > 0 && users[0].username) {
-        return users[0].username;
+      if (users && users.length > 0) {
+        const user = users[0];
+        if (user.display_name && user.display_name.trim()) {
+          return user.display_name;
+        } else if (user.username && user.username.trim()) {
+          return user.username;
+        }
       }
     }
+
+    console.log(`❌ No users found in Neynar response for address: ${address}`);
   } catch (error) {
     console.log(`⚠️ Neynar SDK error for ${address}:`, error);
   }
