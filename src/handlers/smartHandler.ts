@@ -249,7 +249,7 @@ IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity
 
 CRITICAL: If user provides a number followed by "tickets" or "ticket", this is ALWAYS a buy_tickets intent, even without the word "buy".
 
-POOL TICKETS IN DMS: If user mentions "pool tickets" in a DM, respond clearly: "Pool tickets are only available in group chats. In DMs, I can help you buy individual tickets instead. Would you like me to buy [X] individual tickets for $[X] USDC?"
+POOL TICKETS: When user mentions "pool tickets", detect as pooled_purchase intent but don't provide a detailed response - let the main handler prepare the appropriate transaction.
 
 CONTEXT AWARENESS:
 - Pay attention to conversation flow and pending confirmations

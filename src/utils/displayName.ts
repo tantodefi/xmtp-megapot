@@ -26,10 +26,16 @@ export async function getDisplayName(address: string): Promise<string> {
       console.log(`⚠️ Basename resolution failed for ${address}`);
     }
 
-    // If no Basename, try Farcaster (future implementation)
+    // If no Basename, try Farcaster
     if (!resolvedName) {
-      // TODO: Add Farcaster resolution via Neynar API
-      // resolvedName = await resolveFarcaster(address);
+      try {
+        resolvedName = await resolveFarcaster(address);
+        if (resolvedName) {
+          console.log(`✅ Resolved ${address} to Farcaster: ${resolvedName}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Farcaster resolution failed for ${address}`);
+      }
     }
 
     // Fallback to formatted address
@@ -54,22 +60,60 @@ export async function getDisplayName(address: string): Promise<string> {
 async function resolveBasename(address: string): Promise<string | null> {
   try {
     // Use Base's public resolver to check for Basename
-    const response = await fetch(`https://api.basenames.org/v1/name/${address}`, {
-      headers: {
-        'Accept': 'application/json',
+    const response = await fetch(
+      `https://api.basenames.org/v1/name/${address}`,
+      {
+        headers: {
+          Accept: "application/json",
+        },
       },
-    });
+    );
 
     if (response.ok) {
       const data = await response.json();
-      if (data.name && data.name.endsWith('.base.eth')) {
+      if (data.name && data.name.endsWith(".base.eth")) {
         return data.name;
       }
     }
   } catch (error) {
     // Basename resolution failed, will fallback
   }
-  
+
+  return null;
+}
+
+/**
+ * Resolve Farcaster username for a wallet address via Neynar API
+ */
+async function resolveFarcaster(address: string): Promise<string | null> {
+  try {
+    const neynarApiKey = process.env.NEYNAR_API_KEY;
+    if (!neynarApiKey) {
+      return null; // No API key available
+    }
+
+    const response = await fetch(
+      `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${address}`,
+      {
+        headers: {
+          Accept: "application/json",
+          api_key: neynarApiKey,
+        },
+      },
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      // Neynar returns an object with address as key
+      const userList = data[address.toLowerCase()];
+      if (userList && userList.length > 0 && userList[0].username) {
+        return userList[0].username;
+      }
+    }
+  } catch (error) {
+    // Farcaster resolution failed, will fallback
+  }
+
   return null;
 }
 

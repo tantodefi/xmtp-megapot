@@ -27,6 +27,7 @@ import {
   type IntentContent,
 } from "./types/IntentContent.js";
 import {
+  getDisplayName,
   getMentionName,
   getPersonalizedGreeting,
 } from "./utils/displayName.js";
@@ -297,6 +298,21 @@ async function main() {
           console.log(
             `🔍 Conversation constructor: ${conversation.constructor.name}`,
           );
+          console.log(`🔍 instanceof Group: ${conversation instanceof Group}`);
+          console.log(
+            `🔍 constructor.name === 'Group': ${conversation.constructor.name === "Group"}`,
+          );
+
+          // Fix the group detection logic - use constructor name as authoritative
+          const actuallyIsGroup = conversation.constructor.name === "Group";
+          if (actuallyIsGroup !== isGroupChat) {
+            console.log(
+              `🚨 GROUP DETECTION MISMATCH! Using constructor.name as authoritative: ${actuallyIsGroup}`,
+            );
+          }
+
+          // Use the corrected group detection
+          const correctedIsGroupChat = actuallyIsGroup;
 
           // Get user address for context
           let userAddress: string | undefined;
@@ -344,7 +360,7 @@ async function main() {
               poolHandler,
               megaPotManager,
               agent,
-              isGroupChat,
+              correctedIsGroupChat,
               userAddress,
             );
           } else if (message.contentType?.typeId === "intent") {
@@ -361,6 +377,7 @@ async function main() {
                 megaPotManager,
                 agent,
                 smartHandler,
+                correctedIsGroupChat,
               );
               continue;
             } catch (error) {
@@ -817,58 +834,31 @@ async function handleSmartTextMessage(
 
       case "pooled_purchase":
         console.log("🎯 Processing pooled purchase intent");
-        if (isGroupChat) {
-          if (intent.extractedData?.ticketCount) {
-            // Set pending pool confirmation context
-            const poolContextHandler = smartHandler.getContextHandler();
-            if (userAddress) {
-              poolContextHandler.setPendingPoolPurchase(
-                conversation.id,
-                message.senderInboxId,
-                intent.extractedData.ticketCount,
-                userAddress,
-              );
+        if (intent.extractedData?.ticketCount && userAddress) {
+          // Universal pool system - works in both DMs and groups
+          const ticketCount = intent.extractedData.ticketCount;
+          const displayName = await getDisplayName(userAddress);
 
-              // Ask for confirmation
-              await conversation.send(
-                `You'd like to buy ${intent.extractedData.ticketCount} ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for the group pool for $${intent.extractedData.ticketCount} USDC. This increases your group's chances of winning, with prize winnings distributed proportionally based on risk exposure. Shall I proceed?`,
-              );
-            } else {
-              await conversation.send(
-                "❌ Could not retrieve your wallet address for the pool purchase.",
-              );
-            }
-          } else {
-            await conversation.send(
-              "🎯 How many tickets would you like to purchase for the group pool? (e.g., '10 tickets for group pool')\n\n💡 Pool purchases increase your group's chances of winning by buying tickets together. Prize winnings are distributed proportionally based on each member's risk exposure!",
-            );
-          }
+          console.log(
+            `🎯 Preparing pool purchase: ${ticketCount} tickets for ${displayName} (${userAddress})`,
+          );
+
+          // Set pending pool confirmation context
+          const poolContextHandler = smartHandler.getContextHandler();
+          poolContextHandler.setPendingPoolPurchase(
+            conversation.id,
+            message.senderInboxId,
+            ticketCount,
+            userAddress,
+          );
+
+          await conversation.send(
+            `🎯 Daily Pool Purchase\n\n${displayName}, you want to buy ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for the daily pool for $${ticketCount} USDC.\n\n💡 How the daily pool works:\n• One shared pool runs each day\n• All pool tickets increase collective winning chances\n• Winnings distributed proportionally based on risk exposure\n• Available in both DMs and group chats\n\nShall I prepare the pool purchase transaction?`,
+          );
         } else {
-          // Handle pool ticket requests in DMs - offer to convert to individual
-          if (intent.extractedData?.ticketCount) {
-            const individualContextHandler = smartHandler.getContextHandler();
-            if (userAddress) {
-              individualContextHandler.setPendingTicketPurchase(
-                conversation.id,
-                message.senderInboxId,
-                intent.extractedData.ticketCount,
-                userAddress,
-                false,
-              );
-
-              await conversation.send(
-                `❌ Pool tickets are only available in group chats!\n\n🎫 Alternative: Individual Purchase\nI can buy you ${intent.extractedData.ticketCount} individual ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for $${intent.extractedData.ticketCount} USDC instead. You'll keep 100% of any winnings.\n\nWould you like to proceed with individual tickets instead?\n\n👥 For pool tickets: Create or join a group chat and add me there!`,
-              );
-            } else {
-              await conversation.send(
-                "❌ Could not retrieve your wallet address for the purchase.",
-              );
-            }
-          } else {
-            await conversation.send(
-              "❌ Pool tickets are only available in group chats!\n\n🎫 In DMs, I can help you buy individual tickets instead.\n\nTell me how many individual tickets you'd like (e.g., '5 tickets') and you'll keep 100% of any winnings.\n\n👥 For pool tickets: Create or join a group chat and add me there!",
-            );
-          }
+          await conversation.send(
+            "🎯 Daily Pool Purchase\n\nHow many tickets would you like to buy for today's pool? (e.g., '5 pool tickets')\n\n💡 The daily pool:\n• Increases collective winning chances\n• Winnings shared proportionally\n• Available everywhere - DMs and groups",
+          );
         }
         break;
 
@@ -962,6 +952,7 @@ async function handleIntentMessage(
   megaPotManager: MegaPotManager,
   agent: any,
   smartHandler: SmartHandler,
+  isGroupChat: boolean,
 ) {
   console.log(
     `🎯 Processing intent: ${intentContent.actionId} for actions: ${intentContent.id}`,
@@ -1348,7 +1339,7 @@ async function handleHelpIntent(conversation: any) {
 }
 
 async function sendMegaPotActions(conversation: any) {
-  const isGroupChat = conversation instanceof Group;
+  const isGroupChat = conversation.constructor.name === "Group";
 
   const actions = [
     {
