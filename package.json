@@ -25,8 +25,8 @@
     "predeploy": "npm run build && npm run lint",
     "revoke-installations": "node revoke-installations.js",
     "revoke-installations-with-id": "node revoke-installations.js",
-    "start": "tsx src/index.ts",
-    "start:prod": "node dist/index.js",
+    "start": "node dist/index.js",
+    "start:dev": "tsx src/index.ts",
     "test": "tsx src/test.ts",
     "type-check": "tsc --noEmit"
   },
