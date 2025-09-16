@@ -80,12 +80,13 @@ export class SmartHandler {
     } catch (error) {
       console.error("❌ Error parsing message intent:", error);
 
-        // Fallback to rule-based parsing
-        const fallbackIntent = this.fallbackIntentParsing(message);
-        return {
-          ...fallbackIntent,
-          response: "I'm having trouble processing your request right now, but I can still help! Try using the action buttons or ask about buying tickets, checking stats, or jackpot info.",
-        };
+      // Fallback to rule-based parsing
+      const fallbackIntent = this.fallbackIntentParsing(message);
+      return {
+        ...fallbackIntent,
+        response:
+          "I'm having trouble processing your request right now, but I can still help! Try using the action buttons or ask about buying tickets, checking stats, or jackpot info.",
+      };
     }
   }
 
@@ -157,24 +158,61 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     const lowerResponse = response.toLowerCase();
     const lowerMessage = originalMessage.toLowerCase();
 
-    // Extract ticket numbers from original message
-    const ticketMatch = originalMessage.match(
-      /(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty)\s*tickets?/i,
-    );
-    const numberMatch = originalMessage.match(/\b(\d+)\b/);
+    // Enhanced ticket number extraction - more comprehensive patterns
+    const ticketPatterns = [
+      /(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty)\s*tickets?/i,
+      /(give\s+me|get\s+me|want)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*tickets?/i,
+      /(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*tickets?/i,
+      /tickets?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)/i,
+    ];
 
     let ticketCount: number | undefined;
-    if (ticketMatch) {
-      const ticketStr = ticketMatch[1].toLowerCase();
-      ticketCount = this.parseNumberFromText(ticketStr);
-    } else if (numberMatch) {
-      ticketCount = parseInt(numberMatch[1]);
+
+    // Try multiple patterns to extract ticket count
+    for (const pattern of ticketPatterns) {
+      const match = originalMessage.match(pattern);
+      if (match) {
+        const ticketStr = match[1] || match[2];
+        if (ticketStr) {
+          ticketCount = this.parseNumberFromText(ticketStr);
+          if (ticketCount) break;
+        }
+      }
     }
 
-    // Determine intent based on message content
+    // Also try standalone numbers in ticket context
+    if (!ticketCount) {
+      const numberMatch = originalMessage.match(/\b(\d+)\b/);
+      if (
+        numberMatch &&
+        (lowerMessage.includes("ticket") ||
+          lowerMessage.includes("buy") ||
+          lowerMessage.includes("get") ||
+          lowerMessage.includes("want"))
+      ) {
+        ticketCount = parseInt(numberMatch[1]);
+      }
+    }
+
+    // Enhanced intent detection with better patterns
+    const buyPatterns = [
+      /\b(buy|purchase|get|want|give\s+me)\b.*\b(ticket|five|ten|two|three|four|six|seven|eight|nine|\d+)/i,
+      /\b(ticket|five|ten|two|three|four|six|seven|eight|nine|\d+)\b.*\b(buy|purchase|get|want)/i,
+    ];
+
+    let isBuyIntent = false;
+    for (const pattern of buyPatterns) {
+      if (pattern.test(originalMessage)) {
+        isBuyIntent = true;
+        break;
+      }
+    }
+
+    // Determine intent based on enhanced patterns
     if (
-      lowerMessage.includes("buy") &&
-      (lowerMessage.includes("ticket") || ticketCount)
+      isBuyIntent ||
+      (lowerMessage.includes("buy") &&
+        (lowerMessage.includes("ticket") || ticketCount))
     ) {
       return {
         type: "buy_tickets",
@@ -205,7 +243,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     if (
       lowerMessage.includes("jackpot") ||
       lowerMessage.includes("prize") ||
-      lowerMessage.includes("pool")
+      lowerMessage.includes("pot")
     ) {
       return { type: "jackpot_info", confidence: 0.8 };
     }
@@ -222,7 +260,9 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("hi") ||
       lowerMessage.includes("hello") ||
       lowerMessage.includes("gm") ||
-      lowerMessage.includes("hey")
+      lowerMessage.includes("hey") ||
+      lowerMessage.includes("whaddup") ||
+      lowerMessage.includes("sup")
     ) {
       return { type: "greeting", confidence: 0.9 };
     }
@@ -246,8 +286,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     intentType: string,
     lotteryStats: any,
   ): string {
-    const baseResponse =
-      response.length > 200 ? response.substring(0, 197) + "..." : response;
+    // Remove truncation - let full responses through
+    const baseResponse = response;
 
     switch (intentType) {
       case "buy_tickets":
@@ -275,14 +315,65 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
   ): Omit<MessageIntent, "response"> {
     const lowerMessage = message.toLowerCase();
 
-    if (lowerMessage.includes("buy") && lowerMessage.includes("ticket")) {
-      const ticketMatch = message.match(/(\d+)/);
+    // Enhanced patterns for ticket purchases
+    const ticketPurchasePatterns = [
+      /\b(buy|purchase|get|want|give\s+me)\b.*\b(ticket|five|ten|two|three|four|six|seven|eight|nine|\d+)/i,
+      /\b(five|ten|two|three|four|six|seven|eight|nine)\s+tickets?/i,
+      /\btickets?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)/i,
+      /(\d+)\s*tickets?/i,
+    ];
+
+    let ticketCount: number | undefined;
+    let isBuyIntent = false;
+
+    // Check for ticket purchase patterns
+    for (const pattern of ticketPurchasePatterns) {
+      const match = message.match(pattern);
+      if (match) {
+        isBuyIntent = true;
+        // Extract number from match
+        const numberStr = match[1] || match[2];
+        if (numberStr) {
+          ticketCount = this.parseNumberFromText(numberStr);
+        }
+        break;
+      }
+    }
+
+    // Also check for standalone word numbers that imply tickets
+    if (!isBuyIntent) {
+      const wordNumbers = [
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+      ];
+      for (const word of wordNumbers) {
+        if (
+          lowerMessage.includes(word) &&
+          (lowerMessage.includes("ticket") ||
+            lowerMessage.includes("buy") ||
+            lowerMessage.includes("get") ||
+            lowerMessage.includes("want"))
+        ) {
+          isBuyIntent = true;
+          ticketCount = this.parseNumberFromText(word);
+          break;
+        }
+      }
+    }
+
+    if (isBuyIntent) {
       return {
         type: "buy_tickets",
-        confidence: 0.7,
-        extractedData: {
-          ticketCount: ticketMatch ? parseInt(ticketMatch[1]) : undefined,
-        },
+        confidence: 0.8,
+        extractedData: { ticketCount },
       };
     }
 
@@ -296,6 +387,15 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
 
     if (lowerMessage.includes("help")) {
       return { type: "help", confidence: 0.8 };
+    }
+
+    if (
+      lowerMessage.includes("gm") ||
+      lowerMessage.includes("hello") ||
+      lowerMessage.includes("hi") ||
+      lowerMessage.includes("whaddup")
+    ) {
+      return { type: "greeting", confidence: 0.8 };
     }
 
     return { type: "unknown", confidence: 0.5 };
@@ -316,13 +416,22 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       eight: 8,
       nine: 9,
       ten: 10,
+      eleven: 11,
+      twelve: 12,
+      thirteen: 13,
+      fourteen: 14,
+      fifteen: 15,
+      sixteen: 16,
+      seventeen: 17,
+      eighteen: 18,
+      nineteen: 19,
       twenty: 20,
       thirty: 30,
       forty: 40,
       fifty: 50,
     };
 
-    const lowerText = text.toLowerCase();
+    const lowerText = text.toLowerCase().trim();
     if (wordToNumber[lowerText]) {
       return wordToNumber[lowerText];
     }
