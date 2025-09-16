@@ -80,23 +80,10 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving Basename for address: ${address}`);
 
-    // Try Base L2 resolver directly using the correct contract address
-    try {
-      const ensName = await publicClient.getEnsName({
-        address: address as `0x${string}`,
-        universalResolverAddress: "0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA", // Base L2Resolver from GitHub
-      });
-
-      if (ensName && ensName.endsWith(".base.eth")) {
-        console.log(`✅ Resolved ${address} via Base L2 resolver: ${ensName}`);
-        return ensName;
-      } else if (ensName) {
-        console.log(`✅ Resolved ${address} via Base resolver: ${ensName}`);
-        return ensName;
-      }
-    } catch (ensError) {
-      console.log(`⚠️ Base L2 resolver failed for ${address}:`, ensError);
-    }
+    // Skip complex contract calls for now - focus on working API resolution
+    console.log(
+      `🔍 Skipping Base contract resolution due to complexity - focusing on API fallbacks`,
+    );
 
     // Try multiple Basename API endpoints as fallback
     const basenameEndpoints = [
