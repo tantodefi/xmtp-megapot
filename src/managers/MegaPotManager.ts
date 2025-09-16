@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { AgentContext } from "@xmtp/agent-sdk";
+import type { WalletSendCallsParams } from "@xmtp/content-type-wallet-send-calls";
 import {
   createPublicClient,
   createWalletClient,
@@ -1300,9 +1301,7 @@ export class MegaPotManager {
   /**
    * Prepare claim winnings transaction for user's wallet
    */
-  async prepareClaimWinnings(
-    userAddress: string,
-  ): Promise<WalletSendCallsParams> {
+  async prepareClaimWinnings(userAddress: string): Promise<any> {
     try {
       console.log(`🎉 Preparing claim winnings transaction for ${userAddress}`);
       const contractAddress = this.getContractAddress();
@@ -1314,7 +1313,7 @@ export class MegaPotManager {
         [],
       );
 
-      const walletSendCalls: WalletSendCallsParams = {
+      const walletSendCalls: any = {
         version: "1.0",
         chainId: `0x${base.id.toString(16)}`,
         from: userAddress as `0x${string}`,

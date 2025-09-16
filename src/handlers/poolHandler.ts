@@ -3,6 +3,7 @@ import { Group, type Conversation } from "@xmtp/node-sdk";
 import { createPublicClient, encodeFunctionData, http } from "viem";
 import { base } from "viem/chains";
 import { MegaPotManager } from "../managers/MegaPotManager.js";
+import { getDisplayName, getMentionName } from "../utils/displayName.js";
 
 // JackpotPool contract ABI
 const JACKPOT_POOL_ABI = [
@@ -237,9 +238,10 @@ To participate:
         100
       ).toFixed(2);
 
+      const userDisplayName = await getDisplayName(userAddress);
       const successMessage = `✅ Pool Purchase Successful!
 
-🎫 You purchased: ${numTickets} tickets for $${totalCost.toFixed(2)}
+🎫 ${userDisplayName} purchased: ${numTickets} tickets for $${totalCost.toFixed(2)}
 📊 Your pool share: ${memberShare}% (${member.ticketsPurchased}/${pool.totalTickets} tickets)
 💰 Your risk exposure: $${member.amountContributed.toFixed(2)}
 

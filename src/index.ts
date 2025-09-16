@@ -26,6 +26,10 @@ import {
   IntentCodec,
   type IntentContent,
 } from "./types/IntentContent.js";
+import {
+  getMentionName,
+  getPersonalizedGreeting,
+} from "./utils/displayName.js";
 
 // Environment variables
 const WALLET_KEY = process.env.WALLET_KEY as string;
@@ -847,6 +851,13 @@ async function handleSmartTextMessage(
 
       case "greeting":
         console.log("👋 Sending welcome message");
+        if (userAddress) {
+          const personalizedGreeting =
+            await getPersonalizedGreeting(userAddress);
+          await conversation.send(
+            `${personalizedGreeting} Welcome to the lottery system. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`,
+          );
+        }
         await sendMegaPotActions(conversation);
         break;
 

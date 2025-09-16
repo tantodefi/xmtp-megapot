@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { MegaPotManager } from "../managers/MegaPotManager.js";
 import { ContextHandler } from "./contextHandler.js";
+import { getPersonalizedGreeting, getDisplayName } from "../utils/displayName.js";
 
 export interface MessageIntent {
   type:
@@ -155,7 +156,7 @@ export class SmartHandler {
 
       return {
         ...intent,
-        response: this.formatResponse(response, intent.type, lotteryStats),
+        response: await this.formatResponse(response, intent.type, lotteryStats, userAddress),
       };
     } catch (error) {
       console.error("❌ Error parsing message intent:", error);
@@ -474,11 +475,12 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
   /**
    * Format response based on intent type
    */
-  private formatResponse(
+  private async formatResponse(
     response: string,
     intentType: string,
     lotteryStats: any,
-  ): string {
+    userAddress?: string,
+  ): Promise<string> {
     // Remove truncation - let full responses through
     const baseResponse = response;
 
@@ -493,6 +495,10 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         return `${baseResponse}\n\n👥 In group chats, members can buy pool tickets together to increase collective winning chances!`;
 
       case "greeting":
+        if (userAddress) {
+          const personalizedGreeting = await getPersonalizedGreeting(userAddress);
+          return `${personalizedGreeting} Welcome to the lottery system. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`;
+        }
         return `${baseResponse}\n\n🌐 Try the full experience: https://frame.megapot.io`;
 
       default:
@@ -775,7 +781,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
 • Confirmation flow - "Yes" to approve purchases
 • Intelligent responses to "7", "buy me a ticket", etc.`;
 
+      const greeting = userAddress ? await getPersonalizedGreeting(userAddress) : "Hello!";
+      
       return `🎰 Smart MegaPot Lottery Assistant
+
+${greeting} Here's your lottery dashboard:
 
 📊 Current Round:
 • Jackpot: $${lotteryStats.jackpotPool || "0"}
