@@ -176,14 +176,33 @@ async function main() {
   console.log("✅ Signer created successfully");
   console.log("🔗 Signer identifier:", signer.getIdentifier());
 
-  // Use in-memory database for testing (simpler)
-  console.log("💾 Using in-memory database for testing...");
+  // Set up persistent database path to avoid creating new installations
+  // Use Render's mounted disk at /app/data/ for persistence
+  const isProduction =
+    process.env.RENDER || process.env.NODE_ENV === "production";
+  const dbPath = isProduction
+    ? "/app/data/xmtp-agent-db"
+    : ".data/xmtp-agent-db";
+
+  console.log(
+    `🌍 Environment: ${isProduction ? "Production (Render)" : "Development"}`,
+  );
+  console.log(`💾 Using persistent database at: ${dbPath}`);
+
+  // Ensure database directory exists
+  const fs = await import("fs");
+  const path = await import("path");
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+    console.log(`📁 Created database directory: ${dbDir}`);
+  }
 
   let agent;
   try {
     agent = await Agent.create(signer as any, {
       env: XMTP_ENV as "dev" | "production",
-      dbPath: null, // Use in-memory database
+      dbPath: dbPath, // Use persistent database
       codecs: [
         new ReactionCodec(),
         new RemoteAttachmentCodec(),
