@@ -746,11 +746,25 @@ async function handleSmartTextMessage(
 
           if (isStandaloneNumber) {
             // User provided just a number (digit or word), ask for purchase type
+            // Save the ticket count in context while waiting for solo/pool choice
+            const contextHandler = smartHandler.getContextHandler();
+            contextHandler.updateContext(
+              conversation.id,
+              message.senderInboxId,
+              {
+                pendingTicketCount: ticketCount,
+                lastIntent: "standalone_number",
+                awaitingConfirmation: false,
+                isGroupChat: isGroupChat,
+                userAddress: userAddress,
+              },
+            );
+
             const displayName = await getDisplayName(userAddress);
             await conversation.send(
               `${displayName}, looks like you want to buy ${ticketCount} tickets. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,
             );
-            return; // Don't set pending context yet, wait for choice
+            return; // Context is now saved, wait for choice
           } else {
             // Regular individual purchase
             aiContextHandler.setPendingTicketPurchase(
@@ -857,8 +871,11 @@ async function handleSmartTextMessage(
         );
 
         console.log(
-          `🔍 Solo choice check: content="${content.toLowerCase().trim()}", context=`,
-          currentContext,
+          `🔍 Solo choice check: content="${content.toLowerCase().trim()}"`,
+        );
+        console.log(
+          `🔍 Current context:`,
+          JSON.stringify(currentContext, null, 2),
         );
 
         if (
