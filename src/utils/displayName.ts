@@ -84,25 +84,33 @@ export async function getDisplayName(address: string): Promise<string> {
  */
 async function resolveENS(address: string): Promise<string | null> {
   try {
-    // Use public ENS resolver
-    const response = await fetch(
-      `https://api.ensideas.com/ens/resolve/${address}`,
-    );
-    if (response.ok) {
-      const data = await response.json();
-      if (data.name && data.name.endsWith(".eth")) {
-        return data.name;
-      }
-    }
+    // Try Ethereum mainnet ENS resolution using public APIs
+    const endpoints = [
+      `https://api.ensdata.net/${address}`,
+      `https://api.ens.domains/name/${address}/reverse`,
+    ];
 
-    // Try alternative public ENS API
-    const altResponse = await fetch(
-      `https://ens.fafrd.star/ens/resolve/${address}`,
-    );
-    if (altResponse.ok) {
-      const altData = await altResponse.json();
-      if (altData.name && altData.name.endsWith(".eth")) {
-        return altData.name;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const ensName = data.name || data.ens || data.reverse;
+          if (ensName && ensName.endsWith(".eth")) {
+            console.log(
+              `✅ Resolved ${address} to ENS: ${ensName} via ${endpoint}`,
+            );
+            return ensName;
+          }
+        }
+      } catch (endpointError) {
+        console.log(`⚠️ ENS endpoint ${endpoint} failed:`, endpointError);
+        continue; // Try next endpoint
       }
     }
   } catch (error) {
@@ -128,45 +136,36 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving Basename for address: ${address}`);
 
-    // Use viem's built-in ENS resolution for Base names
+    // Try direct Basename API (more reliable than viem ENS on Base)
     try {
-      const ensName = await publicClient.getEnsName({
-        address: address as `0x${string}`,
-      });
-
-      if (ensName) {
-        console.log(`✅ Resolved ${address} to name: ${ensName}`);
-        return ensName;
-      } else {
-        console.log(`⚠️ No Basename found for ${address}`);
-
-        // Also try direct Basename API as fallback
-        try {
-          const basenameResponse = await fetch(
-            `https://api.basename.app/v1/name/${address}`,
-          );
-          if (basenameResponse.ok) {
-            const basenameData = await basenameResponse.json();
-            if (basenameData.name && basenameData.name.endsWith(".base.eth")) {
-              console.log(
-                `✅ Resolved ${address} via Basename API: ${basenameData.name}`,
-              );
-              return basenameData.name;
-            }
-          }
-        } catch (apiError) {
-          console.log(
-            `⚠️ Basename API fallback failed for ${address}:`,
-            apiError,
-          );
-        }
-      }
-    } catch (ensError) {
-      console.log(
-        `⚠️ ENS/Basename resolution failed for ${address}:`,
-        ensError,
+      const basenameResponse = await fetch(
+        `https://api.basename.app/v1/name/${address}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        },
       );
+
+      if (basenameResponse.ok) {
+        const basenameData = await basenameResponse.json();
+        if (basenameData.name && basenameData.name.endsWith(".base.eth")) {
+          console.log(
+            `✅ Resolved ${address} via Basename API: ${basenameData.name}`,
+          );
+          return basenameData.name;
+        }
+      } else {
+        console.log(
+          `⚠️ Basename API returned ${basenameResponse.status}: ${basenameResponse.statusText}`,
+        );
+      }
+    } catch (apiError) {
+      console.log(`⚠️ Basename API failed for ${address}:`, apiError);
     }
+
+    console.log(`⚠️ No Basename found for ${address}`);
   } catch (error) {
     console.log(`⚠️ Basename resolution error for ${address}:`, error);
   }
@@ -261,10 +260,7 @@ function formatFallbackName(address: string): string {
   // Create a more friendly format: first 6 + last 4 chars
   const friendlyAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // For well-known addresses, provide friendly names
-  if (address.toLowerCase() === "0x6529b0f882b209a1918fa6935a40c224611cc510") {
-    return "6529"; // This appears to be a well-known address
-  }
+  // No hardcoded mappings - let the real API resolution work
 
   return friendlyAddress;
 }
