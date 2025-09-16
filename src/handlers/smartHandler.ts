@@ -127,7 +127,9 @@ ${groupChatInfo}
 
 RESPONSE RULES:
 - Keep responses SHORT and actionable (2-3 sentences max)
-- For ticket purchases, extract the number and confirm the action
+- For ticket purchases, ALWAYS extract or infer the number and confirm the action
+- If user says "buy me a ticket" (singular), assume 1 ticket
+- If user gives just a number in ticket context, use that number
 - For stats requests, provide relevant current data
 - For jackpot inquiries, give current pool and ticket price
 - For greetings, welcome them and show key actions
@@ -135,7 +137,7 @@ RESPONSE RULES:
 - Always end with a clear next step or action button reference
 
 INTENT CATEGORIES:
-- buy_tickets: User wants to purchase tickets (extract quantity)
+- buy_tickets: User wants to purchase tickets (ALWAYS extract or infer quantity)
 - check_stats: User wants to see their statistics
 - jackpot_info: User wants jackpot/prize information  
 - claim_winnings: User wants to claim prizes
@@ -144,6 +146,12 @@ INTENT CATEGORIES:
 - pooled_purchase: User mentions group/pool/together ticket buying
 - general_inquiry: Questions about lottery mechanics
 - unknown: Unclear intent
+
+IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity:
+- "buy me a ticket" = 1 ticket
+- "buy tickets" = ask how many
+- "buy 5 tickets" = 5 tickets
+- Just "7" in ticket context = 7 tickets
 
 Respond naturally but concisely, and I'll handle the specific actions.`;
   }
@@ -183,15 +191,18 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     // Also try standalone numbers in ticket context
     if (!ticketCount) {
       const numberMatch = originalMessage.match(/\b(\d+)\b/);
-      if (
-        numberMatch &&
-        (lowerMessage.includes("ticket") ||
-          lowerMessage.includes("buy") ||
-          lowerMessage.includes("get") ||
-          lowerMessage.includes("want"))
-      ) {
-        ticketCount = parseInt(numberMatch[1]);
+      if (numberMatch) {
+        const number = parseInt(numberMatch[1]);
+        // If it's a reasonable ticket number (1-100), use it
+        if (number >= 1 && number <= 100) {
+          ticketCount = number;
+        }
       }
+    }
+
+    // Special case: if user says "a ticket" or "me a ticket", default to 1
+    if (!ticketCount && /\b(a|me\s+a)\s+ticket\b/i.test(originalMessage)) {
+      ticketCount = 1;
     }
 
     // Enhanced intent detection with better patterns
@@ -208,12 +219,32 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       }
     }
 
+    // Try to extract ticket count from LLM response if not found in original message
+    if (!ticketCount && lowerResponse) {
+      const llmTicketMatch = lowerResponse.match(/(\d+)\s*tickets?/i);
+      if (llmTicketMatch) {
+        const llmTicketCount = parseInt(llmTicketMatch[1]);
+        if (llmTicketCount >= 1 && llmTicketCount <= 100) {
+          ticketCount = llmTicketCount;
+        }
+      }
+    }
+
     // Determine intent based on enhanced patterns
     if (
       isBuyIntent ||
       (lowerMessage.includes("buy") &&
         (lowerMessage.includes("ticket") || ticketCount))
     ) {
+      // If no ticket count found but singular "ticket", default to 1
+      if (
+        !ticketCount &&
+        /\bticket\b/.test(lowerMessage) &&
+        !/\btickets\b/.test(lowerMessage)
+      ) {
+        ticketCount = 1;
+      }
+
       return {
         type: "buy_tickets",
         confidence: 0.9,
@@ -340,6 +371,18 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       }
     }
 
+    // Check for standalone numbers that could be ticket counts
+    if (!isBuyIntent) {
+      const standaloneNumber = message.match(/^\s*(\d+)\s*$/);
+      if (standaloneNumber) {
+        const number = parseInt(standaloneNumber[1]);
+        if (number >= 1 && number <= 100) {
+          isBuyIntent = true;
+          ticketCount = number;
+        }
+      }
+    }
+
     // Also check for standalone word numbers that imply tickets
     if (!isBuyIntent) {
       const wordNumbers = [
@@ -367,6 +410,12 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           break;
         }
       }
+    }
+
+    // Special case: "a ticket" or "me a ticket" defaults to 1
+    if (!isBuyIntent && /\b(a|me\s+a)\s+ticket\b/i.test(message)) {
+      isBuyIntent = true;
+      ticketCount = 1;
     }
 
     if (isBuyIntent) {
@@ -477,23 +526,23 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       const allTimeStats = await this.fetchAllTimeStats();
 
       const groupInfo = isGroupChat
-        ? "\n\n👥 **Group Chat Features:**\n• Organize pooled ticket purchases with friends\n• Split costs and share potential winnings"
+        ? "\n\n👥 Group Chat Features:\n• Organize pooled ticket purchases with friends\n• Split costs and share potential winnings"
         : "";
 
-      return `🎰 **MegaPot Lottery Assistant**
+      return `🎰 MegaPot Lottery Assistant
 
-**Current Round:**
+Current Round:
 • Jackpot: $${lotteryStats.jackpotPool || "0"}
 • Ticket Price: $${lotteryStats.ticketPrice || "1.00"} USDC
 • Your Tickets: ${lotteryStats.totalTicketsPurchased || 0}
 
-**Commands:**
+Commands:
 • "buy X tickets" - Purchase lottery tickets
 • "stats" - View your statistics  
 • "jackpot" - Current round info
 • "claim" - Claim winnings
 
-**All-Time Stats:**
+All-Time Stats:
 • Total Jackpots: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
 • Winners: ${allTimeStats?.total_won || "19"} lucky players!
 

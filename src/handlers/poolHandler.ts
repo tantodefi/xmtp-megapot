@@ -142,20 +142,20 @@ export class PoolHandler {
       const members = await conversation.members();
       const memberCount = members.length;
 
-      const message = `🎯 **Group Pool Connected!**
+      const message = `🎯 Group Pool Connected!
 
 📋 Pool Contract: ${pool.poolContractAddress}
 👥 Group Members: ${memberCount}
 🎫 Total Tickets: ${pool.totalTickets}
 💰 Total Contributed: $${pool.totalContributed.toFixed(2)}
 
-**How Group Pools Work:**
+How Group Pools Work:
 • Each member buys tickets individually through the shared pool contract
 • Your share of winnings = (your tickets / total pool tickets) × total winnings
 • All purchases benefit from collective pool participation
 • Winnings are automatically calculated proportionally
 
-**To participate:**
+To participate:
 • "buy 5 tickets for group pool" - Purchase through pool contract
 • "pool status" - Check current pool statistics
 • "my pool share" - See your contribution and potential share
@@ -237,13 +237,13 @@ export class PoolHandler {
         100
       ).toFixed(2);
 
-      const successMessage = `✅ **Pool Purchase Successful!**
+      const successMessage = `✅ Pool Purchase Successful!
 
 🎫 You purchased: ${numTickets} tickets for $${totalCost.toFixed(2)}
 📊 Your pool share: ${memberShare}% (${member.ticketsPurchased}/${pool.totalTickets} tickets)
 💰 Your total contributed: $${member.amountContributed.toFixed(2)}
 
-**Pool Status:**
+Pool Status:
 👥 Active members: ${pool.members.size}
 🎫 Total pool tickets: ${pool.totalTickets}
 💰 Total pool value: $${pool.totalContributed.toFixed(2)}
@@ -366,17 +366,17 @@ export class PoolHandler {
       })
       .join("\n");
 
-    return `🎯 **Group Pool Status**
+    return `🎯 Group Pool Status
 
 📋 Pool: ${pool.poolContractAddress.slice(0, 8)}...${pool.poolContractAddress.slice(-6)}
 👥 Members: ${pool.members.size}
 🎫 Total Tickets: ${pool.totalTickets}
 💰 Total Value: $${pool.totalContributed.toFixed(2)}
 
-**Top Contributors:**
+Top Contributors:
 ${membersList}
 
-**Your Options:**
+Your Options:
 • "buy X tickets" - Purchase through pool
 • "my pool share" - See your contribution
 • "claim pool winnings" - Claim your share of winnings`;
@@ -403,14 +403,14 @@ ${membersList}
         ? ((member.ticketsPurchased / pool.totalTickets) * 100).toFixed(2)
         : "0";
 
-    return `📊 **Your Pool Share**
+    return `📊 Your Pool Share
 
 🎫 Your tickets: ${member.ticketsPurchased} / ${pool.totalTickets}
 📈 Your share: ${sharePercentage}%
 💰 You contributed: $${member.amountContributed.toFixed(2)}
 📅 Last purchase: ${member.lastPurchaseTime.toLocaleDateString()}
 
-💡 **How winnings work:**
+💡 How winnings work:
 If the pool wins $1,000, you get ${sharePercentage}% = $${((parseFloat(sharePercentage) / 100) * 1000).toFixed(2)}`;
   }
 

@@ -103,7 +103,6 @@ const MEGAPOT_CONFIG = {
   referrerAddress: MEGAPOT_REFERRER_ADDRESS as `0x${string}`,
 };
 
-
 // Create a signer for XMTP
 function createSigner(privateKey: string): Signer {
   console.log("🔧 Creating signer with private key...");
@@ -201,7 +200,7 @@ async function main() {
 
       console.log("");
       console.log("❌ XMTP INSTALLATION LIMIT REACHED (10/10)");
-      console.log("=" .repeat(50));
+      console.log("=".repeat(50));
       console.log(`📋 Inbox ID: ${inboxId}`);
       console.log("");
       console.log("🔧 MANUAL FIX REQUIRED:");
@@ -210,13 +209,17 @@ async function main() {
       console.log("");
       console.log("2. OR generate new keys:");
       console.log("   yarn gen:keys");
-      console.log("   # Update WALLET_KEY and ENCRYPTION_KEY in Render dashboard");
+      console.log(
+        "   # Update WALLET_KEY and ENCRYPTION_KEY in Render dashboard",
+      );
       console.log("");
       console.log("3. Then redeploy the agent");
       console.log("");
-      console.log("🔗 More info: https://docs.xmtp.org/inboxes/installation-management");
-      console.log("=" .repeat(50));
-      
+      console.log(
+        "🔗 More info: https://docs.xmtp.org/inboxes/installation-management",
+      );
+      console.log("=".repeat(50));
+
       throw error; // Re-throw original error
     } else {
       throw error;
@@ -506,7 +509,7 @@ async function handleSmartTextMessage(
           );
 
           await conversation.send(
-            "💰 **Claiming Pool Winnings**\n\nPreparing transaction to claim your proportional share of pool winnings...",
+            "💰 Claiming Pool Winnings\n\nPreparing transaction to claim your proportional share of pool winnings...",
           );
           await conversation.send(claimTx, ContentTypeWalletSendCalls);
         } catch (error) {
@@ -600,9 +603,29 @@ async function handleSmartTextMessage(
             agent,
           );
         } else {
-          await conversation.send(
-            "🎫 How many tickets would you like to purchase? (e.g., 'buy 5 tickets')",
-          );
+          // Check if the original message implies a single ticket
+          const lowerContent = content.toLowerCase();
+          if (
+            /\b(a|me\s+a)\s+ticket\b/i.test(content) ||
+            (lowerContent.includes("buy") &&
+              lowerContent.includes("ticket") &&
+              !lowerContent.includes("tickets"))
+          ) {
+            console.log(
+              "🎫 Processing single ticket purchase (inferred from 'a ticket')",
+            );
+            await handleTicketPurchaseIntent(
+              1,
+              userAddress || "",
+              conversation,
+              megaPotManager,
+              agent,
+            );
+          } else {
+            await conversation.send(
+              "🎫 How many tickets would you like to purchase? (e.g., 'buy 5 tickets')",
+            );
+          }
         }
         break;
 
@@ -644,7 +667,7 @@ async function handleSmartTextMessage(
       case "pooled_purchase":
         if (isGroupChat) {
           await conversation.send(
-            `👥 **Group Pool Purchases**\n\nBuy tickets through the group pool to benefit from collective winnings!\n\n**Commands:**\n• "buy 5 tickets for group pool" - Purchase through pool\n• "pool status" - Check pool statistics\n• "my pool share" - See your contribution\n\n💡 Your winnings are proportional to your ticket contributions!`,
+            `👥 Group Pool Purchases\n\nBuy tickets through the group pool to benefit from collective winnings!\n\nCommands:\n• "buy 5 tickets for group pool" - Purchase through pool\n• "pool status" - Check pool statistics\n• "my pool share" - See your contribution\n\n💡 Your winnings are proportional to your ticket contributions!`,
           );
         } else {
           await conversation.send(
@@ -846,12 +869,12 @@ async function handleStatsIntent(
   try {
     const stats = await megaPotManager.getStats(userAddress);
 
-    let statsMessage = `📊 **Your MegaPot Stats:**
+    let statsMessage = `📊 Your MegaPot Stats:
 🎫 Tickets purchased: ${stats.totalTicketsPurchased}
 💵 Total spent: ${megaPotManager.formatAmount(stats.totalSpent)}
 🎉 Total won: ${megaPotManager.formatAmount(stats.totalWinnings)}
 
-🎰 **Current Round:**
+🎰 Current Round:
 💰 Jackpot: $${stats.jackpotPool || "0"}
 🎫 Ticket price: $${stats.ticketPrice || "1"}
 📈 Tickets sold: ${stats.ticketsSoldRound || 0}`;
@@ -897,13 +920,13 @@ async function handleJackpotInfoIntent(
       console.error("Failed to fetch all-time stats:", error);
     }
 
-    const jackpotMessage = `🎰 **MegaPot Jackpot Info:**
+    const jackpotMessage = `🎰 MegaPot Jackpot Info:
 💰 Current jackpot: $${stats.jackpotPool || "0"}
 🎫 Ticket price: $${stats.ticketPrice || "1"}
 📈 Tickets sold: ${stats.ticketsSoldRound || 0}
 👥 Active players: ${stats.activePlayers || 0}
 
-📊 **All-Time Stats:**
+📊 All-Time Stats:
 💎 Total jackpots: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
 🎫 Total tickets: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}
 👥 Total players: ${allTimeStats?.total_players?.toLocaleString() || "14K+"}
@@ -956,25 +979,25 @@ async function handleHelpIntent(conversation: any) {
   const groupPoolFeatures = isGroupChat
     ? `
 
-**Group Pool Features:**
+Group Pool Features:
 • "buy 5 tickets for group pool" - Purchase through shared pool
 • "pool status" - Check group pool statistics  
 • "my pool share" - See your contribution and share
 • Winnings are distributed proportionally to contributions!`
     : "";
 
-  const helpMessage = `🤖 **Smart MegaPot Agent**
+  const helpMessage = `🤖 Smart MegaPot Agent
 
 🎰 AI-powered lottery assistant with natural language understanding!
 
-**Smart Features:**
+Smart Features:
 • Ask questions naturally - I understand context!
 • "I want to buy some lottery tickets"
 • "How much is the current jackpot?"
 • "Show me my lottery history"
 • "Can you help me claim winnings?"${groupPoolFeatures}
 
-**Quick Commands:**
+Quick Commands:
 🎫 Buy tickets - "buy X tickets"
 📊 Statistics - "my stats" or "show stats"
 🎰 Jackpot info - "jackpot" or "current prize"
