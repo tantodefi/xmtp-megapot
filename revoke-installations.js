@@ -12,23 +12,33 @@ import { base } from "viem/chains";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Read .env file
-function readEnvFile() {
+// Read environment variables from .env file or system environment
+function readEnvVars() {
   const envPath = path.join(__dirname, ".env");
-  if (!fs.existsSync(envPath)) {
-    console.error("❌ .env file not found");
-    process.exit(1);
+  let envVars = {};
+
+  // First try to read from .env file (local development)
+  if (fs.existsSync(envPath)) {
+    console.log("📁 Reading from .env file...");
+    const envContent = fs.readFileSync(envPath, "utf-8");
+
+    envContent.split("\n").forEach((line) => {
+      const [key, value] = line.split("=");
+      if (key && value && !key.startsWith("#")) {
+        envVars[key.trim()] = value.trim();
+      }
+    });
+  } else {
+    console.log("🔍 No .env file found, using system environment variables...");
   }
 
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  const envVars = {};
-
-  envContent.split("\n").forEach((line) => {
-    const [key, value] = line.split("=");
-    if (key && value && !key.startsWith("#")) {
-      envVars[key.trim()] = value.trim();
-    }
-  });
+  // Merge with system environment variables (deployment environment)
+  envVars = {
+    ...envVars,
+    WALLET_KEY: process.env.WALLET_KEY || envVars.WALLET_KEY,
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || envVars.ENCRYPTION_KEY,
+    XMTP_ENV: process.env.XMTP_ENV || envVars.XMTP_ENV || "dev",
+  };
 
   return envVars;
 }
@@ -69,12 +79,13 @@ if (!inboxId) {
 }
 
 console.log("🔍 Reading environment variables...");
-const envVars = readEnvFile();
+const envVars = readEnvVars();
 
 const { WALLET_KEY, ENCRYPTION_KEY, XMTP_ENV } = envVars;
 
 if (!WALLET_KEY || !ENCRYPTION_KEY) {
-  console.error("❌ WALLET_KEY and ENCRYPTION_KEY are required in .env file");
+  console.error("❌ WALLET_KEY and ENCRYPTION_KEY are required");
+  console.error("💡 Set them in .env file or as environment variables");
   process.exit(1);
 }
 

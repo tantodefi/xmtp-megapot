@@ -103,6 +103,7 @@ const MEGAPOT_CONFIG = {
   referrerAddress: MEGAPOT_REFERRER_ADDRESS as `0x${string}`,
 };
 
+
 // Create a signer for XMTP
 function createSigner(privateKey: string): Signer {
   console.log("🔧 Creating signer with private key...");
@@ -192,52 +193,31 @@ async function main() {
       error instanceof Error &&
       error.message.includes("already registered 10/10 installations")
     ) {
-      console.log(
-        "⚠️ Maximum installations reached. Auto-revoking old installations...",
+      // Extract inbox ID from error message
+      const inboxIdMatch = error.message.match(
+        /InboxID (\w+) has already registered/,
       );
+      const inboxId = inboxIdMatch ? inboxIdMatch[1] : "UNKNOWN";
 
-      try {
-        // Extract inbox ID from error message
-        const inboxIdMatch = error.message.match(
-          /InboxID (\w+) has already registered/,
-        );
-        const inboxId = inboxIdMatch ? inboxIdMatch[1] : null;
-
-        if (!inboxId) {
-          throw new Error("Could not extract inbox ID from error message");
-        }
-
-        console.log(`📋 Inbox ID: ${inboxId}`);
-
-        // Import and run the revoke function with inbox ID
-        const { execSync } = await import("child_process");
-        console.log(`🔄 Running: node revoke-installations.js ${inboxId}`);
-        execSync(`node revoke-installations.js ${inboxId}`, {
-          stdio: "inherit",
-          cwd: process.cwd(),
-        });
-
-        console.log("✅ Installations revoked. Retrying agent creation...");
-
-        // Retry agent creation
-        agent = await Agent.create(signer as any, {
-          env: XMTP_ENV as "dev" | "production",
-          dbPath: null,
-          codecs: [
-            new ReactionCodec(),
-            new RemoteAttachmentCodec(),
-            new WalletSendCallsCodec(),
-            new ActionsCodec(),
-            new IntentCodec(),
-          ],
-        });
-      } catch (revokeError) {
-        console.error("❌ Failed to auto-revoke installations:", revokeError);
-        console.log(
-          "💡 Manual solution: Run 'npm run revoke-installations' locally",
-        );
-        throw error;
-      }
+      console.log("");
+      console.log("❌ XMTP INSTALLATION LIMIT REACHED (10/10)");
+      console.log("=" .repeat(50));
+      console.log(`📋 Inbox ID: ${inboxId}`);
+      console.log("");
+      console.log("🔧 MANUAL FIX REQUIRED:");
+      console.log("1. Run locally with your .env file:");
+      console.log(`   node revoke-installations.js ${inboxId}`);
+      console.log("");
+      console.log("2. OR generate new keys:");
+      console.log("   yarn gen:keys");
+      console.log("   # Update WALLET_KEY and ENCRYPTION_KEY in Render dashboard");
+      console.log("");
+      console.log("3. Then redeploy the agent");
+      console.log("");
+      console.log("🔗 More info: https://docs.xmtp.org/inboxes/installation-management");
+      console.log("=" .repeat(50));
+      
+      throw error; // Re-throw original error
     } else {
       throw error;
     }
