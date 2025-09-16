@@ -347,6 +347,7 @@ async function main() {
                 conversation,
                 megaPotManager,
                 agent,
+                smartHandler,
               );
               continue;
             } catch (error) {
@@ -580,6 +581,8 @@ async function handleSmartTextMessage(
       content,
       userAddress,
       isGroupChat,
+      conversation.id,
+      message.senderInboxId,
     );
     console.log(
       `🎯 AI detected intent: ${intent.type} (confidence: ${intent.confidence})`,
@@ -590,22 +593,104 @@ async function handleSmartTextMessage(
 
     // Handle specific actions based on intent
     switch (intent.type) {
+      case "confirmation":
+        console.log("✅ Processing confirmation for pending purchase");
+        const contextHandler = smartHandler.getContextHandler();
+        const pendingConfirmation = contextHandler.getPendingConfirmation(
+          conversation.id,
+          message.senderInboxId,
+        );
+
+        if (
+          pendingConfirmation &&
+          pendingConfirmation.ticketCount &&
+          userAddress
+        ) {
+          if (pendingConfirmation.flow === "pool_purchase") {
+            console.log(
+              `🎫 Executing pool purchase: ${pendingConfirmation.ticketCount} tickets`,
+            );
+            // Handle pool purchase confirmation
+            const poolResult = await poolHandler.processPooledTicketPurchase(
+              conversation.id,
+              message.senderInboxId,
+              userAddress,
+              pendingConfirmation.ticketCount,
+              conversation,
+              agent.client,
+            );
+            await conversation.send(poolResult.message);
+            if (poolResult.success && poolResult.transactionData) {
+              await conversation.send(
+                poolResult.transactionData,
+                ContentTypeWalletSendCalls,
+              );
+            }
+          } else {
+            console.log(
+              `🎫 Executing solo purchase: ${pendingConfirmation.ticketCount} tickets`,
+            );
+            // Handle solo ticket purchase confirmation
+            await handleTicketPurchaseIntent(
+              pendingConfirmation.ticketCount,
+              userAddress,
+              conversation,
+              megaPotManager,
+              agent,
+            );
+          }
+          // Clear the pending confirmation
+          contextHandler.clearPendingConfirmation(
+            conversation.id,
+            message.senderInboxId,
+          );
+        } else {
+          await conversation.send(
+            "❌ No pending purchase found to confirm. Please start a new ticket purchase.",
+          );
+        }
+        break;
+
+      case "cancellation":
+        console.log("❌ Processing cancellation for pending purchase");
+        const cancelContextHandler = smartHandler.getContextHandler();
+        cancelContextHandler.clearPendingConfirmation(
+          conversation.id,
+          message.senderInboxId,
+        );
+        // Response already sent by the AI
+        break;
+
       case "buy_tickets":
         if (intent.extractedData?.askForQuantity) {
           await conversation.send(
-            "How many tickets would you like to buy? Each ticket costs $1 USDC.",
+            "🎫 How many tickets would you like to purchase? (e.g., '5 tickets')",
           );
         } else if (intent.extractedData?.ticketCount) {
           console.log(
             `🎫 Processing ticket purchase: ${intent.extractedData.ticketCount} tickets`,
           );
-          await handleTicketPurchaseIntent(
-            intent.extractedData.ticketCount,
-            userAddress || "",
-            conversation,
-            megaPotManager,
-            agent,
-          );
+
+          // Set pending confirmation context
+          const buyContextHandler = smartHandler.getContextHandler();
+          if (userAddress) {
+            buyContextHandler.setPendingTicketPurchase(
+              conversation.id,
+              message.senderInboxId,
+              intent.extractedData.ticketCount,
+              userAddress,
+              isGroupChat,
+            );
+
+            // Ask for confirmation
+            await conversation.send(
+              `You'd like to buy ${intent.extractedData.ticketCount} ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for $${intent.extractedData.ticketCount} USDC. Shall I proceed with the purchase?`,
+            );
+          } else {
+            await conversation.send(
+              "❌ Could not retrieve your wallet address for the purchase.",
+            );
+          }
         } else {
           // Check if the original message implies a single ticket
           const lowerContent = content.toLowerCase();
@@ -618,16 +703,27 @@ async function handleSmartTextMessage(
             console.log(
               "🎫 Processing single ticket purchase (inferred from 'a ticket')",
             );
-            await handleTicketPurchaseIntent(
-              1,
-              userAddress || "",
-              conversation,
-              megaPotManager,
-              agent,
-            );
+            const singleContextHandler = smartHandler.getContextHandler();
+            if (userAddress) {
+              singleContextHandler.setPendingTicketPurchase(
+                conversation.id,
+                message.senderInboxId,
+                1,
+                userAddress,
+                isGroupChat,
+              );
+
+              await conversation.send(
+                "You'd like to buy 1 ticket for $1 USDC. Shall I proceed with the purchase?",
+              );
+            } else {
+              await conversation.send(
+                "❌ Could not retrieve your wallet address for the purchase.",
+              );
+            }
           } else {
             await conversation.send(
-              "How many tickets would you like to buy? Each ticket costs $1 USDC.",
+              "🎫 How many tickets would you like to purchase? (e.g., '5 tickets')",
             );
           }
         }
@@ -641,6 +737,41 @@ async function handleSmartTextMessage(
           megaPotManager,
           agent,
         );
+        break;
+
+      case "pooled_purchase":
+        console.log("🎯 Processing pooled purchase intent");
+        if (isGroupChat) {
+          if (intent.extractedData?.ticketCount) {
+            // Set pending pool confirmation context
+            const poolContextHandler = smartHandler.getContextHandler();
+            if (userAddress) {
+              poolContextHandler.setPendingPoolPurchase(
+                conversation.id,
+                message.senderInboxId,
+                intent.extractedData.ticketCount,
+                userAddress,
+              );
+
+              // Ask for confirmation
+              await conversation.send(
+                `You'd like to buy ${intent.extractedData.ticketCount} ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for the group pool for $${intent.extractedData.ticketCount} USDC. This will be a shared purchase where winnings are distributed proportionally. Shall I proceed?`,
+              );
+            } else {
+              await conversation.send(
+                "❌ Could not retrieve your wallet address for the pool purchase.",
+              );
+            }
+          } else {
+            await conversation.send(
+              "🎯 How many tickets would you like to purchase for the group pool? (e.g., '10 tickets for group pool')\n\n💡 Pool purchases benefit from collective winnings - your share is proportional to your contribution!",
+            );
+          }
+        } else {
+          await conversation.send(
+            "❌ Group pool purchases are only available in group chats! In DMs, you can only buy individual tickets.",
+          );
+        }
         break;
 
       case "jackpot_info":
@@ -714,6 +845,7 @@ async function handleIntentMessage(
   conversation: any,
   megaPotManager: MegaPotManager,
   agent: any,
+  smartHandler: SmartHandler,
 ) {
   console.log(
     `🎯 Processing intent: ${intentContent.actionId} for actions: ${intentContent.id}`,
@@ -773,6 +905,29 @@ async function handleIntentMessage(
             "❌ Group pool purchases are only available in group chats!",
           );
         }
+        break;
+      case "pool-status":
+        if (conversation instanceof Group) {
+          // Get pool status from pool handler
+          const poolId = conversation.id;
+          // This would need to be implemented in the pool handler
+          await conversation.send(
+            "📊 Group Pool Status:\n\n🎯 Active Pool: Not found\n👥 Members: 0\n🎫 Total Tickets: 0\n💰 Total Contributed: $0\n\n💡 Start a pool purchase to create an active pool!",
+          );
+        } else {
+          await conversation.send(
+            "❌ Pool status is only available in group chats!",
+          );
+        }
+        break;
+      case "explain-ticket-types":
+        // Generate comprehensive explanation of solo vs pool tickets
+        const explanation = await smartHandler.generateTicketTypeExplanation(
+          userAddress,
+          conversation instanceof Group,
+        );
+        await conversation.send(explanation);
+        await sendMegaPotActions(conversation);
         break;
       case "check-stats":
         await handleStatsIntent(
@@ -1012,32 +1167,58 @@ async function handleHelpIntent(conversation: any) {
   const groupPoolFeatures = isGroupChat
     ? `
 
-Group Pool Features:
+👥 Group Pool Features:
 • "buy 5 tickets for group pool" - Purchase through shared pool
-• "pool status" - Check group pool statistics  
-• "my pool share" - See your contribution and share
-• Winnings are distributed proportionally to contributions!`
-    : "";
+• "pool status" - Check active group pools
+• "explain ticket types" - Learn solo vs pool differences
+• Pool purchases share costs and winnings proportionally
+• Use "Buy for Group Pool" button for pool purchases`
+    : `
 
-  const helpMessage = `🤖 Smart MegaPot Agent
+🎫 Solo Ticket Features:
+• Individual purchases with 100% ownership
+• "buy X tickets" - Purchase solo tickets
+• Join a group chat to access pool purchase options`;
 
-🎰 AI-powered lottery assistant with natural language understanding!
+  const smartFeatures = `
 
-Smart Features:
-• Ask questions naturally - I understand context!
-• "I want to buy some lottery tickets"
-• "How much is the current jackpot?"
-• "Show me my lottery history"
-• "Can you help me claim winnings?"${groupPoolFeatures}
+🤖 Enhanced AI Features:
+• Natural conversation understanding
+• Context-aware responses and confirmations
+• Multi-step purchase flow with confirmations
+• Intelligent number parsing ("seven", "a ticket", etc.)
+• Remembers your intent between messages
 
-Quick Commands:
-🎫 Buy tickets - "buy X tickets"
-📊 Statistics - "my stats" or "show stats"
-🎰 Jackpot info - "jackpot" or "current prize"
-💰 Claim winnings - "claim" or "winnings"
+💬 Smart Examples:
+• "I want to buy some lottery tickets" → AI asks how many
+• "Seven" → AI understands you want 7 tickets  
+• "Yes" → Confirms pending purchase
+• "buy me a ticket" → AI infers 1 ticket
+• "Continue with purchase" → Processes confirmation`;
 
-🌐 Full experience: https://frame.megapot.io
-⚠️ Need USDC on Base network for purchases`;
+  const helpMessage = `🤖 Smart MegaPot Lottery Agent
+
+🎰 AI-powered lottery assistant with advanced natural language understanding!${smartFeatures}${groupPoolFeatures}
+
+🎯 Quick Commands:
+🎫 "buy X tickets" - Purchase individual tickets
+📊 "stats" or "my stats" - View your statistics
+🎰 "jackpot" or "prize info" - Current round details  
+💰 "claim" or "winnings" - Claim any prizes
+🎯 "explain ticket types" - Learn about solo vs pool options
+❓ "help" - Show this help message
+
+🔄 Transaction Flow:
+1. Tell me how many tickets you want
+2. I'll ask for confirmation with cost details
+3. Say "yes" or "approve" to proceed
+4. Open your wallet to complete the transaction
+
+⚠️ Requirements:
+• USDC on Base network for purchases
+• Connected wallet for transaction approval
+
+🌐 Full web experience: https://frame.megapot.io`;
 
   await conversation.send(helpMessage);
   await sendMegaPotActions(conversation);
@@ -1088,6 +1269,11 @@ async function sendMegaPotActions(conversation: any) {
   }
 
   actions.push(
+    {
+      id: "explain-ticket-types",
+      label: "🎯 Solo vs Pool",
+      style: "secondary" as const,
+    },
     {
       id: "view-past-results",
       label: "📈 Past Results",

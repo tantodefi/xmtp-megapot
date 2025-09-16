@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { MegaPotManager } from "../managers/MegaPotManager.js";
+import { ContextHandler } from "./contextHandler.js";
 
 export interface MessageIntent {
   type:
@@ -11,6 +12,8 @@ export interface MessageIntent {
     | "greeting"
     | "general_inquiry"
     | "pooled_purchase"
+    | "confirmation"
+    | "cancellation"
     | "unknown";
   confidence: number;
   extractedData?: {
@@ -19,6 +22,8 @@ export interface MessageIntent {
     pooledRequest?: boolean;
     askForQuantity?: boolean;
     askForPurchaseType?: boolean;
+    isConfirmation?: boolean;
+    isCancellation?: boolean;
   };
   response: string;
 }
@@ -26,10 +31,20 @@ export interface MessageIntent {
 export class SmartHandler {
   private openai: OpenAI;
   private megaPotManager: MegaPotManager;
+  private contextHandler: ContextHandler;
 
   constructor(openaiApiKey: string, megaPotManager: MegaPotManager) {
     this.openai = new OpenAI({ apiKey: openaiApiKey });
     this.megaPotManager = megaPotManager;
+    this.contextHandler = new ContextHandler();
+
+    // Cleanup expired contexts every 5 minutes
+    setInterval(
+      () => {
+        this.contextHandler.cleanupExpiredContexts();
+      },
+      5 * 60 * 1000,
+    );
   }
 
   /**
@@ -39,8 +54,55 @@ export class SmartHandler {
     message: string,
     userAddress?: string,
     isGroupChat: boolean = false,
+    conversationId?: string,
+    userInboxId?: string,
   ): Promise<MessageIntent> {
     try {
+      // Check for conversation context first
+      let conversationContext = "";
+      if (conversationId && userInboxId) {
+        conversationContext = this.contextHandler.getFlowContext(
+          conversationId,
+          userInboxId,
+        );
+
+        // Check for confirmation/cancellation in context
+        if (
+          this.contextHandler.hasPendingConfirmation(
+            conversationId,
+            userInboxId,
+          )
+        ) {
+          if (this.contextHandler.isConfirmationMessage(message)) {
+            const pendingConfirmation =
+              this.contextHandler.getPendingConfirmation(
+                conversationId,
+                userInboxId,
+              );
+            return {
+              type: "confirmation",
+              confidence: 0.95,
+              extractedData: {
+                isConfirmation: true,
+                ticketCount:
+                  pendingConfirmation?.ticketCount ||
+                  pendingConfirmation?.poolTicketCount,
+                pooledRequest: pendingConfirmation?.flow === "pool_purchase",
+              },
+              response: `Perfect! Proceeding with your ${pendingConfirmation?.message || "purchase"}...`,
+            };
+          } else if (this.contextHandler.isCancellationMessage(message)) {
+            return {
+              type: "cancellation",
+              confidence: 0.95,
+              extractedData: { isCancellation: true },
+              response:
+                "No problem! Your purchase has been cancelled. Let me know if you'd like to try something else.",
+            };
+          }
+        }
+      }
+
       // Fetch current lottery data for context
       const lotteryStats = await this.megaPotManager.getStats(userAddress);
       const allTimeStats = await this.fetchAllTimeStats();
@@ -50,6 +112,7 @@ export class SmartHandler {
         lotteryStats,
         allTimeStats,
         isGroupChat,
+        conversationContext,
       );
 
       const completion = await this.openai.chat.completions.create({
@@ -73,7 +136,22 @@ export class SmartHandler {
         "I'm here to help with MegaPot lottery! Try asking about buying tickets, checking stats, or jackpot info.";
 
       // Parse the LLM response to extract intent and data
-      const intent = this.extractIntentFromResponse(response, message);
+      const intent = this.extractIntentFromResponse(
+        response,
+        message,
+        conversationId,
+        userInboxId,
+      );
+
+      // Update context with the detected intent
+      if (conversationId && userInboxId) {
+        this.contextHandler.updateLastIntent(
+          conversationId,
+          userInboxId,
+          intent.type,
+          intent.confidence,
+        );
+      }
 
       return {
         ...intent,
@@ -99,6 +177,7 @@ export class SmartHandler {
     lotteryStats: any,
     allTimeStats: any,
     isGroupChat: boolean,
+    conversationContext: string = "",
   ): string {
     const groupChatInfo = isGroupChat
       ? "\n- This is a GROUP CHAT. Users can organize POOLED TICKET PURCHASES where multiple people contribute to buy tickets together."
@@ -147,6 +226,8 @@ INTENT CATEGORIES:
 - greeting: User says hello/hi/gm
 - pooled_purchase: User mentions group/pool/together ticket buying
 - general_inquiry: Questions about lottery mechanics
+- confirmation: User is confirming a pending action (yes/approve/continue)
+- cancellation: User is cancelling a pending action (no/cancel/stop)
 - unknown: Unclear intent
 
 IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity:
@@ -154,6 +235,14 @@ IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity
 - "buy tickets" = ask how many
 - "buy 5 tickets" = 5 tickets
 - Just "7" in ticket context = 7 tickets
+
+CONTEXT AWARENESS:
+- Pay attention to conversation flow and pending confirmations
+- If user says "yes", "approve", "continue" after being asked to confirm a purchase, treat as confirmation
+- If user provides just a number after being asked "how many tickets", use that number
+- Maintain conversational continuity and don't repeat information unnecessarily
+
+${conversationContext}
 
 Respond naturally but concisely, and I'll handle the specific actions.`;
   }
@@ -164,9 +253,46 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
   private extractIntentFromResponse(
     response: string,
     originalMessage: string,
+    conversationId?: string,
+    userInboxId?: string,
   ): Omit<MessageIntent, "response"> {
     const lowerResponse = response.toLowerCase();
     const lowerMessage = originalMessage.toLowerCase();
+
+    // Check for context-aware confirmation/cancellation first
+    if (conversationId && userInboxId) {
+      const hasPending = this.contextHandler.hasPendingConfirmation(
+        conversationId,
+        userInboxId,
+      );
+
+      if (hasPending) {
+        if (this.contextHandler.isConfirmationMessage(originalMessage)) {
+          const pendingConfirmation =
+            this.contextHandler.getPendingConfirmation(
+              conversationId,
+              userInboxId,
+            );
+          return {
+            type: "confirmation",
+            confidence: 0.95,
+            extractedData: {
+              isConfirmation: true,
+              ticketCount:
+                pendingConfirmation?.ticketCount ||
+                pendingConfirmation?.poolTicketCount,
+              pooledRequest: pendingConfirmation?.flow === "pool_purchase",
+            },
+          };
+        } else if (this.contextHandler.isCancellationMessage(originalMessage)) {
+          return {
+            type: "cancellation",
+            confidence: 0.95,
+            extractedData: { isCancellation: true },
+          };
+        }
+      }
+    }
 
     // Enhanced ticket number extraction - more comprehensive patterns
     const ticketPatterns = [
@@ -609,32 +735,144 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       const allTimeStats = await this.fetchAllTimeStats();
 
       const groupInfo = isGroupChat
-        ? "\n\n👥 Group Chat Features:\n• Organize pooled ticket purchases with friends\n• Split costs and share potential winnings"
-        : "";
+        ? `
 
-      return `🎰 MegaPot Lottery Assistant
+👥 Group Chat Features:
+• "buy X tickets for group pool" - Pool purchases with shared winnings
+• "pool status" - Check active group pools
+• "explain ticket types" - Learn about solo vs pool tickets
+• Winnings distributed proportionally to contributions!
 
-Current Round:
+🎯 Pool vs Solo Tickets:
+• Solo: You keep 100% of winnings
+• Pool: Share costs and winnings with group members`
+        : `
+
+🎫 Solo Tickets Only:
+• Individual purchases with 100% ownership
+• Join a group chat for pool purchase options`;
+
+      const smartFeatures = `
+
+🤖 Smart AI Features:
+• Natural conversation - "I want to buy some tickets"
+• Context awareness - remembers your purchase intent
+• Confirmation flow - "Yes" to approve purchases
+• Intelligent responses to "7", "buy me a ticket", etc.`;
+
+      return `🎰 Smart MegaPot Lottery Assistant
+
+📊 Current Round:
 • Jackpot: $${lotteryStats.jackpotPool || "0"}
 • Ticket Price: $${lotteryStats.ticketPrice || "1.00"} USDC
-• Your Tickets: ${lotteryStats.totalTicketsPurchased || 0}
+• Your Total Tickets: ${lotteryStats.totalTicketsPurchased || 0}
+• Solo Tickets: ${lotteryStats.individualTicketsPurchased || 0}
+• Pool Tickets: ${lotteryStats.groupTicketsPurchased || 0}
 
-Commands:
-• "buy X tickets" - Purchase lottery tickets
-• "stats" - View your statistics  
-• "jackpot" - Current round info
-• "claim" - Claim winnings
+💬 Smart Commands:
+• "buy X tickets" - Purchase individual tickets
+• "stats" or "my stats" - View your statistics  
+• "jackpot" or "prize info" - Current round details
+• "claim" or "winnings" - Claim any prizes
+• "help" - Show this help message${smartFeatures}${groupInfo}
 
-All-Time Stats:
-• Total Jackpots: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
-• Winners: ${allTimeStats?.total_won || "19"} lucky players!
+🏆 All-Time Performance:
+• Total Jackpots Won: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
+• Lucky Winners: ${allTimeStats?.total_won || "19"} players
+• Total Tickets Sold: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}
 
-${groupInfo}
+⚠️ Requirements:
+• USDC on Base network for purchases
+• Connected wallet for transactions
 
 🌐 Full experience: https://frame.megapot.io`;
     } catch (error) {
       console.error("Error generating contextual help:", error);
-      return "🎰 MegaPot Lottery Assistant - I can help you buy tickets, check stats, view jackpot info, and claim winnings!";
+      return `🎰 Smart MegaPot Lottery Assistant
+
+I'm an AI-powered lottery assistant that can help you:
+• Buy tickets with natural language
+• Check your statistics and history  
+• View jackpot information
+• Claim winnings
+• Understand solo vs pool ticket options
+
+Use the action buttons below or just ask me naturally!`;
+    }
+  }
+
+  /**
+   * Get the context handler instance
+   */
+  getContextHandler(): ContextHandler {
+    return this.contextHandler;
+  }
+
+  /**
+   * Generate explanation of solo vs pool tickets with stats
+   */
+  async generateTicketTypeExplanation(
+    userAddress?: string,
+    isGroupChat: boolean = false,
+  ): Promise<string> {
+    try {
+      const lotteryStats = await this.megaPotManager.getStats(userAddress);
+      const allTimeStats = await this.fetchAllTimeStats();
+
+      const soloSection = `🎫 **Solo Tickets (Individual Purchase)**
+• You keep 100% of any winnings
+• Direct purchase from your wallet
+• Immediate ownership and control
+• Current price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
+• Your solo tickets: ${lotteryStats.individualTicketsPurchased || 0}`;
+
+      const poolSection = isGroupChat
+        ? `
+👥 **Pool Tickets (Group Purchase)**
+• Share costs and winnings with group members
+• Your share is proportional to your contribution
+• Collective buying power for larger purchases
+• Same ticket price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
+• Your pool contributions: ${lotteryStats.groupTicketsPurchased || 0} tickets
+
+📊 **Pool Benefits:**
+• Lower individual risk (shared costs)
+• Higher collective ticket volume
+• Social lottery experience
+• Automatic payout distribution`
+        : `
+👥 **Pool Tickets (Group Purchase)**
+• Only available in group chats
+• Share costs and winnings with group members
+• Join a group conversation to access pool purchases`;
+
+      const statsSection = `
+📈 **Current Round Stats:**
+• Jackpot: $${lotteryStats.jackpotPool || "0"}
+• Total tickets sold: ${lotteryStats.ticketsSoldRound || 0}
+• Your total tickets: ${lotteryStats.totalTicketsPurchased || 0}
+• Your winning odds: 1 in ${lotteryStats.userOdds || "∞"}
+
+🏆 **All-Time Performance:**
+• Total jackpots won: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
+• Lucky winners: ${allTimeStats?.total_won || "19"} players
+• Total tickets sold: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}`;
+
+      return `${soloSection}${poolSection}${statsSection}
+
+💡 **Which should you choose?**
+• Solo: Maximum control and 100% winnings
+• Pool: Shared risk and social experience
+
+🎰 Ready to play? Use the action buttons below!`;
+    } catch (error) {
+      console.error("Error generating ticket type explanation:", error);
+      return `🎫 **Solo vs Pool Tickets**
+
+**Solo Tickets:** You buy individually and keep all winnings
+**Pool Tickets:** Group members share costs and winnings
+
+Both types cost $1 USDC per ticket. Choose based on your preference for individual control vs. shared experience!`;
     }
   }
 }
