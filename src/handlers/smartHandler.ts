@@ -17,6 +17,7 @@ export interface MessageIntent {
     ticketCount?: number;
     amount?: number;
     pooledRequest?: boolean;
+    askForQuantity?: boolean;
   };
   response: string;
 }
@@ -445,6 +446,21 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("whaddup")
     ) {
       return { type: "greeting", confidence: 0.8 };
+    }
+
+    // Handle "yes" responses to ticket purchase questions
+    if (
+      lowerMessage === "yes" ||
+      lowerMessage === "yeah" ||
+      lowerMessage === "sure" ||
+      lowerMessage === "yep" ||
+      lowerMessage === "y"
+    ) {
+      return {
+        type: "buy_tickets",
+        confidence: 0.9,
+        extractedData: { askForQuantity: true },
+      };
     }
 
     return { type: "unknown", confidence: 0.5 };

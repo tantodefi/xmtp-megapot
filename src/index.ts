@@ -14,7 +14,7 @@ import { createWalletClient, http, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { PoolHandler } from "./handlers/poolHandler.js";
-import { SmartHandler } from "./handlers/smartHandler.js";
+import { SmartHandler, type MessageIntent } from "./handlers/smartHandler.js";
 import { MegaPotManager } from "./managers/MegaPotManager.js";
 import {
   ActionsCodec,
@@ -591,7 +591,11 @@ async function handleSmartTextMessage(
     // Handle specific actions based on intent
     switch (intent.type) {
       case "buy_tickets":
-        if (intent.extractedData?.ticketCount) {
+        if (intent.extractedData?.askForQuantity) {
+          await conversation.send(
+            "How many tickets would you like to buy? Each ticket costs $1 USDC.",
+          );
+        } else if (intent.extractedData?.ticketCount) {
           console.log(
             `🎫 Processing ticket purchase: ${intent.extractedData.ticketCount} tickets`,
           );
@@ -623,7 +627,7 @@ async function handleSmartTextMessage(
             );
           } else {
             await conversation.send(
-              "🎫 How many tickets would you like to purchase? (e.g., 'buy 5 tickets')",
+              "How many tickets would you like to buy? Each ticket costs $1 USDC.",
             );
           }
         }
@@ -814,6 +818,9 @@ async function handleTicketPurchaseIntent(
         domain: "megapot.io",
         name: "MegaPot Lottery",
         description: "MegaPot Lottery Assistant",
+        hostname: "megapot.io",
+        faviconUrl: "https://megapot.io/favicon.ico",
+        title: "MegaPot Lottery",
       },
       calls: [
         {
@@ -826,6 +833,9 @@ async function handleTicketPurchaseIntent(
             transactionType: "erc20_approve",
             source: "MegaPot",
             origin: "megapot.io",
+            hostname: "megapot.io",
+            faviconUrl: "https://megapot.io/favicon.ico",
+            title: "MegaPot Lottery",
           },
         },
         {
@@ -839,6 +849,9 @@ async function handleTicketPurchaseIntent(
             appName: "MegaPot",
             appIcon: "https://megapot.io/favicon.ico",
             appDomain: "megapot.io",
+            hostname: "megapot.io",
+            faviconUrl: "https://megapot.io/favicon.ico",
+            title: "MegaPot Lottery",
           },
         },
       ],
