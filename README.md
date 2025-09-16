@@ -197,6 +197,17 @@ The agent supports MegaPot's referrer system through the `MEGAPOT_REFERRER_ADDRE
 - Development with `yarn dev` works perfectly
 - Production deployment uses npm commands in render.yaml
 
+### Installation Management
+If you encounter "10/10 installations" error:
+```bash
+# Automatically revoke old installations
+npm run revoke-installations
+
+# Or manually if needed
+node revoke-installations.js
+```
+The agent now auto-handles this error during startup.
+
 ## Network Support
 
 - **Testnet**: Base Sepolia

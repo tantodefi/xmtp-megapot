@@ -174,17 +174,58 @@ async function main() {
   // Use in-memory database for testing (simpler)
   console.log("💾 Using in-memory database for testing...");
 
-  const agent = await Agent.create(signer as any, {
-    env: XMTP_ENV as "dev" | "production",
-    dbPath: null, // Use in-memory database
-    codecs: [
-      new ReactionCodec(),
-      new RemoteAttachmentCodec(),
-      new WalletSendCallsCodec(),
-      new ActionsCodec(),
-      new IntentCodec(),
-    ],
-  });
+  let agent;
+  try {
+    agent = await Agent.create(signer as any, {
+      env: XMTP_ENV as "dev" | "production",
+      dbPath: null, // Use in-memory database
+      codecs: [
+        new ReactionCodec(),
+        new RemoteAttachmentCodec(),
+        new WalletSendCallsCodec(),
+        new ActionsCodec(),
+        new IntentCodec(),
+      ],
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("already registered 10/10 installations")
+    ) {
+      console.log(
+        "⚠️ Maximum installations reached. Auto-revoking old installations...",
+      );
+
+      try {
+        // Import and run the revoke function
+        const { execSync } = await import("child_process");
+        execSync("npm run revoke-installations", { stdio: "inherit" });
+
+        console.log("✅ Installations revoked. Retrying agent creation...");
+
+        // Retry agent creation
+        agent = await Agent.create(signer as any, {
+          env: XMTP_ENV as "dev" | "production",
+          dbPath: null,
+          codecs: [
+            new ReactionCodec(),
+            new RemoteAttachmentCodec(),
+            new WalletSendCallsCodec(),
+            new ActionsCodec(),
+            new IntentCodec(),
+          ],
+        });
+      } catch (revokeError) {
+        console.error("❌ Failed to auto-revoke installations:", revokeError);
+        console.log(
+          "💡 Manual solution: Run 'npm run revoke-installations' locally",
+        );
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
 
   console.log("✅ Agent created successfully!");
   console.log(`🔗 Agent inbox: ${agent.client.inboxId}`);
