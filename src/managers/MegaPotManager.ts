@@ -1297,88 +1297,93 @@ export class MegaPotManager {
   /**
    * Claim lottery winnings
    */
-  async claimWinnings(): Promise<{ txHash: string; distributed?: boolean }> {
+  /**
+   * Prepare claim winnings transaction for user's wallet
+   */
+  async prepareClaimWinnings(
+    userAddress: string,
+  ): Promise<WalletSendCallsParams> {
     try {
-      // First check if there are winnings to claim
-      const hasWinnings = await this.hasWinningsToClaim();
-      if (!hasWinnings) {
-        throw new Error("No winnings available to claim");
-      }
-
-      console.log("🎉 Claiming MegaPot winnings...");
+      console.log(`🎉 Preparing claim winnings transaction for ${userAddress}`);
       const contractAddress = this.getContractAddress();
 
-      // First claim winnings from contract
+      // Prepare the withdrawWinnings call data
       const claimData = encodeFunctionDataCall(
         MEGAPOT_ABI as unknown as any[],
         "withdrawWinnings",
         [],
       );
 
-      const claimHash = await this.wallet.sendTransaction({
-        account: this.wallet.account!,
-        chain: base,
-        to: contractAddress,
-        data: claimData,
-      });
+      const walletSendCalls: WalletSendCallsParams = {
+        version: "1.0",
+        chainId: `0x${base.id.toString(16)}`,
+        from: userAddress as `0x${string}`,
+        capabilities: {
+          reference: `megapot_claim_${Date.now()}`,
+          app: "MegaPot",
+          icon: "https://megapot.io/favicon.ico",
+          domain: "megapot.io",
+          name: "MegaPot Winnings",
+          description: "Claim your lottery winnings",
+          hostname: "megapot.io",
+          faviconUrl: "https://megapot.io/favicon.ico",
+          title: "MegaPot Lottery Claim",
+        },
+        calls: [
+          {
+            to: contractAddress as `0x${string}`,
+            data: claimData as `0x${string}`,
+            value: "0x0",
+            gas: "0x15F90", // ~90,000 gas
+            metadata: {
+              description: "Claim your lottery winnings",
+              transactionType: "claim_winnings",
+              appName: "MegaPot",
+              appIcon: "https://megapot.io/favicon.ico",
+              appDomain: "megapot.io",
+              hostname: "megapot.io",
+              faviconUrl: "https://megapot.io/favicon.ico",
+              title: "MegaPot Lottery Claim",
+            },
+          },
+        ],
+      };
 
-      console.log(`🎉 Lottery winnings claimed: ${claimHash}`);
-
-      return { txHash: claimHash, distributed: false };
+      return walletSendCalls;
     } catch (error) {
-      console.error("❌ Failed to claim winnings:", error);
+      console.error("❌ Failed to prepare claim transaction:", error);
       throw new Error(
-        `Failed to claim winnings: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to prepare claim transaction: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
 
   /**
+   * Legacy method - keeping for backward compatibility but now throws error
+   */
+  async claimWinnings(): Promise<{ txHash: string; distributed?: boolean }> {
+    throw new Error(
+      "Use prepareClaimWinnings() instead - agent cannot claim winnings for users",
+    );
+  }
+
+  /**
    * Check if user has winnings to claim
+   * Note: getUserWins() doesn't take parameters - it returns wins for the calling wallet
    */
   async hasWinningsToClaim(userAddress?: string): Promise<boolean> {
     try {
-      // If no userAddress provided, check agent's winnings (for claiming)
-      // If userAddress provided, check that user's winnings (for display)
-      const addressToCheck = userAddress || this.wallet?.account?.address;
-
-      console.log(`🎰 Checking winnings for address: ${addressToCheck}`);
-      console.log(`🎰 Wallet initialized: ${!!this.wallet}`);
-      console.log(`🎰 Wallet account: ${!!this.wallet?.account}`);
-      console.log(`🎰 Wallet address: ${this.wallet?.account?.address}`);
-
-      if (!addressToCheck) {
-        console.warn("No address available to check winnings");
-        return false;
-      }
-
-      if (!this.wallet?.account?.address) {
-        console.warn("MegaPotManager wallet not properly initialized");
-        return false;
-      }
-
-      const contract = getContract({
-        address: this.getContractAddress(),
-        abi: MEGAPOT_ABI,
-        client: this.client,
-      });
-
-      // Note: getUserWins doesn't take parameters and returns wins for the caller
-      // For now, we'll skip the winnings check to avoid ABI errors
-      // This can be fixed when we have a proper way to check winnings for specific addresses
-
+      // getUserWins() returns wins for the caller, so we need to use the user's wallet context
+      // For now, we'll always return true and let the actual claim attempt determine if there are winnings
       console.log(
-        `🎰 Skipping winnings check - getUserWins function doesn't accept address parameter`,
+        `🎰 Checking winnings availability for user: ${userAddress || "agent"}`,
       );
 
-      // Return false for now (no winnings to claim)
-      return false;
+      // Since getUserWins() doesn't take parameters and only works for the calling wallet,
+      // we can't pre-check winnings for other users. We'll return true and let the claim attempt handle it.
+      return true;
     } catch (error) {
       console.error("Error checking winnings:", error);
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       return false;
     }
   }

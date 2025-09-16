@@ -158,7 +158,7 @@ How Group Pools Work:
 To participate:
 • "buy 5 tickets for group pool" - Purchase through pool contract
 • "pool status" - Check current pool statistics
-• "my pool share" - See your contribution and potential share
+• "my pool share" - See your risk exposure and potential share
 • "claim pool winnings" - Claim your proportional share`;
 
       return { poolId: pool.id, message };
@@ -241,14 +241,14 @@ To participate:
 
 🎫 You purchased: ${numTickets} tickets for $${totalCost.toFixed(2)}
 📊 Your pool share: ${memberShare}% (${member.ticketsPurchased}/${pool.totalTickets} tickets)
-💰 Your total contributed: $${member.amountContributed.toFixed(2)}
+💰 Your risk exposure: $${member.amountContributed.toFixed(2)}
 
 Pool Status:
 👥 Active members: ${pool.members.size}
 🎫 Total pool tickets: ${pool.totalTickets}
 💰 Total pool value: $${pool.totalContributed.toFixed(2)}
 
-🎰 Winnings will be distributed proportionally to your ticket share!`;
+🎰 Pool increases winning chances! Prizes distributed proportionally to risk exposure.`;
 
       return {
         success: true,
@@ -378,7 +378,7 @@ ${membersList}
 
 Your Options:
 • "buy X tickets" - Purchase through pool
-• "my pool share" - See your contribution
+• "my pool share" - See your risk exposure
 • "claim pool winnings" - Claim your share of winnings`;
   }
 

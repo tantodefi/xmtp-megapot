@@ -180,7 +180,7 @@ export class SmartHandler {
     conversationContext: string = "",
   ): string {
     const groupChatInfo = isGroupChat
-      ? "\n- This is a GROUP CHAT. Users can organize POOLED TICKET PURCHASES where multiple people contribute to buy tickets together."
+      ? "\n- This is a GROUP CHAT. Users can buy POOL TICKETS together to increase their collective chances of winning."
       : "\n- This is a DIRECT MESSAGE conversation.";
 
     return `You are MegaPot, an AI assistant for a lottery system on Base blockchain. Your role is to:
@@ -214,7 +214,7 @@ RESPONSE RULES:
 - For stats requests, provide relevant current data
 - For jackpot inquiries, give current pool and ticket price
 - For greetings, welcome them and show key actions
-- For pooled purchases in groups, explain how multiple people can contribute
+- For pooled purchases in groups, explain how they increase winning chances through volume
 - Always end with a clear next step or action button reference
 
 INTENT CATEGORIES:
@@ -234,7 +234,11 @@ IMPORTANT: For buy_tickets intent, you MUST extract or infer the ticket quantity
 - "buy me a ticket" = 1 ticket
 - "buy tickets" = ask how many
 - "buy 5 tickets" = 5 tickets
+- "5 tickets" = 5 tickets (standalone)
 - Just "7" in ticket context = 7 tickets
+- "seven" or other word numbers = convert to digits
+
+CRITICAL: If user provides a number followed by "tickets" or "ticket", this is ALWAYS a buy_tickets intent, even without the word "buy".
 
 CONTEXT AWARENESS:
 - Pay attention to conversation flow and pending confirmations
@@ -300,6 +304,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       /(give\s+me|get\s+me|want)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*tickets?/i,
       /(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*tickets?/i,
       /tickets?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)/i,
+      /^(\d+)\s*tickets?$/i, // Match standalone "5 tickets"
+      /^(\d+)\s*ticket$/i, // Match standalone "5 ticket"
     ];
 
     let ticketCount: number | undefined;
@@ -337,6 +343,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     const buyPatterns = [
       /\b(buy|purchase|get|want|give\s+me)\b.*\b(ticket|five|ten|two|three|four|six|seven|eight|nine|\d+)/i,
       /\b(ticket|five|ten|two|three|four|six|seven|eight|nine|\d+)\b.*\b(buy|purchase|get|want)/i,
+      /^\d+\s*tickets?$/i, // Match standalone "5 tickets"
+      /^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s*tickets?$/i, // Match word numbers
     ];
 
     let isBuyIntent = false;
@@ -345,6 +353,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         isBuyIntent = true;
         break;
       }
+    }
+
+    // Also check if we found a ticket count - that's likely a buy intent
+    if (!isBuyIntent && ticketCount && ticketCount > 0) {
+      isBuyIntent = true;
     }
 
     // Try to extract ticket count from LLM response if not found in original message
@@ -477,7 +490,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         return `${baseResponse}\n\n🎰 Jackpot: $${lotteryStats.jackpotPool || "0"} | Tickets sold: ${lotteryStats.ticketsSoldRound || 0}`;
 
       case "pooled_purchase":
-        return `${baseResponse}\n\n👥 In group chats, multiple members can contribute to buy tickets together!`;
+        return `${baseResponse}\n\n👥 In group chats, members can buy pool tickets together to increase collective winning chances!`;
 
       case "greeting":
         return `${baseResponse}\n\n🌐 Try the full experience: https://frame.megapot.io`;
@@ -501,6 +514,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       /\b(five|ten|two|three|four|six|seven|eight|nine)\s+tickets?/i,
       /\btickets?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)/i,
       /(\d+)\s*tickets?/i,
+      /^(\d+)\s*tickets?$/i, // Match standalone "5 tickets"
+      /^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s*tickets?$/i, // Match word numbers
     ];
 
     let ticketCount: number | undefined;
@@ -819,7 +834,7 @@ Use the action buttons below or just ask me naturally!`;
       const lotteryStats = await this.megaPotManager.getStats(userAddress);
       const allTimeStats = await this.fetchAllTimeStats();
 
-      const soloSection = `🎫 **Solo Tickets (Individual Purchase)**
+      const soloSection = `🎫 Solo Tickets (Individual Purchase)
 • You keep 100% of any winnings
 • Direct purchase from your wallet
 • Immediate ownership and control
@@ -828,49 +843,50 @@ Use the action buttons below or just ask me naturally!`;
 
       const poolSection = isGroupChat
         ? `
-👥 **Pool Tickets (Group Purchase)**
-• Share costs and winnings with group members
-• Your share is proportional to your contribution
-• Collective buying power for larger purchases
+👥 Pool Tickets (Group Purchase)
+• Increases your group's chances of winning
+• Share costs and winnings proportionally based on risk exposure
+• Collective buying power for larger ticket volumes
 • Same ticket price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
 • Your pool contributions: ${lotteryStats.groupTicketsPurchased || 0} tickets
 
-📊 **Pool Benefits:**
-• Lower individual risk (shared costs)
-• Higher collective ticket volume
-• Social lottery experience
+📊 Pool Benefits:
+• Higher winning chances through volume
+• Proportional prize sharing based on contribution
+• Social lottery experience with friends
 • Automatic payout distribution`
         : `
-👥 **Pool Tickets (Group Purchase)**
+👥 Pool Tickets (Group Purchase)
 • Only available in group chats
+• Increases group's chances of winning
 • Share costs and winnings with group members
 • Join a group conversation to access pool purchases`;
 
       const statsSection = `
-📈 **Current Round Stats:**
+📈 Current Round Stats:
 • Jackpot: $${lotteryStats.jackpotPool || "0"}
 • Total tickets sold: ${lotteryStats.ticketsSoldRound || 0}
 • Your total tickets: ${lotteryStats.totalTicketsPurchased || 0}
 • Your winning odds: 1 in ${lotteryStats.userOdds || "∞"}
 
-🏆 **All-Time Performance:**
+🏆 All-Time Performance:
 • Total jackpots won: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
 • Lucky winners: ${allTimeStats?.total_won || "19"} players
 • Total tickets sold: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}`;
 
       return `${soloSection}${poolSection}${statsSection}
 
-💡 **Which should you choose?**
+💡 Which should you choose?
 • Solo: Maximum control and 100% winnings
-• Pool: Shared risk and social experience
+• Pool: Higher chances through volume, shared winnings
 
 🎰 Ready to play? Use the action buttons below!`;
     } catch (error) {
       console.error("Error generating ticket type explanation:", error);
-      return `🎫 **Solo vs Pool Tickets**
+      return `🎫 Solo vs Pool Tickets
 
-**Solo Tickets:** You buy individually and keep all winnings
-**Pool Tickets:** Group members share costs and winnings
+Solo Tickets: You buy individually and keep all winnings
+Pool Tickets: Group members share costs and winnings, increasing collective chances
 
 Both types cost $1 USDC per ticket. Choose based on your preference for individual control vs. shared experience!`;
     }

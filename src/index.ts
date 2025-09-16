@@ -9,7 +9,7 @@ import {
   WalletSendCallsCodec,
   type WalletSendCallsParams,
 } from "@xmtp/content-type-wallet-send-calls";
-import { Group, Signer } from "@xmtp/node-sdk";
+import { Group, Signer, type Conversation } from "@xmtp/node-sdk";
 import { createWalletClient, http, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -591,6 +591,35 @@ async function handleSmartTextMessage(
     // Send the AI-generated response
     await conversation.send(intent.response);
 
+    // Check if AI response contains confirmation request and extract ticket count
+    const aiResponseLower = intent.response.toLowerCase();
+    const confirmationRequestMatch = aiResponseLower.match(
+      /you want to buy (\d+) tickets?.*would you like to proceed/i,
+    );
+
+    if (confirmationRequestMatch && intent.type === "unknown") {
+      // AI is asking for confirmation but intent wasn't properly detected
+      const ticketCount = parseInt(confirmationRequestMatch[1]);
+      console.log(
+        `🔧 Detected confirmation request in AI response for ${ticketCount} tickets`,
+      );
+
+      // Set pending confirmation context
+      const aiContextHandler = smartHandler.getContextHandler();
+      if (userAddress && ticketCount > 0) {
+        aiContextHandler.setPendingTicketPurchase(
+          conversation.id,
+          message.senderInboxId,
+          ticketCount,
+          userAddress,
+          isGroupChat,
+        );
+        console.log(
+          `✅ Set pending confirmation context for ${ticketCount} tickets`,
+        );
+      }
+    }
+
     // Handle specific actions based on intent
     switch (intent.type) {
       case "confirmation":
@@ -755,7 +784,7 @@ async function handleSmartTextMessage(
 
               // Ask for confirmation
               await conversation.send(
-                `You'd like to buy ${intent.extractedData.ticketCount} ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for the group pool for $${intent.extractedData.ticketCount} USDC. This will be a shared purchase where winnings are distributed proportionally. Shall I proceed?`,
+                `You'd like to buy ${intent.extractedData.ticketCount} ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for the group pool for $${intent.extractedData.ticketCount} USDC. This increases your group's chances of winning, with prize winnings distributed proportionally based on risk exposure. Shall I proceed?`,
               );
             } else {
               await conversation.send(
@@ -764,13 +793,35 @@ async function handleSmartTextMessage(
             }
           } else {
             await conversation.send(
-              "🎯 How many tickets would you like to purchase for the group pool? (e.g., '10 tickets for group pool')\n\n💡 Pool purchases benefit from collective winnings - your share is proportional to your contribution!",
+              "🎯 How many tickets would you like to purchase for the group pool? (e.g., '10 tickets for group pool')\n\n💡 Pool purchases increase your group's chances of winning by buying tickets together. Prize winnings are distributed proportionally based on each member's risk exposure!",
             );
           }
         } else {
-          await conversation.send(
-            "❌ Group pool purchases are only available in group chats! In DMs, you can only buy individual tickets.",
-          );
+          // Handle pool ticket requests in DMs - offer to convert to individual
+          if (intent.extractedData?.ticketCount) {
+            const individualContextHandler = smartHandler.getContextHandler();
+            if (userAddress) {
+              individualContextHandler.setPendingTicketPurchase(
+                conversation.id,
+                message.senderInboxId,
+                intent.extractedData.ticketCount,
+                userAddress,
+                false,
+              );
+
+              await conversation.send(
+                `❌ Pool tickets are only available in group chats!\n\n🎫 Converting to individual purchase:\nI can buy you ${intent.extractedData.ticketCount} individual ticket${intent.extractedData.ticketCount > 1 ? "s" : ""} for $${intent.extractedData.ticketCount} USDC instead. You'll keep 100% of any winnings.\n\nShall I proceed with the individual purchase?\n\n👥 To buy pool tickets: Add me to a group chat!`,
+              );
+            } else {
+              await conversation.send(
+                "❌ Could not retrieve your wallet address for the purchase.",
+              );
+            }
+          } else {
+            await conversation.send(
+              "❌ Pool tickets are only available in group chats!\n\n🎫 In DMs, I can help you buy individual tickets instead.\n\nTell me how many individual tickets you'd like (e.g., '5 tickets') and you'll keep 100% of any winnings.\n\n👥 To buy pool tickets: Add me to a group chat where you can organize shared purchases with friends!",
+            );
+          }
         }
         break;
 
@@ -781,7 +832,7 @@ async function handleSmartTextMessage(
 
       case "claim_winnings":
         console.log("💰 Processing winnings claim");
-        await handleClaimIntent(conversation, megaPotManager);
+        await handleClaimIntent(conversation, megaPotManager, userAddress);
         break;
 
       case "help":
@@ -805,13 +856,13 @@ async function handleSmartTextMessage(
             await conversation.send(
               "Would you like to buy tickets individually or through the group pool?\n\n" +
                 "🎫 Individual Purchase: You keep all potential winnings\n" +
-                "👥 Group Pool: Share costs and winnings with the group - your share is proportional to your contribution\n\n" +
+                "👥 Group Pool: Increases group's chances, winnings shared proportionally based on risk exposure\n\n" +
                 "Reply with 'individual' or 'pool', or use the action buttons below.",
             );
             await sendMegaPotActions(conversation);
           } else {
             await conversation.send(
-              `👥 Group Pool Purchases\n\nBuy tickets through the group pool to benefit from collective winnings!\n\nCommands:\n• "buy 5 tickets for group pool" - Purchase through pool\n• "pool status" - Check group pool statistics\n• "my pool share" - See your contribution\n\n💡 Your winnings are proportional to your ticket contributions!`,
+              `👥 Group Pool Purchases\n\nBuy tickets through the group pool to increase your collective chances of winning!\n\nCommands:\n• "buy 5 tickets for group pool" - Purchase through jackpot pool\n• "pool status" - Check group pool statistics\n• "my pool share" - See your risk exposure\n\n💡 Pool purchases increase winning chances, with prizes distributed proportionally based on risk exposure!`,
             );
           }
         } else {
@@ -885,7 +936,7 @@ async function handleIntentMessage(
           await conversation.send(
             "Would you like to buy tickets individually or through the group pool?\n\n" +
               "🎫 Individual Purchase: You keep all potential winnings\n" +
-              "👥 Group Pool: Share costs and winnings with the group - your share is proportional to your contribution\n\n" +
+              "👥 Group Pool: Increases group's chances, winnings shared proportionally based on risk exposure\n\n" +
               "Reply with 'individual' or 'pool', or use the action buttons below.",
           );
           await sendMegaPotActions(conversation);
@@ -898,7 +949,7 @@ async function handleIntentMessage(
       case "buy-pool-tickets":
         if (conversation instanceof Group) {
           await conversation.send(
-            "🎯 How many tickets would you like to purchase for the group pool? (e.g., '10 tickets for group pool')\n\n💡 Pool purchases benefit from collective winnings - your share is proportional to your contribution!",
+            "🎯 How many tickets would you like to purchase for the group pool? (e.g., '10 tickets for group pool')\n\n💡 Pool purchases increase your group's chances of winning by buying tickets together. Prize winnings are distributed proportionally based on each member's risk exposure!",
           );
         } else {
           await conversation.send(
@@ -941,7 +992,7 @@ async function handleIntentMessage(
         await handleJackpotInfoIntent(conversation, megaPotManager);
         break;
       case "claim-winnings":
-        await handleClaimIntent(conversation, megaPotManager);
+        await handleClaimIntent(conversation, megaPotManager, userAddress);
         break;
       case "view-past-results":
         await conversation.send(
@@ -1136,27 +1187,34 @@ ${stats.isActive ? "✅ Round is active!" : "❌ Round has ended"}
 async function handleClaimIntent(
   conversation: any,
   megaPotManager: MegaPotManager,
+  userAddress?: string,
 ) {
   try {
-    await conversation.send("🎉 Checking for winnings...");
-
-    const hasWinnings = await megaPotManager.hasWinningsToClaim();
-    if (!hasWinnings) {
+    if (!userAddress) {
       await conversation.send(
-        "😔 No winnings available to claim at this time. Better luck next round!",
+        "❌ Could not retrieve your wallet address for claiming winnings.",
       );
       return;
     }
 
-    const result = await megaPotManager.claimWinnings();
+    await conversation.send("🎉 Preparing winnings claim...");
+
+    // Prepare the claim transaction for the user's wallet
+    const claimTransaction =
+      await megaPotManager.prepareClaimWinnings(userAddress);
 
     await conversation.send(
-      `🎉 Congratulations! Winnings claimed successfully!\n\nTransaction: ${result.txHash}\n\nYour winnings have been transferred to your wallet. Check your balance to confirm the transfer.`,
+      "💰 Claim Winnings Transaction\n\n🎯 This will attempt to claim any lottery winnings you may have.\n\n✅ Open your wallet to approve the transaction.\n\n💡 If you have no winnings, the transaction will fail safely.",
     );
+
+    // Send the transaction to user's wallet
+    await conversation.send(claimTransaction, ContentTypeWalletSendCalls);
+
+    console.log(`✅ Claim transaction sent to user's wallet: ${userAddress}`);
   } catch (error) {
-    console.error("❌ Error claiming winnings:", error);
+    console.error("❌ Error preparing claim transaction:", error);
     await conversation.send(
-      `❌ Error claiming winnings: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `❌ Error preparing winnings claim: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
   }
 }
@@ -1168,10 +1226,10 @@ async function handleHelpIntent(conversation: any) {
     ? `
 
 👥 Group Pool Features:
-• "buy 5 tickets for group pool" - Purchase through shared pool
+• "buy 5 tickets for group pool" - Purchase through jackpot pool
 • "pool status" - Check active group pools
 • "explain ticket types" - Learn solo vs pool differences
-• Pool purchases share costs and winnings proportionally
+• Pool purchases increase winning chances, prizes shared proportionally
 • Use "Buy for Group Pool" button for pool purchases`
     : `
 
