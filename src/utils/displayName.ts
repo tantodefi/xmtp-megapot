@@ -5,11 +5,11 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 /**
  * Convert address to reverse node for ENS resolution (from Base tutorial)
  */
-function convertReverseNodeToBytes(
+async function convertReverseNodeToBytes(
   address: string,
   chainId: number,
-): `0x${string}` {
-  const { encodePacked, keccak256, namehash } = require("viem");
+): Promise<`0x${string}`> {
+  const { encodePacked, keccak256, namehash } = await import("viem");
 
   const addressFormatted = address.toLowerCase() as `0x${string}`;
   const addressNode = keccak256(encodePacked(["address"], [addressFormatted]));
@@ -25,7 +25,7 @@ function convertReverseNodeToBytes(
 
 /**
  * Get display name for a wallet address
- * Tries multiple resolution methods: Farcaster first, then Basename, then ENS, then fallback
+ * Resolution chain: 1) Farcaster → 2) Basename → 3) ENS → 4) Abbreviated address
  */
 export async function getDisplayName(address: string): Promise<string> {
   try {
@@ -36,19 +36,6 @@ export async function getDisplayName(address: string): Promise<string> {
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       console.log(`📋 Using cached name for ${address}: ${cached.name}`);
       return cached.name;
-    }
-
-    // Hardcoded mappings for known addresses (temporary fix for network issues)
-    const knownAddresses: Record<string, string> = {
-      "0x6529b0f882b209a1918fa6935a40c224611cc510": "6529", // Known Farcaster user
-    };
-
-    const lowerAddress = address.toLowerCase();
-    if (knownAddresses[lowerAddress]) {
-      console.log(
-        `✅ Using known mapping for ${address}: ${knownAddresses[lowerAddress]}`,
-      );
-      return knownAddresses[lowerAddress];
     }
 
     let resolvedName = null;
@@ -81,6 +68,21 @@ export async function getDisplayName(address: string): Promise<string> {
       }
     }
 
+    // If no Basename, try ENS resolution
+    if (!resolvedName) {
+      console.log(`🌐 Attempting ENS resolution for ${address}...`);
+      try {
+        resolvedName = await resolveENS(address);
+        if (resolvedName) {
+          console.log(`✅ Resolved ${address} to ENS: ${resolvedName}`);
+        } else {
+          console.log(`⚠️ No ENS name found for ${address}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ ENS resolution failed for ${address}:`, error);
+      }
+    }
+
     // Fallback to formatted address
     const finalName = resolvedName || formatFallbackName(address);
     console.log(`🏁 Final resolved name for ${address}: ${finalName}`);
@@ -103,9 +105,28 @@ export async function getDisplayName(address: string): Promise<string> {
  */
 async function resolveENS(address: string): Promise<string | null> {
   try {
-    // Skip ENS resolution in production due to network restrictions
-    // Focus on Farcaster and Basename which are more relevant for Base users
-    console.log(`⚠️ ENS resolution skipped in production environment`);
+    // Use viem to resolve ENS from Ethereum mainnet
+    const { createPublicClient, http } = await import("viem");
+    const { mainnet } = await import("viem/chains");
+
+    const mainnetClient = createPublicClient({
+      chain: mainnet,
+      transport: http("https://eth-mainnet.g.alchemy.com/v2/demo"), // Public endpoint
+    });
+
+    console.log(`🔍 Resolving ENS for address: ${address}`);
+
+    const ensName = await mainnetClient.getEnsName({
+      address: address as `0x${string}`,
+    });
+
+    if (ensName && ensName.endsWith(".eth")) {
+      console.log(`✅ Resolved ${address} via ENS: ${ensName}`);
+      return ensName;
+    } else if (ensName) {
+      console.log(`✅ Resolved ${address} via ENS (non-.eth): ${ensName}`);
+      return ensName;
+    }
   } catch (error) {
     console.log(`⚠️ ENS resolution error for ${address}:`, error);
   }
@@ -131,12 +152,19 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     // Use Base L2 resolver with proper reverse node calculation (from Base tutorial)
     try {
-      // Base L2 Resolver contract address from https://docs.base.org/base-account/basenames/basenames-wagmi-tutorial
+      // Base L2 Resolver contract address - mainnet
+      // From Base docs: https://docs.base.org/base-account/basenames/basenames-wagmi-tutorial
       const BASENAME_L2_RESOLVER_ADDRESS =
-        "0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA";
+        "0xC6d566A56A1aFf6508b41f6c90ff131615583BCD"; // Mainnet L2Resolver
 
       // Convert address to reverse node (proper ENS reverse resolution)
-      const addressReverseNode = convertReverseNodeToBytes(address, base.id);
+      const addressReverseNode = await convertReverseNodeToBytes(
+        address,
+        base.id,
+      );
+      console.log(
+        `🔍 Generated reverse node for ${address}: ${addressReverseNode}`,
+      );
 
       const basename = await publicClient.readContract({
         abi: [
@@ -153,6 +181,8 @@ async function resolveBasename(address: string): Promise<string | null> {
         args: [addressReverseNode],
       });
 
+      console.log(`🔍 L2Resolver response for ${address}:`, basename);
+
       if (basename && typeof basename === "string" && basename.length > 0) {
         console.log(`✅ Resolved ${address} via Base L2 resolver: ${basename}`);
         return basename;
@@ -161,12 +191,14 @@ async function resolveBasename(address: string): Promise<string | null> {
       console.log(`⚠️ Base L2 resolver failed for ${address}:`, resolverError);
     }
 
-    // Try ReverseRegistrar contract as backup
+    // Try ReverseRegistrar approach with proper mainnet addresses
     try {
-      // ReverseRegistrar from basenames repo
-      const REVERSE_REGISTRAR = "0x876eF94ce0773052a2f81921E70FF25a5e76841f";
+      // ReverseRegistrar from basenames repo (mainnet)
+      const REVERSE_REGISTRAR = "0x79EA96012eEa67A83431F1701B3dFf7e37F9E282"; // Mainnet ReverseRegistrar
+      const MAINNET_L2_RESOLVER = "0xC6d566A56A1aFf6508b41f6c90ff131615583BCD"; // Mainnet L2Resolver
 
-      const reverseData = await publicClient.readContract({
+      // Get the reverse record for this address
+      const reverseRecord = await publicClient.readContract({
         address: REVERSE_REGISTRAR as `0x${string}`,
         abi: [
           {
@@ -181,13 +213,41 @@ async function resolveBasename(address: string): Promise<string | null> {
         args: [address as `0x${string}`],
       });
 
-      if (reverseData) {
-        console.log(`🔍 Got reverse node for ${address}: ${reverseData}`);
-        // Try to resolve the node to a name
-        // This would require additional resolver calls
+      if (reverseRecord) {
+        console.log(`🔍 Got reverse record for ${address}: ${reverseRecord}`);
+
+        // Now try to resolve this node to a name using the L2Resolver
+        const resolvedName = await publicClient.readContract({
+          address: MAINNET_L2_RESOLVER as `0x${string}`,
+          abi: [
+            {
+              inputs: [{ name: "node", type: "bytes32" }],
+              name: "name",
+              outputs: [{ name: "", type: "string" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ],
+          functionName: "name",
+          args: [reverseRecord],
+        });
+
+        if (
+          resolvedName &&
+          typeof resolvedName === "string" &&
+          resolvedName.length > 0
+        ) {
+          console.log(
+            `✅ Resolved ${address} via ReverseRegistrar: ${resolvedName}`,
+          );
+          return resolvedName;
+        }
       }
     } catch (reverseError) {
-      console.log(`⚠️ Reverse registrar failed for ${address}:`, reverseError);
+      console.log(
+        `⚠️ ReverseRegistrar approach failed for ${address}:`,
+        reverseError,
+      );
     }
 
     // Try Base Registry contract for reverse resolution
@@ -195,11 +255,13 @@ async function resolveBasename(address: string): Promise<string | null> {
       // Base Registry contract from basenames repo
       const BASE_REGISTRY = "0x1C8b7c5f8b9b1c1e5c8b1c1e5c8b1c1e5c8b1c1e"; // This would be the actual registry address
 
-      // For now, try the Basename API endpoints
+      // Try multiple Basename API endpoints
       const endpoints = [
         `https://resolver-api.basename.app/v1/reverse-lookup?address=${address}`,
         `https://api.basename.app/v1/reverse/${address}`,
         `https://basename.app/api/reverse/${address}`,
+        `https://www.base.org/api/v1/reverse/${address}`,
+        `https://base.org/api/names/reverse/${address}`,
       ];
 
       for (const endpoint of endpoints) {
@@ -213,6 +275,12 @@ async function resolveBasename(address: string): Promise<string | null> {
 
           if (response.ok) {
             const data = await response.json();
+            console.log(
+              `🔍 Response from ${endpoint}:`,
+              JSON.stringify(data, null, 2),
+            );
+
+            // Check various possible response formats
             if (data.name && data.name.endsWith(".base.eth")) {
               console.log(
                 `✅ Resolved ${address} via ${endpoint}: ${data.name}`,
@@ -223,6 +291,23 @@ async function resolveBasename(address: string): Promise<string | null> {
                 `✅ Resolved ${address} via ${endpoint}: ${data.basename}`,
               );
               return data.basename;
+            } else if (
+              data.data &&
+              data.data.name &&
+              data.data.name.endsWith(".base.eth")
+            ) {
+              console.log(
+                `✅ Resolved ${address} via ${endpoint}: ${data.data.name}`,
+              );
+              return data.data.name;
+            } else if (data.result && data.result.endsWith(".base.eth")) {
+              console.log(
+                `✅ Resolved ${address} via ${endpoint}: ${data.result}`,
+              );
+              return data.result;
+            } else if (typeof data === "string" && data.endsWith(".base.eth")) {
+              console.log(`✅ Resolved ${address} via ${endpoint}: ${data}`);
+              return data;
             }
           } else {
             console.log(
@@ -419,7 +504,9 @@ function formatFallbackName(address: string): string {
   // Create a more friendly format: first 6 + last 4 chars
   const friendlyAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-  // No hardcoded mappings - let the real API resolution work
+  console.log(
+    `📝 Using fallback address format for ${address}: ${friendlyAddress}`,
+  );
 
   return friendlyAddress;
 }

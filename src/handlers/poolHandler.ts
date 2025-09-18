@@ -497,6 +497,15 @@ To participate:
     const totalCostUSDC = BigInt(Math.floor(totalCost * 1000000));
 
     // Encode the actual JackpotPool.purchaseTickets call
+    console.log(`🔍 Encoding JackpotPool.purchaseTickets call:`);
+    console.log(`  - Contract: ${poolContractAddress}`);
+    console.log(`  - Function: purchaseTickets(address,uint256,address)`);
+    console.log(`  - Referrer: ${referrerAddress}`);
+    console.log(
+      `  - Value: ${totalCostUSDC.toString()} USDC (${numTickets} tickets)`,
+    );
+    console.log(`  - Recipient: ${userAddress}`);
+
     const poolPurchaseCallData = encodeFunctionData({
       abi: JACKPOT_POOL_ABI,
       functionName: "purchaseTickets",
@@ -506,6 +515,8 @@ To participate:
         userAddress as `0x${string}`, // recipient gets credit for the tickets
       ],
     });
+
+    console.log(`🔍 Generated call data: ${poolPurchaseCallData}`);
 
     // Encode USDC approval
     const approveCallData = encodeFunctionData({
@@ -537,19 +548,25 @@ To participate:
           value: "0x0",
           gas: "0xC350", // ~50,000 gas
           metadata: {
-            description: `Approve USDC for pool purchase: $${totalCost.toFixed(2)}`,
+            description: `Approve $${totalCost.toFixed(2)} USDC for MegaPot Pool Purchase`,
             transactionType: "erc20_approve",
+            appName: "MegaPot Pool",
+            appIcon: "https://megapot.io/favicon.ico",
           },
         },
         {
-          // Then call the real JackpotPool contract
+          // Then call the real JackpotPool.purchaseTickets(referrer, value, recipient)
           to: poolContractAddress as `0x${string}`,
           data: poolPurchaseCallData as `0x${string}`,
           value: "0x0",
           gas: "0x30D40", // ~200,000 gas
           metadata: {
-            description: `Purchase ${numTickets} tickets through group pool`,
-            transactionType: "pool_purchase",
+            description: `Purchase ${numTickets} lottery tickets through MegaPot Pool Contract`,
+            transactionType: "contract_interaction",
+            appName: "MegaPot Pool",
+            appIcon: "https://megapot.io/favicon.ico",
+            contractFunction: "purchaseTickets",
+            contractAddress: poolContractAddress,
           },
         },
       ],

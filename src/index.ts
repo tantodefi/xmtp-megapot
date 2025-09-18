@@ -1711,8 +1711,10 @@ async function sendMegaPotActions(conversation: any) {
     },
   );
 
+  const uniqueActionId = `megapot-smart-actions-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
   const actionsContent: ActionsContent = {
-    id: `megapot-smart-actions-${Date.now()}`,
+    id: uniqueActionId,
     description: isGroupChat
       ? "🤖 Smart MegaPot lottery assistant. Individual or group pool purchases:"
       : "🤖 Smart MegaPot lottery assistant. Choose an action:",
@@ -1720,7 +1722,7 @@ async function sendMegaPotActions(conversation: any) {
   };
 
   console.log(
-    `🎯 Sending Smart MegaPot inline actions (${isGroupChat ? "GROUP" : "DM"} - ${actions.length} buttons)`,
+    `🎯 Sending Smart MegaPot inline actions (${isGroupChat ? "GROUP" : "DM"} - ${actions.length} buttons) with ID: ${uniqueActionId}`,
   );
   if (isGroupChat) {
     console.log(
