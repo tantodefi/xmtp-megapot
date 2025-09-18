@@ -1536,11 +1536,12 @@ async function handleStatsIntent(
 🎫 Tickets purchased: ${stats.totalTicketsPurchased}
 💵 Total spent: ${megaPotManager.formatAmount(stats.totalSpent)}
 🎉 Total won: ${megaPotManager.formatAmount(stats.totalWinnings)}
+🎁 Daily prizes won: $${winningsData.breakdown.totalDailyPrizesWon.toFixed(2)} USDC (includes claimed prizes)
 
 💰 Claimable Winnings:
 • 🎯 Contract: $${winningsData.breakdown.contract.toFixed(2)} USDC
-• 🎁 Daily Prizes: $${winningsData.breakdown.dailyPrizes.toFixed(2)} USDC
-• 📊 Total Claimable: $${winningsData.amount.toFixed(2)} USDC
+• 👥 Pool: $0.00 USDC
+• 📊 Total Claimable: $${winningsData.breakdown.contract.toFixed(2)} USDC
 
 🎰 Current Round:
 💰 Jackpot: $${stats.jackpotPool || "0"}

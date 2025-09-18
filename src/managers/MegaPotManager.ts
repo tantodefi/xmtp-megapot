@@ -1384,7 +1384,11 @@ export class MegaPotManager {
   async hasWinningsToClaim(userAddress: string): Promise<{
     hasWinnings: boolean;
     amount: number;
-    breakdown: { contract: number; dailyPrizes: number };
+    breakdown: {
+      contract: number;
+      dailyPrizes: number;
+      totalDailyPrizesWon: number;
+    };
   }> {
     try {
       console.log(`🎰 Checking all winnings for user: ${userAddress}`);
@@ -1413,6 +1417,7 @@ export class MegaPotManager {
 
       // Check daily prizes using API (from MegaPot API docs)
       let dailyPrizeWinnings = 0;
+      let totalDailyPrizesWon = 0;
       try {
         const apiKey = process.env.MEGAPOT_DATA_API_KEY;
         if (apiKey) {
@@ -1435,20 +1440,25 @@ export class MegaPotManager {
               JSON.stringify(dailyPrizes, null, 2),
             );
 
-            // Calculate total unclaimed daily prizes
+            // Calculate total daily prizes (claimed and unclaimed)
             for (const [key, prize] of Object.entries(dailyPrizes)) {
               if (
                 prize &&
                 typeof prize === "object" &&
-                "prizeValueTotal" in prize &&
-                !("claimedAt" in prize)
+                "prizeValueTotal" in prize
               ) {
-                dailyPrizeWinnings += Number(prize.prizeValueTotal || 0);
+                const prizeValue = Number(prize.prizeValueTotal || 0);
+                totalDailyPrizesWon += prizeValue;
+
+                // Only count unclaimed prizes as claimable
+                if (!("claimedAt" in prize)) {
+                  dailyPrizeWinnings += prizeValue;
+                }
               }
             }
 
             console.log(
-              `🎁 Daily prize winnings for ${userAddress}: $${dailyPrizeWinnings.toFixed(2)} USDC`,
+              `🎁 Daily prizes for ${userAddress}: $${totalDailyPrizesWon.toFixed(2)} total won, $${dailyPrizeWinnings.toFixed(2)} unclaimed`,
             );
           } else {
             console.log(
@@ -1473,7 +1483,8 @@ export class MegaPotManager {
         amount: totalWinnings,
         breakdown: {
           contract: contractWinnings,
-          dailyPrizes: dailyPrizeWinnings,
+          dailyPrizes: dailyPrizeWinnings, // Unclaimed only
+          totalDailyPrizesWon: totalDailyPrizesWon, // All daily prizes (claimed + unclaimed)
         },
       };
     } catch (error) {
@@ -1481,7 +1492,7 @@ export class MegaPotManager {
       return {
         hasWinnings: false,
         amount: 0,
-        breakdown: { contract: 0, dailyPrizes: 0 },
+        breakdown: { contract: 0, dailyPrizes: 0, totalDailyPrizesWon: 0 },
       };
     }
   }
