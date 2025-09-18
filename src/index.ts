@@ -829,10 +829,9 @@ async function handleSmartTextMessage(
                 ContentTypeWalletSendCalls,
               );
 
-              // Execute post-transaction callback if available
-              if (poolResult.postTransactionCallback) {
-                poolResult.postTransactionCallback();
-              }
+              console.log(
+                `📋 Pool transaction sent with reference: ${poolResult.referenceId}`,
+              );
             }
           } else {
             const soloTicketCount = (pendingConfirmation.ticketCount ||
@@ -1091,10 +1090,9 @@ async function handleSmartTextMessage(
               ContentTypeWalletSendCalls,
             );
 
-            // Execute post-transaction callback if available
-            if (poolResult.postTransactionCallback) {
-              poolResult.postTransactionCallback();
-            }
+            console.log(
+              `📋 Pool transaction sent with reference: ${poolResult.referenceId}`,
+            );
           }
         } else if (intent.extractedData?.ticketCount && userAddress) {
           // Universal pool system - works in both DMs and groups

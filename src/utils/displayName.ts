@@ -3,6 +3,27 @@ const displayNameCache = new Map<string, { name: string; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
+ * Convert address to reverse node for ENS resolution (from Base tutorial)
+ */
+function convertReverseNodeToBytes(
+  address: string,
+  chainId: number,
+): `0x${string}` {
+  const { encodePacked, keccak256, namehash } = require("viem");
+
+  const addressFormatted = address.toLowerCase() as `0x${string}`;
+  const addressNode = keccak256(encodePacked(["address"], [addressFormatted]));
+  const chainCoinType = (0x80000000 | chainId) >>> 0;
+  const baseReverseNode = namehash(
+    `${chainCoinType.toString(16).toUpperCase()}.reverse`,
+  );
+  const addressReverseNode = keccak256(
+    encodePacked(["bytes32", "bytes32"], [baseReverseNode, addressNode]),
+  );
+  return addressReverseNode;
+}
+
+/**
  * Get display name for a wallet address
  * Tries multiple resolution methods: Farcaster first, then Basename, then ENS, then fallback
  */
@@ -108,46 +129,33 @@ async function resolveBasename(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving Basename for address: ${address}`);
 
-    // Use Base L2 resolver contract for Basename resolution (from basenames repo)
+    // Use Base L2 resolver with proper reverse node calculation (from Base tutorial)
     try {
-      // Base L2 Resolver contract address from https://github.com/base/basenames
-      const BASE_L2_RESOLVER = "0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA";
+      // Base L2 Resolver contract address from https://docs.base.org/base-account/basenames/basenames-wagmi-tutorial
+      const BASENAME_L2_RESOLVER_ADDRESS =
+        "0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA";
 
-      // Try direct contract call to Base L2 resolver using reverse resolution
-      const resolverData = await publicClient.readContract({
-        address: BASE_L2_RESOLVER as `0x${string}`,
+      // Convert address to reverse node (proper ENS reverse resolution)
+      const addressReverseNode = convertReverseNodeToBytes(address, base.id);
+
+      const basename = await publicClient.readContract({
         abi: [
           {
-            inputs: [{ name: "addr", type: "address" }],
+            inputs: [{ name: "node", type: "bytes32" }],
             name: "name",
             outputs: [{ name: "", type: "string" }],
             stateMutability: "view",
             type: "function",
           },
         ],
+        address: BASENAME_L2_RESOLVER_ADDRESS as `0x${string}`,
         functionName: "name",
-        args: [address as `0x${string}`],
+        args: [addressReverseNode],
       });
 
-      if (
-        resolverData &&
-        typeof resolverData === "string" &&
-        resolverData.length > 0 &&
-        resolverData.endsWith(".base.eth")
-      ) {
-        console.log(
-          `✅ Resolved ${address} via Base L2 resolver: ${resolverData}`,
-        );
-        return resolverData;
-      } else if (
-        resolverData &&
-        typeof resolverData === "string" &&
-        resolverData.length > 0
-      ) {
-        console.log(
-          `✅ Resolved ${address} via Base L2 resolver (non-.base.eth): ${resolverData}`,
-        );
-        return resolverData;
+      if (basename && typeof basename === "string" && basename.length > 0) {
+        console.log(`✅ Resolved ${address} via Base L2 resolver: ${basename}`);
+        return basename;
       }
     } catch (resolverError) {
       console.log(`⚠️ Base L2 resolver failed for ${address}:`, resolverError);
@@ -294,16 +302,34 @@ async function resolveFarcaster(address: string): Promise<string | null> {
         addresses: [address],
       });
       console.log(
-        `🔍 Neynar bulk response for ${address}:`,
-        JSON.stringify(response, null, 2),
-      );
-    } catch (bulkError) {
-      console.log(
-        `⚠️ Bulk lookup failed, trying individual lookup:`,
-        bulkError,
+        `🔍 Neynar bulk response for ${address}: Found ${Object.keys(response).length} address entries`,
       );
 
-      // Fallback to direct API call
+      // Log the actual response structure for debugging
+      if (Object.keys(response).length > 0) {
+        console.log(`🔍 Response keys:`, Object.keys(response));
+        console.log(`🔍 Full response:`, JSON.stringify(response, null, 2));
+      }
+    } catch (bulkError) {
+      console.log(
+        `⚠️ Bulk lookup failed for ${address}:`,
+        bulkError instanceof Error ? bulkError.message : String(bulkError),
+      );
+
+      // Check if it's a 404 (user not found) vs other errors
+      if (
+        bulkError &&
+        typeof bulkError === "object" &&
+        "status" in bulkError &&
+        bulkError.status === 404
+      ) {
+        console.log(
+          `📝 Address ${address} not found in Farcaster (404) - likely not a Farcaster user`,
+        );
+        return null; // Skip fallback attempts for confirmed non-users
+      }
+
+      // For other errors, try direct API call
       try {
         const directResponse = await fetch(
           `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${address}`,
@@ -318,19 +344,24 @@ async function resolveFarcaster(address: string): Promise<string | null> {
         if (directResponse.ok) {
           const directData = await directResponse.json();
           console.log(
-            `🔍 Neynar direct API response:`,
+            `🔍 Neynar direct API success:`,
             JSON.stringify(directData, null, 2),
           );
           response = directData;
+        } else if (directResponse.status === 404) {
+          console.log(
+            `📝 Direct API confirms: ${address} not a Farcaster user (404)`,
+          );
+          return null;
         } else {
           console.log(
             `⚠️ Direct API call failed with status ${directResponse.status}`,
           );
-          throw bulkError; // Re-throw original error
+          return null;
         }
       } catch (directError) {
         console.log(`⚠️ Direct API call also failed:`, directError);
-        throw bulkError; // Re-throw original error
+        return null;
       }
     }
 
