@@ -140,6 +140,18 @@ const MEGAPOT_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  // User info function from MegaPot docs
+  {
+    inputs: [{ name: "", type: "address" }],
+    name: "usersInfo",
+    outputs: [
+      { name: "ticketsPurchasedTotalBps", type: "uint256" },
+      { name: "winningsClaimable", type: "uint256" },
+      { name: "active", type: "bool" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
   // LP functions
   {
     inputs: [{ name: "_amount", type: "uint256" }],
@@ -1367,23 +1379,43 @@ export class MegaPotManager {
   }
 
   /**
-   * Check if user has winnings to claim
-   * Note: getUserWins() doesn't take parameters - it returns wins for the calling wallet
+   * Check if user has winnings to claim using usersInfo(address)
    */
-  async hasWinningsToClaim(userAddress?: string): Promise<boolean> {
+  async hasWinningsToClaim(
+    userAddress: string,
+  ): Promise<{ hasWinnings: boolean; amount: number }> {
     try {
-      // getUserWins() returns wins for the caller, so we need to use the user's wallet context
-      // For now, we'll always return true and let the actual claim attempt determine if there are winnings
+      console.log(`🎰 Checking winnings for user: ${userAddress}`);
+
+      const contract = getContract({
+        address: this.getContractAddress(),
+        abi: MEGAPOT_ABI,
+        client: this.client,
+      });
+
+      // Use usersInfo(address) to check winningsClaimable
+      const userInfo = await contract.read.usersInfo([
+        userAddress as `0x${string}`,
+      ]);
+
+      // usersInfo returns: [ticketsPurchasedTotalBps, winningsClaimable, active]
+      const winningsClaimable = userInfo[1]; // Second element is winningsClaimable
+      const winningsUSDC = Number(winningsClaimable) / 1000000; // Convert from 6 decimals
+
       console.log(
-        `🎰 Checking winnings availability for user: ${userAddress || "agent"}`,
+        `💰 User ${userAddress} has ${winningsUSDC.toFixed(6)} USDC claimable winnings`,
       );
 
-      // Since getUserWins() doesn't take parameters and only works for the calling wallet,
-      // we can't pre-check winnings for other users. We'll return true and let the claim attempt handle it.
-      return true;
+      return {
+        hasWinnings: winningsUSDC > 0,
+        amount: winningsUSDC,
+      };
     } catch (error) {
       console.error("Error checking winnings:", error);
-      return false;
+      return {
+        hasWinnings: false,
+        amount: 0,
+      };
     }
   }
 

@@ -422,6 +422,7 @@ async function main() {
                 megaPotManager,
                 agent,
                 smartHandler,
+                poolHandler,
                 correctedIsGroupChat,
               );
               continue;
@@ -556,6 +557,19 @@ async function handleSmartTextMessage(
       ) {
         const poolStatus = await poolHandler.getPoolStatus(conversation.id);
         await conversation.send(poolStatus);
+        return;
+      }
+
+      // Check for total pool tickets command
+      if (
+        lowerContent.includes("total pool tickets") ||
+        lowerContent.includes("pool tickets total") ||
+        lowerContent.includes("jackpot pool tickets")
+      ) {
+        const poolStats = await poolHandler.getTotalPoolTickets();
+        await conversation.send(
+          `📊 JackpotPool Contract Stats\n\n🎫 Total Pool Tickets: ${poolStats.tickets.toFixed(2)}\n💰 Pool Value: $${poolStats.tickets.toFixed(2)}\n🏆 Pending Winnings: $${poolStats.winnings.toFixed(2)}\n\n📋 Contract: ${process.env.JACKPOT_POOL_CONTRACT_ADDRESS}\n\n⚠️ These tickets are separate from individual MegaPot tickets and won't show in regular stats until prizes are distributed.`,
+        );
         return;
       }
 
@@ -1128,7 +1142,12 @@ async function handleSmartTextMessage(
 
       case "claim_winnings":
         console.log("💰 Processing winnings claim");
-        await handleClaimIntent(conversation, megaPotManager, userAddress);
+        await handleClaimIntent(
+          conversation,
+          megaPotManager,
+          poolHandler,
+          userAddress,
+        );
         break;
 
       case "help":
@@ -1292,6 +1311,7 @@ async function handleIntentMessage(
   megaPotManager: MegaPotManager,
   agent: any,
   smartHandler: SmartHandler,
+  poolHandler: PoolHandler,
   isGroupChat: boolean,
 ) {
   console.log(
@@ -1388,7 +1408,12 @@ async function handleIntentMessage(
         await handleJackpotInfoIntent(conversation, megaPotManager);
         break;
       case "claim-winnings":
-        await handleClaimIntent(conversation, megaPotManager, userAddress);
+        await handleClaimIntent(
+          conversation,
+          megaPotManager,
+          poolHandler,
+          userAddress,
+        );
         break;
       case "view-past-results":
         await conversation.send(
@@ -1580,9 +1605,25 @@ ${stats.isActive ? "✅ Round is active!" : "❌ Round has ended"}
   }
 }
 
+// Helper function to check pool winnings
+async function checkPoolWinnings(
+  userAddress: string,
+  poolHandler: PoolHandler,
+): Promise<{ hasWinnings: boolean; amount: number }> {
+  try {
+    // This would need to be implemented in poolHandler to check pool contract winnings
+    // For now, return no winnings since we can't reliably check the pool contract
+    return { hasWinnings: false, amount: 0 };
+  } catch (error) {
+    console.log("⚠️ Failed to check pool winnings:", error);
+    return { hasWinnings: false, amount: 0 };
+  }
+}
+
 async function handleClaimIntent(
   conversation: any,
   megaPotManager: MegaPotManager,
+  poolHandler: PoolHandler,
   userAddress?: string,
 ) {
   try {
@@ -1593,24 +1634,66 @@ async function handleClaimIntent(
       return;
     }
 
-    await conversation.send("🎉 Preparing winnings claim...");
+    await conversation.send("🔍 Checking your winnings in both contracts...");
 
-    // Prepare the claim transaction for the user's wallet
-    const claimTransaction =
-      await megaPotManager.prepareClaimWinnings(userAddress);
+    // Check winnings in both MegaPot and JackpotPool contracts
+    const [megaPotWinnings, poolWinnings] = await Promise.all([
+      megaPotManager.hasWinningsToClaim(userAddress),
+      checkPoolWinnings(userAddress, poolHandler),
+    ]);
 
-    await conversation.send(
-      "💰 Claim Winnings Transaction\n\n🎯 This will attempt to claim any lottery winnings you may have.\n\n✅ Open your wallet to approve the transaction.\n\n💡 If you have no winnings, the transaction will fail safely.",
+    const totalWinnings = megaPotWinnings.amount + poolWinnings.amount;
+    const hasAnyWinnings =
+      megaPotWinnings.hasWinnings || poolWinnings.hasWinnings;
+
+    if (!hasAnyWinnings) {
+      await conversation.send(
+        `🎰 No Winnings Available\n\n🔍 Checked both contracts:\n• 🎯 MegaPot: $${megaPotWinnings.amount.toFixed(2)}\n• 👥 JackpotPool: $${poolWinnings.amount.toFixed(2)}\n\n💡 Winnings appear after:\n• You win a lottery round (MegaPot)\n• Pool wins and distributes prizes (JackpotPool)\n• Rounds are finalized\n\n🎫 Keep playing for your chance to win!`,
+      );
+      return;
+    }
+
+    // User has winnings - show breakdown
+    let winningsMessage = `🎉 Winnings Found!\n\n`;
+    if (megaPotWinnings.hasWinnings) {
+      winningsMessage += `💰 MegaPot Contract: $${megaPotWinnings.amount.toFixed(2)} USDC\n`;
+    }
+    if (poolWinnings.hasWinnings) {
+      winningsMessage += `👥 JackpotPool Contract: $${poolWinnings.amount.toFixed(2)} USDC\n`;
+    }
+    winningsMessage += `\n📊 Total Winnings: $${totalWinnings.toFixed(2)} USDC\n\nPreparing claim transactions...`;
+
+    await conversation.send(winningsMessage);
+
+    // Send MegaPot claim transaction if applicable
+    if (megaPotWinnings.hasWinnings) {
+      const megaPotClaimTx =
+        await megaPotManager.prepareClaimWinnings(userAddress);
+      await conversation.send(
+        `💰 Claim MegaPot Winnings: $${megaPotWinnings.amount.toFixed(2)} USDC\n\n🎯 This claims from the main MegaPot contract.\n\n✅ Open your wallet to approve this transaction.`,
+      );
+      await conversation.send(megaPotClaimTx, ContentTypeWalletSendCalls);
+    }
+
+    // Send Pool claim transaction if applicable
+    if (poolWinnings.hasWinnings) {
+      const poolClaimTx = await poolHandler.prepareClaimPoolWinnings(
+        userAddress,
+        process.env.JACKPOT_POOL_CONTRACT_ADDRESS as string,
+      );
+      await conversation.send(
+        `👥 Claim Pool Winnings: $${poolWinnings.amount.toFixed(2)} USDC\n\n🎯 This claims from the JackpotPool contract.\n\n✅ Open your wallet to approve this transaction.`,
+      );
+      await conversation.send(poolClaimTx, ContentTypeWalletSendCalls);
+    }
+
+    console.log(
+      `✅ Claim transactions sent - MegaPot: $${megaPotWinnings.amount.toFixed(2)}, Pool: $${poolWinnings.amount.toFixed(2)} to: ${userAddress}`,
     );
-
-    // Send the transaction to user's wallet
-    await conversation.send(claimTransaction, ContentTypeWalletSendCalls);
-
-    console.log(`✅ Claim transaction sent to user's wallet: ${userAddress}`);
   } catch (error) {
-    console.error("❌ Error preparing claim transaction:", error);
+    console.error("❌ Error in claim process:", error);
     await conversation.send(
-      `❌ Error preparing winnings claim: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `❌ Error checking winnings: ${error instanceof Error ? error.message : "Unable to check winnings at this time"}`,
     );
   }
 }

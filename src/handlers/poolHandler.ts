@@ -741,6 +741,47 @@ If the pool wins $1,000, you get ${sharePercentage}% = $${((parseFloat(sharePerc
   }
 
   /**
+   * Get total tickets in the JackpotPool contract
+   */
+  async getTotalPoolTickets(): Promise<{ tickets: number; winnings: number }> {
+    try {
+      console.log("📊 Checking total tickets in JackpotPool contract...");
+
+      const [poolTicketsBps, pendingWinnings] = await Promise.all([
+        this.client.readContract({
+          address: this.poolContractAddress as `0x${string}`,
+          abi: JACKPOT_POOL_ABI,
+          functionName: "poolTicketsPurchasedBps",
+        }),
+        this.client.readContract({
+          address: this.poolContractAddress as `0x${string}`,
+          abi: JACKPOT_POOL_ABI,
+          functionName: "pendingPoolWinnings",
+        }),
+      ]);
+
+      // Convert BPS to actual ticket count (7000 BPS = 1 ticket after 30% fees)
+      const totalTickets = Number(poolTicketsBps) / 7000;
+      const winningsUSDC = Number(pendingWinnings) / 1000000;
+
+      console.log(
+        `📊 JackpotPool has ${totalTickets.toFixed(2)} tickets, $${winningsUSDC.toFixed(2)} pending winnings`,
+      );
+
+      return {
+        tickets: totalTickets,
+        winnings: winningsUSDC,
+      };
+    } catch (error) {
+      console.log("⚠️ Failed to read JackpotPool stats:", error);
+      return {
+        tickets: 0,
+        winnings: 0,
+      };
+    }
+  }
+
+  /**
    * Clean up old pools
    */
   cleanupOldPools(): void {
