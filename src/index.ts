@@ -1529,10 +1529,18 @@ async function handleStatsIntent(
   try {
     const stats = await megaPotManager.getStats(userAddress);
 
+    // Get enhanced winnings data (including daily prizes)
+    const winningsData = await megaPotManager.hasWinningsToClaim(userAddress);
+
     let statsMessage = `📊 Your MegaPot Stats:
 🎫 Tickets purchased: ${stats.totalTicketsPurchased}
 💵 Total spent: ${megaPotManager.formatAmount(stats.totalSpent)}
 🎉 Total won: ${megaPotManager.formatAmount(stats.totalWinnings)}
+
+💰 Claimable Winnings:
+• 🎯 Contract: $${winningsData.breakdown.contract.toFixed(2)} USDC
+• 🎁 Daily Prizes: $${winningsData.breakdown.dailyPrizes.toFixed(2)} USDC
+• 📊 Total Claimable: $${winningsData.amount.toFixed(2)} USDC
 
 🎰 Current Round:
 💰 Jackpot: $${stats.jackpotPool || "0"}

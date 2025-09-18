@@ -1381,9 +1381,7 @@ export class MegaPotManager {
   /**
    * Check if user has winnings to claim using both contract and API
    */
-  async hasWinningsToClaim(
-    userAddress: string,
-  ): Promise<{
+  async hasWinningsToClaim(userAddress: string): Promise<{
     hasWinnings: boolean;
     amount: number;
     breakdown: { contract: number; dailyPrizes: number };
@@ -1416,7 +1414,7 @@ export class MegaPotManager {
       // Check daily prizes using API (from MegaPot API docs)
       let dailyPrizeWinnings = 0;
       try {
-        const apiKey = process.env.MEGAPOT_API_KEY;
+        const apiKey = process.env.MEGAPOT_DATA_API_KEY;
         if (apiKey) {
           console.log(`🎁 Checking daily prize winnings for: ${userAddress}`);
 
@@ -1458,7 +1456,7 @@ export class MegaPotManager {
             );
           }
         } else {
-          console.log(`⚠️ No MEGAPOT_API_KEY for daily prizes check`);
+          console.log(`⚠️ No MEGAPOT_DATA_API_KEY for daily prizes check`);
         }
       } catch (apiError) {
         console.log(`⚠️ Failed to check daily prizes:`, apiError);
