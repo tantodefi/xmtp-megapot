@@ -1648,31 +1648,41 @@ async function handleClaimIntent(
 
     if (!hasAnyWinnings) {
       await conversation.send(
-        `🎰 No Winnings Available\n\n🔍 Checked both contracts:\n• 🎯 MegaPot: $${megaPotWinnings.amount.toFixed(2)}\n• 👥 JackpotPool: $${poolWinnings.amount.toFixed(2)}\n\n💡 Winnings appear after:\n• You win a lottery round (MegaPot)\n• Pool wins and distributes prizes (JackpotPool)\n• Rounds are finalized\n\n🎫 Keep playing for your chance to win!`,
+        `🎰 No Winnings Available\n\n🔍 Checked all sources:\n• 🎯 MegaPot Contract: $${megaPotWinnings.breakdown.contract.toFixed(2)}\n• 🎁 Daily Prizes: $${megaPotWinnings.breakdown.dailyPrizes.toFixed(2)}\n• 👥 JackpotPool: $${poolWinnings.amount.toFixed(2)}\n\n💡 Winnings appear after:\n• You win a lottery round (Contract)\n• You win daily prizes (API)\n• Pool wins and distributes prizes (JackpotPool)\n\n🎫 Keep playing for your chance to win!`,
       );
       return;
     }
 
-    // User has winnings - show breakdown
+    // User has winnings - show detailed breakdown
     let winningsMessage = `🎉 Winnings Found!\n\n`;
-    if (megaPotWinnings.hasWinnings) {
-      winningsMessage += `💰 MegaPot Contract: $${megaPotWinnings.amount.toFixed(2)} USDC\n`;
+    if (megaPotWinnings.breakdown.contract > 0) {
+      winningsMessage += `💰 MegaPot Contract: $${megaPotWinnings.breakdown.contract.toFixed(2)} USDC\n`;
+    }
+    if (megaPotWinnings.breakdown.dailyPrizes > 0) {
+      winningsMessage += `🎁 Daily Prizes: $${megaPotWinnings.breakdown.dailyPrizes.toFixed(2)} USDC\n`;
     }
     if (poolWinnings.hasWinnings) {
-      winningsMessage += `👥 JackpotPool Contract: $${poolWinnings.amount.toFixed(2)} USDC\n`;
+      winningsMessage += `👥 JackpotPool: $${poolWinnings.amount.toFixed(2)} USDC\n`;
     }
     winningsMessage += `\n📊 Total Winnings: $${totalWinnings.toFixed(2)} USDC\n\nPreparing claim transactions...`;
 
     await conversation.send(winningsMessage);
 
-    // Send MegaPot claim transaction if applicable
-    if (megaPotWinnings.hasWinnings) {
+    // Send MegaPot claim transaction if user has contract winnings
+    if (megaPotWinnings.breakdown.contract > 0) {
       const megaPotClaimTx =
         await megaPotManager.prepareClaimWinnings(userAddress);
       await conversation.send(
-        `💰 Claim MegaPot Winnings: $${megaPotWinnings.amount.toFixed(2)} USDC\n\n🎯 This claims from the main MegaPot contract.\n\n✅ Open your wallet to approve this transaction.`,
+        `💰 Claim MegaPot Contract Winnings: $${megaPotWinnings.breakdown.contract.toFixed(2)} USDC\n\n🎯 This claims jackpot winnings from the main MegaPot contract.\n\n✅ Open your wallet to approve this transaction.`,
       );
       await conversation.send(megaPotClaimTx, ContentTypeWalletSendCalls);
+    }
+
+    // Show info about daily prizes (these might be auto-claimed or need different process)
+    if (megaPotWinnings.breakdown.dailyPrizes > 0) {
+      await conversation.send(
+        `🎁 Daily Prize Winnings: $${megaPotWinnings.breakdown.dailyPrizes.toFixed(2)} USDC\n\n💡 Daily prizes may be automatically distributed or require a different claim process. Check your wallet balance or the MegaPot website for more details.`,
+      );
     }
 
     // Send Pool claim transaction if applicable

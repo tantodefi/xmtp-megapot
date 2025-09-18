@@ -1379,42 +1379,111 @@ export class MegaPotManager {
   }
 
   /**
-   * Check if user has winnings to claim using usersInfo(address)
+   * Check if user has winnings to claim using both contract and API
    */
   async hasWinningsToClaim(
     userAddress: string,
-  ): Promise<{ hasWinnings: boolean; amount: number }> {
+  ): Promise<{
+    hasWinnings: boolean;
+    amount: number;
+    breakdown: { contract: number; dailyPrizes: number };
+  }> {
     try {
-      console.log(`🎰 Checking winnings for user: ${userAddress}`);
+      console.log(`🎰 Checking all winnings for user: ${userAddress}`);
 
-      const contract = getContract({
-        address: this.getContractAddress(),
-        abi: MEGAPOT_ABI,
-        client: this.client,
-      });
+      // Check contract winnings using usersInfo(address)
+      let contractWinnings = 0;
+      try {
+        const contract = getContract({
+          address: this.getContractAddress(),
+          abi: MEGAPOT_ABI,
+          client: this.client,
+        });
 
-      // Use usersInfo(address) to check winningsClaimable
-      const userInfo = await contract.read.usersInfo([
-        userAddress as `0x${string}`,
-      ]);
+        const userInfo = await contract.read.usersInfo([
+          userAddress as `0x${string}`,
+        ]);
+        const winningsClaimable = userInfo[1]; // winningsClaimable field
+        contractWinnings = Number(winningsClaimable) / 1000000; // Convert from 6 decimals
 
-      // usersInfo returns: [ticketsPurchasedTotalBps, winningsClaimable, active]
-      const winningsClaimable = userInfo[1]; // Second element is winningsClaimable
-      const winningsUSDC = Number(winningsClaimable) / 1000000; // Convert from 6 decimals
+        console.log(
+          `💰 Contract winnings for ${userAddress}: $${contractWinnings.toFixed(6)} USDC`,
+        );
+      } catch (contractError) {
+        console.log(`⚠️ Failed to check contract winnings:`, contractError);
+      }
+
+      // Check daily prizes using API (from MegaPot API docs)
+      let dailyPrizeWinnings = 0;
+      try {
+        const apiKey = process.env.MEGAPOT_API_KEY;
+        if (apiKey) {
+          console.log(`🎁 Checking daily prize winnings for: ${userAddress}`);
+
+          const dailyPrizesResponse = await fetch(
+            `https://api.megapot.io/api/v1/giveaways/daily-giveaway-winners/${userAddress}`,
+            {
+              headers: {
+                apikey: apiKey,
+                Accept: "application/json",
+              },
+            },
+          );
+
+          if (dailyPrizesResponse.ok) {
+            const dailyPrizes = await dailyPrizesResponse.json();
+            console.log(
+              `🎁 Daily prizes response:`,
+              JSON.stringify(dailyPrizes, null, 2),
+            );
+
+            // Calculate total unclaimed daily prizes
+            for (const [key, prize] of Object.entries(dailyPrizes)) {
+              if (
+                prize &&
+                typeof prize === "object" &&
+                "prizeValueTotal" in prize &&
+                !("claimedAt" in prize)
+              ) {
+                dailyPrizeWinnings += Number(prize.prizeValueTotal || 0);
+              }
+            }
+
+            console.log(
+              `🎁 Daily prize winnings for ${userAddress}: $${dailyPrizeWinnings.toFixed(2)} USDC`,
+            );
+          } else {
+            console.log(
+              `⚠️ Daily prizes API returned ${dailyPrizesResponse.status}`,
+            );
+          }
+        } else {
+          console.log(`⚠️ No MEGAPOT_API_KEY for daily prizes check`);
+        }
+      } catch (apiError) {
+        console.log(`⚠️ Failed to check daily prizes:`, apiError);
+      }
+
+      const totalWinnings = contractWinnings + dailyPrizeWinnings;
 
       console.log(
-        `💰 User ${userAddress} has ${winningsUSDC.toFixed(6)} USDC claimable winnings`,
+        `💰 Total winnings for ${userAddress}: $${totalWinnings.toFixed(6)} USDC (Contract: $${contractWinnings.toFixed(2)}, Daily: $${dailyPrizeWinnings.toFixed(2)})`,
       );
 
       return {
-        hasWinnings: winningsUSDC > 0,
-        amount: winningsUSDC,
+        hasWinnings: totalWinnings > 0,
+        amount: totalWinnings,
+        breakdown: {
+          contract: contractWinnings,
+          dailyPrizes: dailyPrizeWinnings,
+        },
       };
     } catch (error) {
       console.error("Error checking winnings:", error);
       return {
         hasWinnings: false,
         amount: 0,
+        breakdown: { contract: 0, dailyPrizes: 0 },
       };
     }
   }
