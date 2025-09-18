@@ -32,7 +32,7 @@ const JACKPOT_POOL_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
-  // Actual functions from the JackpotPool contract
+  // Read-only functions from the JackpotPool contract
   {
     inputs: [],
     name: "poolTicketsPurchasedBps",
@@ -53,6 +53,42 @@ const JACKPOT_POOL_ABI = [
     outputs: [{ name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
+  },
+  {
+    inputs: [],
+    name: "currentRound",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "", type: "uint256" }],
+    name: "poolTickets",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "", type: "address" },
+      { name: "", type: "uint256" },
+    ],
+    name: "participantTickets",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  // Events
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "participant", type: "address" },
+      { indexed: true, name: "round", type: "uint256" },
+      { indexed: false, name: "ticketsPurchasedTotalBps", type: "uint256" },
+      { indexed: true, name: "referrer", type: "address" },
+    ],
+    name: "ParticipantTicketPurchase",
+    type: "event",
   },
 ] as const;
 
@@ -93,15 +129,190 @@ export class PoolHandler {
   private groupPools = new Map<string, GroupPool>();
   private megaPotManager: MegaPotManager;
   private client: any; // Simplified type to avoid viem version conflicts
+  private poolContractAddress: string;
+  private currentRound: number = 0;
 
   constructor(megaPotManager: MegaPotManager) {
     this.megaPotManager = megaPotManager;
+    this.poolContractAddress = process.env
+      .JACKPOT_POOL_CONTRACT_ADDRESS as string;
 
     // Initialize public client for reading contract data
     this.client = createPublicClient({
       chain: base,
-      transport: http(process.env.BASE_RPC_URL || "https://sepolia.base.org"),
+      transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org"),
     });
+
+    // Initialize current round (but don't start constant monitoring)
+    this.initializeCurrentRound();
+  }
+
+  /**
+   * Initialize current round from contract (one-time setup)
+   */
+  private async initializeCurrentRound(): Promise<void> {
+    if (!this.poolContractAddress) {
+      console.log("⚠️ No pool contract address configured");
+      return;
+    }
+
+    try {
+      console.log(
+        `📊 Initializing pool handler for ${this.poolContractAddress}`,
+      );
+      await this.syncCurrentRound();
+    } catch (error) {
+      console.log("⚠️ Failed to initialize current round:", error);
+    }
+  }
+
+  /**
+   * Sync current round from contract
+   */
+  private async syncCurrentRound(): Promise<void> {
+    try {
+      const round = await this.client.readContract({
+        address: this.poolContractAddress as `0x${string}`,
+        abi: JACKPOT_POOL_ABI,
+        functionName: "currentRound",
+      });
+      this.currentRound = Number(round);
+      console.log(`📊 Synced current round: ${this.currentRound}`);
+    } catch (error) {
+      console.log("⚠️ Failed to sync current round:", error);
+    }
+  }
+
+  /**
+   * Refresh pool data on-demand (only when users request it)
+   */
+  private async refreshPoolDataOnDemand(): Promise<void> {
+    try {
+      console.log("📊 Refreshing pool data on user request...");
+
+      // Read current pool stats from contract
+      const poolTicketsBps = await this.client.readContract({
+        address: this.poolContractAddress as `0x${string}`,
+        abi: JACKPOT_POOL_ABI,
+        functionName: "poolTicketsPurchasedBps",
+      });
+
+      const pendingWinnings = await this.client.readContract({
+        address: this.poolContractAddress as `0x${string}`,
+        abi: JACKPOT_POOL_ABI,
+        functionName: "pendingPoolWinnings",
+      });
+
+      // Convert BPS to actual ticket count (7000 BPS = 1 ticket after 30% fees)
+      const totalPoolTickets = Number(poolTicketsBps) / 7000;
+      const poolWinningsUSDC = Number(pendingWinnings) / 1000000;
+
+      console.log(
+        `📊 Fresh pool contract stats: ${totalPoolTickets.toFixed(2)} tickets, $${poolWinningsUSDC.toFixed(2)} pending winnings`,
+      );
+
+      // Update all pools with latest contract data
+      for (const [groupId, pool] of this.groupPools.entries()) {
+        if (pool.poolContractAddress === this.poolContractAddress) {
+          pool.totalTickets = totalPoolTickets;
+          pool.totalContributed = totalPoolTickets; // $1 per ticket
+        }
+      }
+    } catch (error) {
+      console.log("⚠️ Failed to refresh pool data:", error);
+    }
+  }
+
+  /**
+   * Get real-time pool stats from contract (fetches fresh data on each call)
+   */
+  async getPoolStatsFromContract(): Promise<{
+    totalTickets: number;
+    pendingWinnings: number;
+    currentRound: number;
+  }> {
+    try {
+      console.log("📊 Fetching fresh pool stats from contract...");
+
+      const [poolTicketsBps, pendingWinnings, currentRound] = await Promise.all(
+        [
+          this.client.readContract({
+            address: this.poolContractAddress as `0x${string}`,
+            abi: JACKPOT_POOL_ABI,
+            functionName: "poolTicketsPurchasedBps",
+          }),
+          this.client.readContract({
+            address: this.poolContractAddress as `0x${string}`,
+            abi: JACKPOT_POOL_ABI,
+            functionName: "pendingPoolWinnings",
+          }),
+          this.client.readContract({
+            address: this.poolContractAddress as `0x${string}`,
+            abi: JACKPOT_POOL_ABI,
+            functionName: "currentRound",
+          }),
+        ],
+      );
+
+      // Convert BPS to actual ticket count (7000 BPS = 1 ticket after 30% fees)
+      const totalTickets = Number(poolTicketsBps) / 7000;
+      const winningsUSDC = Number(pendingWinnings) / 1000000;
+
+      // Update cached current round
+      this.currentRound = Number(currentRound);
+
+      console.log(
+        `📊 Fresh contract data: ${totalTickets.toFixed(2)} tickets, $${winningsUSDC.toFixed(2)} winnings, round ${this.currentRound}`,
+      );
+
+      return {
+        totalTickets,
+        pendingWinnings: winningsUSDC,
+        currentRound: this.currentRound,
+      };
+    } catch (error) {
+      console.log("⚠️ Failed to read pool stats from contract:", error);
+      return {
+        totalTickets: 0,
+        pendingWinnings: 0,
+        currentRound: this.currentRound || 0,
+      };
+    }
+  }
+
+  /**
+   * Get participant's tickets for current round (fetches fresh data)
+   */
+  async getParticipantTickets(participantAddress: string): Promise<number> {
+    try {
+      console.log(
+        `📊 Fetching participant tickets for ${participantAddress} in round ${this.currentRound}...`,
+      );
+
+      // Ensure we have the latest round
+      await this.syncCurrentRound();
+
+      const participantTicketsBps = await this.client.readContract({
+        address: this.poolContractAddress as `0x${string}`,
+        abi: JACKPOT_POOL_ABI,
+        functionName: "participantTickets",
+        args: [participantAddress as `0x${string}`, BigInt(this.currentRound)],
+      });
+
+      // Convert BPS to actual ticket count
+      const tickets = Number(participantTicketsBps) / 7000;
+      console.log(
+        `📊 ${participantAddress} has ${tickets.toFixed(2)} tickets in round ${this.currentRound}`,
+      );
+
+      return tickets;
+    } catch (error) {
+      console.log(
+        `⚠️ Failed to read participant tickets for ${participantAddress}:`,
+        error,
+      );
+      return 0;
+    }
   }
 
   /**
@@ -235,7 +446,12 @@ To participate:
     numTickets: number,
     conversation: Group,
     client: any,
-  ): Promise<{ success: boolean; message: string; transactionData?: any }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    transactionData?: any;
+    postTransactionCallback?: () => void;
+  }> {
     try {
       let pool = this.groupPools.get(groupId);
 
@@ -262,7 +478,16 @@ To participate:
         totalCost,
       );
 
-      // Update pool tracking
+      // Get real-time pool stats from contract
+      const contractStats = await this.getPoolStatsFromContract();
+      const participantTickets = await this.getParticipantTickets(userAddress);
+
+      // Update pool with contract data
+      pool.totalTickets = contractStats.totalTickets;
+      pool.totalContributed = contractStats.totalTickets; // $1 per ticket
+      pool.lastActivity = new Date();
+
+      // Update member tracking with contract data
       let member = pool.members.get(userInboxId);
       if (!member) {
         member = {
@@ -275,21 +500,17 @@ To participate:
         pool.members.set(userInboxId, member);
       }
 
-      // Update member stats
-      member.ticketsPurchased += numTickets;
-      member.amountContributed += totalCost;
+      // Update member stats with contract data + pending purchase
+      member.ticketsPurchased = participantTickets + numTickets; // Current + pending
+      member.amountContributed = member.ticketsPurchased * 1; // $1 per ticket
       member.lastPurchaseTime = new Date();
 
-      // Update pool totals
-      pool.totalTickets += numTickets;
-      pool.totalContributed += totalCost;
-      pool.lastActivity = new Date();
-
-      // Calculate member's share percentage
-      const memberShare = (
-        (member.ticketsPurchased / pool.totalTickets) *
-        100
-      ).toFixed(2);
+      // Calculate member's share percentage based on expected pool total after this purchase
+      const expectedPoolTotal = contractStats.totalTickets + numTickets;
+      const memberShare =
+        expectedPoolTotal > 0
+          ? ((member.ticketsPurchased / expectedPoolTotal) * 100).toFixed(2)
+          : "0.00";
 
       const userDisplayName = await getDisplayName(userAddress);
       const preparingMessage = `🎯 Pool Purchase Transaction Prepared!
@@ -298,6 +519,8 @@ To participate:
 📊 Pool share: ${memberShare}% (${member.ticketsPurchased}/${pool.totalTickets} tickets)
 💰 Risk exposure: $${member.amountContributed.toFixed(2)}
 
+⚠️ Important: Pool tickets are held by the pool contract and won't appear in your regular ticket stats or the miniapp until prizes are distributed.
+
 ✅ Open wallet to approve pool purchase transaction
 🎰 Pool increases winning chances! Prizes shared proportionally.`;
 
@@ -305,6 +528,13 @@ To participate:
         success: true,
         message: preparingMessage,
         transactionData: txData,
+        postTransactionCallback: async () => {
+          // Wait for transaction to be mined, then fetch fresh stats once
+          setTimeout(async () => {
+            console.log("⏰ Post-transaction: Fetching updated pool stats...");
+            await this.sendUpdatedPoolStats(conversation, userAddress);
+          }, 15000); // 15 seconds delay for mining
+        },
       };
     } catch (error) {
       console.error("Error processing pooled purchase:", error);
@@ -312,6 +542,39 @@ To participate:
         success: false,
         message: `❌ Failed to process pool purchase: ${error instanceof Error ? error.message : "Unknown error"}`,
       };
+    }
+  }
+
+  /**
+   * Send updated pool stats after a transaction
+   */
+  async sendUpdatedPoolStats(
+    conversation: any,
+    userAddress: string,
+  ): Promise<void> {
+    try {
+      console.log("📊 Fetching updated pool stats after transaction...");
+
+      // Get fresh contract stats
+      const contractStats = await this.getPoolStatsFromContract();
+      const participantTickets = await this.getParticipantTickets(userAddress);
+
+      const displayName = await getDisplayName(userAddress);
+
+      const updateMessage = `📊 Pool Stats Updated!
+
+🎫 Total Pool Tickets: ${contractStats.totalTickets.toFixed(2)}
+💰 Pool Value: $${contractStats.totalTickets.toFixed(2)}
+🏆 Pending Winnings: $${contractStats.pendingWinnings.toFixed(2)}
+
+👤 ${displayName}: ${participantTickets.toFixed(2)} tickets
+📈 Your Share: ${contractStats.totalTickets > 0 ? ((participantTickets / contractStats.totalTickets) * 100).toFixed(2) : "0.00"}%
+
+⚠️ Remember: Pool tickets are held by the contract and won't appear in regular stats until prizes are distributed.`;
+
+      await conversation.send(updateMessage);
+    } catch (error) {
+      console.log("⚠️ Failed to send updated pool stats:", error);
     }
   }
 
@@ -396,73 +659,152 @@ To participate:
   }
 
   /**
-   * Get pool status for a group
+   * Get pool status for a group (using real contract data)
    */
-  getPoolStatus(groupId: string): string {
-    const pool = this.groupPools.get(groupId);
+  async getPoolStatus(groupId: string): Promise<string> {
+    try {
+      // Get real-time contract stats
+      const contractStats = await this.getPoolStatsFromContract();
 
-    if (!pool) {
-      return "❌ No pool found for this group. Use 'init pool' to create one.";
-    }
+      const pool = this.groupPools.get(groupId);
+      if (!pool) {
+        return `🎯 Pool Status (Live from Contract)
 
-    const membersList = Array.from(pool.members.values())
-      .sort((a, b) => b.ticketsPurchased - a.ticketsPurchased)
-      .slice(0, 5) // Top 5 contributors
-      .map((member) => {
-        const share = (
-          (member.ticketsPurchased / pool.totalTickets) *
-          100
-        ).toFixed(1);
-        return `• ${member.inboxId.slice(0, 8)}...: ${member.ticketsPurchased} tickets (${share}%)`;
-      })
-      .join("\n");
+📋 Pool Contract: ${this.poolContractAddress.slice(0, 8)}...${this.poolContractAddress.slice(-6)}
+🎫 Total Pool Tickets: ${contractStats.totalTickets.toFixed(2)}
+💰 Pool Value: $${contractStats.totalTickets.toFixed(2)}
+🏆 Pending Winnings: $${contractStats.pendingWinnings.toFixed(2)}
+🔄 Current Round: ${contractStats.currentRound}
 
-    return `🎯 Group Pool Status
-
-📋 Pool: ${pool.poolContractAddress.slice(0, 8)}...${pool.poolContractAddress.slice(-6)}
-👥 Members: ${pool.members.size}
-🎫 Total Tickets: ${pool.totalTickets}
-💰 Total Value: $${pool.totalContributed.toFixed(2)}
-
-Top Contributors:
-${membersList}
+⚠️ Pool tickets are held by the contract and won't show in regular stats until prizes are distributed.
 
 Your Options:
-• "buy X tickets" - Purchase through pool
+• "buy X pool tickets" - Purchase through pool contract
 • "my pool share" - See your risk exposure
 • "claim pool winnings" - Claim your share of winnings`;
+      }
+
+      // Update pool with latest contract data
+      pool.totalTickets = contractStats.totalTickets;
+      pool.totalContributed = contractStats.totalTickets;
+
+      // Get display names for top contributors with fresh contract data
+      const membersList: string[] = [];
+
+      if (pool.members.size > 0) {
+        const topMembers = Array.from(pool.members.values())
+          .sort((a, b) => b.ticketsPurchased - a.ticketsPurchased)
+          .slice(0, 5); // Top 5 contributors
+
+        // Get fresh participant data from contract for each member
+        for (const member of topMembers) {
+          try {
+            const participantTickets = await this.getParticipantTickets(
+              member.address,
+            );
+
+            if (participantTickets > 0) {
+              const share =
+                contractStats.totalTickets > 0
+                  ? (
+                      (participantTickets / contractStats.totalTickets) *
+                      100
+                    ).toFixed(1)
+                  : "0.0";
+
+              // Get display name for the member's address (not inbox ID)
+              const displayName = await getDisplayName(member.address);
+
+              membersList.push(
+                `• ${displayName}: ${participantTickets.toFixed(2)} tickets (${share}%)`,
+              );
+            }
+          } catch (error) {
+            console.log(
+              `⚠️ Failed to get data for member ${member.address}:`,
+              error,
+            );
+          }
+        }
+      }
+
+      const membersListString =
+        membersList.length > 0
+          ? membersList.join("\n")
+          : "• No active participants in current round";
+
+      return `🎯 Pool Status (Live from Contract)
+
+📋 Pool Contract: ${pool.poolContractAddress.slice(0, 8)}...${pool.poolContractAddress.slice(-6)}
+👥 Group Members: ${pool.members.size}
+🎫 Total Pool Tickets: ${contractStats.totalTickets.toFixed(2)}
+💰 Pool Value: $${contractStats.totalTickets.toFixed(2)}
+🏆 Pending Winnings: $${contractStats.pendingWinnings.toFixed(2)}
+🔄 Current Round: ${contractStats.currentRound}
+
+Top Contributors:
+${membersListString || "• No contributions tracked yet"}
+
+⚠️ Pool tickets are held by the contract and won't show in regular stats until prizes are distributed.
+
+Your Options:
+• "buy X pool tickets" - Purchase through pool contract
+• "my pool share" - See your risk exposure
+• "claim pool winnings" - Claim your share of winnings`;
+    } catch (error) {
+      console.error("Error getting pool status:", error);
+      return `❌ Error reading pool status: ${error instanceof Error ? error.message : "Unknown error"}`;
+    }
   }
 
   /**
-   * Get member's pool share information
+   * Get member's pool share information (with real contract data)
    */
-  getMemberPoolShare(groupId: string, userInboxId: string): string {
-    const pool = this.groupPools.get(groupId);
+  async getMemberPoolShare(
+    groupId: string,
+    userInboxId: string,
+    userAddress?: string,
+  ): Promise<string> {
+    try {
+      const pool = this.groupPools.get(groupId);
 
-    if (!pool) {
-      return "❌ No pool found for this group.";
-    }
+      if (!pool) {
+        return "❌ No pool found for this group.";
+      }
 
-    const member = pool.members.get(userInboxId);
+      const member = pool.members.get(userInboxId);
 
-    if (!member) {
-      return "❌ You haven't participated in this pool yet. Use 'buy X tickets' to join!";
-    }
+      if (!member || !userAddress) {
+        return "❌ You haven't participated in this pool yet. Use 'buy X pool tickets' to join!";
+      }
 
-    const sharePercentage =
-      pool.totalTickets > 0
-        ? ((member.ticketsPurchased / pool.totalTickets) * 100).toFixed(2)
-        : "0";
+      // Get fresh contract data
+      const contractStats = await this.getPoolStatsFromContract();
+      const participantTickets = await this.getParticipantTickets(userAddress);
 
-    return `📊 Your Pool Share
+      const sharePercentage =
+        contractStats.totalTickets > 0
+          ? ((participantTickets / contractStats.totalTickets) * 100).toFixed(2)
+          : "0";
 
-🎫 Your tickets: ${member.ticketsPurchased} / ${pool.totalTickets}
+      const displayName = await getDisplayName(userAddress);
+
+      return `📊 ${displayName}'s Pool Share (Live Data)
+
+🎫 Your tickets: ${participantTickets.toFixed(2)} / ${contractStats.totalTickets.toFixed(2)}
 📈 Your share: ${sharePercentage}%
-💰 You contributed: $${member.amountContributed.toFixed(2)}
-📅 Last purchase: ${member.lastPurchaseTime.toLocaleDateString()}
+💰 You contributed: $${participantTickets.toFixed(2)}
+🏆 Pool winnings: $${contractStats.pendingWinnings.toFixed(2)}
+🔄 Current round: ${contractStats.currentRound}
 
 💡 How winnings work:
-If the pool wins $1,000, you get ${sharePercentage}% = $${((parseFloat(sharePercentage) / 100) * 1000).toFixed(2)}`;
+If the pool wins $1,000, you get ${sharePercentage}% = $${((parseFloat(sharePercentage) / 100) * 1000).toFixed(2)}
+
+⚠️ Pool tickets are held by the contract and won't show in regular stats until prizes are distributed.`;
+    } catch (error) {
+      console.error("Error getting member pool share:", error);
+      return `❌ Error reading pool share: ${error instanceof Error ? error.message : "Unknown error"}`;
+    }
   }
 
   /**
