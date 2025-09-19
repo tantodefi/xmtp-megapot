@@ -796,3 +796,279 @@ If the pool wins $1,000, you get ${sharePercentage}% = $${((parseFloat(sharePerc
     }
   }
 }
+
+      functionName: "approve",
+      args: [
+        poolContractAddress as `0x${string}`, // spender (the pool contract)
+        totalCostUSDC, // amount to approve
+      ],
+    });
+
+    const walletSendCalls: WalletSendCallsParams = {
+      version: "1.0",
+      chainId: `0x${base.id.toString(16)}`,
+      from: userAddress as `0x${string}`,
+      capabilities: {
+        reference: `megapot_pool_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        app: "MegaPot Lottery",
+        icon: "https://megapot.io/favicon.ico",
+        domain: "megapot.io",
+        name: "MegaPot Pool Purchase",
+        description: `Pool purchase: ${numTickets} tickets for $${totalCost.toFixed(2)} USDC`,
+      },
+      calls: [
+        {
+          // First approve USDC spending to the pool contract
+          to: usdcAddress,
+          data: approveCallData as `0x${string}`,
+          value: "0x0",
+          gas: "0xC350", // ~50,000 gas
+          metadata: {
+            description: `Approve $${totalCost.toFixed(2)} USDC for MegaPot Pool Purchase`,
+            transactionType: "erc20_approve",
+            appName: "MegaPot Pool",
+            appIcon: "https://megapot.io/favicon.ico",
+          },
+        },
+        {
+          // Then call the real JackpotPool.purchaseTickets(referrer, value, recipient)
+          to: poolContractAddress as `0x${string}`,
+          data: poolPurchaseCallData as `0x${string}`,
+          value: "0x0",
+          gas: "0x30D40", // ~200,000 gas
+          metadata: {
+            description: `Purchase ${numTickets} lottery tickets through MegaPot Pool Contract`,
+            transactionType: "contract_interaction",
+            appName: "MegaPot Pool",
+            appIcon: "https://megapot.io/favicon.ico",
+            contractFunction: "purchaseTickets",
+            contractAddress: poolContractAddress,
+          },
+        },
+      ],
+    };
+
+    return walletSendCalls;
+  }
+
+  /**
+   * Get pool status for a group (using real contract data)
+   */
+  async getPoolStatus(groupId: string): Promise<string> {
+    try {
+      const pool = this.groupPools.get(groupId);
+
+      if (!pool) {
+        return `🎯 Pool Status
+
+📋 Pool Contract: ${this.poolContractAddress.slice(0, 8)}...${this.poolContractAddress.slice(-6)}
+🎫 Total Pool Tickets: 0.00
+💰 Pool Value: $0.00
+🏆 Pending Winnings: $0.00
+
+⚠️ Pool tickets are held by the contract and won't show in regular stats until prizes are distributed.
+
+Your Options:
+• "buy X pool tickets" - Purchase through pool contract
+• "my pool share" - See your risk exposure
+• "claim pool winnings" - Claim your share of winnings`;
+      }
+
+      // Get display names for top contributors using local tracking
+      const membersList: string[] = [];
+
+      if (pool.members.size > 0) {
+        const topMembers = Array.from(pool.members.values())
+          .sort((a, b) => b.ticketsPurchased - a.ticketsPurchased)
+          .slice(0, 5); // Top 5 contributors
+
+        for (const member of topMembers) {
+          const share =
+            pool.totalTickets > 0
+              ? ((member.ticketsPurchased / pool.totalTickets) * 100).toFixed(1)
+              : "0.0";
+
+          // Get display name for the member's address (not inbox ID)
+          const displayName = await getDisplayName(member.address);
+
+          membersList.push(
+            `• ${displayName}: ${member.ticketsPurchased} tickets (${share}%)`,
+          );
+        }
+      }
+
+      const membersListString =
+        membersList.length > 0
+          ? membersList.join("\n")
+          : "• No pool participants yet";
+
+      return `🎯 Pool Status
+
+📋 Pool Contract: ${pool.poolContractAddress.slice(0, 8)}...${pool.poolContractAddress.slice(-6)}
+👥 Group Members: ${pool.members.size}
+🎫 Total Pool Tickets: ${pool.totalTickets.toFixed(2)}
+💰 Pool Value: $${pool.totalContributed.toFixed(2)}
+
+Top Contributors:
+${membersListString}
+
+⚠️ Pool tickets are held by the contract and won't show in regular stats until prizes are distributed.
+
+Your Options:
+• "buy X pool tickets" - Purchase through pool contract
+• "my pool share" - See your risk exposure
+• "claim pool winnings" - Claim your share of winnings`;
+    } catch (error) {
+      console.error("Error getting pool status:", error);
+      return `❌ Error reading pool status: ${error instanceof Error ? error.message : "Unknown error"}`;
+    }
+  }
+
+  /**
+   * Get member's pool share information (with real contract data)
+   */
+  async getMemberPoolShare(
+    groupId: string,
+    userInboxId: string,
+    userAddress?: string,
+  ): Promise<string> {
+    try {
+      const pool = this.groupPools.get(groupId);
+
+      if (!pool) {
+        return "❌ No pool found for this group.";
+      }
+
+      const member = pool.members.get(userInboxId);
+
+      if (!member || !userAddress) {
+        return "❌ You haven't participated in this pool yet. Use 'buy X pool tickets' to join!";
+      }
+
+      const sharePercentage =
+        pool.totalTickets > 0
+          ? ((member.ticketsPurchased / pool.totalTickets) * 100).toFixed(2)
+          : "0";
+
+      const displayName = await getDisplayName(userAddress);
+
+      return `📊 ${displayName}'s Pool Share
+
+🎫 Your tickets: ${member.ticketsPurchased} / ${pool.totalTickets}
+📈 Your share: ${sharePercentage}%
+💰 You contributed: $${member.amountContributed.toFixed(2)}
+📅 Last purchase: ${member.lastPurchaseTime.toLocaleDateString()}
+
+💡 How winnings work:
+If the pool wins $1,000, you get ${sharePercentage}% = $${((parseFloat(sharePercentage) / 100) * 1000).toFixed(2)}
+
+⚠️ Pool tickets are held by the contract and won't show in regular stats until prizes are distributed.`;
+    } catch (error) {
+      console.error("Error getting member pool share:", error);
+      return `❌ Error reading pool share: ${error instanceof Error ? error.message : "Unknown error"}`;
+    }
+  }
+
+  /**
+   * Add method to claim pool winnings for a user
+   */
+  async prepareClaimPoolWinnings(
+    userAddress: string,
+    poolContractAddress: string,
+  ): Promise<WalletSendCallsParams> {
+    const claimCallData = encodeFunctionData({
+      abi: JACKPOT_POOL_ABI,
+      functionName: "withdrawParticipantWinnings",
+      args: [], // No args for self-withdrawal
+    });
+
+    return {
+      version: "1.0",
+      chainId: `0x${base.id.toString(16)}`,
+      from: userAddress as `0x${string}`,
+      capabilities: {
+        reference: `pool_claim_${Date.now()}`,
+        app: "MegaPot Pool",
+        icon: "https://megapot.io/favicon.ico",
+        domain: "megapot.io",
+        name: "MegaPot Pool Winnings",
+        description: "Claim proportional pool winnings",
+      },
+      calls: [
+        {
+          to: poolContractAddress as `0x${string}`,
+          data: claimCallData as `0x${string}`,
+          value: "0x0",
+          gas: "0x15F90", // ~90,000 gas
+          metadata: {
+            description: "Claim your share of pool winnings",
+            transactionType: "pool_claim",
+          },
+        },
+      ],
+    };
+  }
+
+  /**
+   * Get active pool for a group
+   */
+  getActivePoolForGroup(groupId: string): GroupPool | null {
+    return this.groupPools.get(groupId) || null;
+  }
+
+  /**
+   * Get total tickets in the JackpotPool contract
+   */
+  async getTotalPoolTickets(): Promise<{ tickets: number; winnings: number }> {
+    try {
+      console.log("📊 Checking total tickets in JackpotPool contract...");
+
+      const [poolTicketsBps, pendingWinnings] = await Promise.all([
+        this.client.readContract({
+          address: this.poolContractAddress as `0x${string}`,
+          abi: JACKPOT_POOL_ABI,
+          functionName: "poolTicketsPurchasedBps",
+        }),
+        this.client.readContract({
+          address: this.poolContractAddress as `0x${string}`,
+          abi: JACKPOT_POOL_ABI,
+          functionName: "pendingPoolWinnings",
+        }),
+      ]);
+
+      // Convert BPS to actual ticket count (7000 BPS = 1 ticket after 30% fees)
+      const totalTickets = Number(poolTicketsBps) / 7000;
+      const winningsUSDC = Number(pendingWinnings) / 1000000;
+
+      console.log(
+        `📊 JackpotPool has ${totalTickets.toFixed(2)} tickets, $${winningsUSDC.toFixed(2)} pending winnings`,
+      );
+
+      return {
+        tickets: totalTickets,
+        winnings: winningsUSDC,
+      };
+    } catch (error) {
+      console.log("⚠️ Failed to read JackpotPool stats:", error);
+      return {
+        tickets: 0,
+        winnings: 0,
+      };
+    }
+  }
+
+  /**
+   * Clean up old pools
+   */
+  cleanupOldPools(): void {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    for (const [groupId, pool] of this.groupPools.entries()) {
+      if (pool.lastActivity < cutoff && pool.totalTickets === 0) {
+        this.groupPools.delete(groupId);
+        console.log(`🧹 Cleaned up inactive pool for group ${groupId}`);
+      }
+    }
+  }
+}

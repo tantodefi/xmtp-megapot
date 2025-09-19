@@ -18,6 +18,12 @@ export interface MessageIntent {
     | "pooled_purchase"
     | "confirmation"
     | "cancellation"
+    | "setup_spend_permission"
+    | "spend_permission_status"
+    | "start_automation"
+    | "stop_automation"
+    | "revoke_permissions"
+    | "spend_config_input"
     | "unknown";
   confidence: number;
   extractedData?: {
@@ -29,6 +35,7 @@ export interface MessageIntent {
     isConfirmation?: boolean;
     isCancellation?: boolean;
     clearIntent?: boolean;
+    configText?: string;
   };
   response: string;
 }
@@ -552,6 +559,72 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return { type: "pooled_purchase", confidence: 0.9 };
     }
 
+    // Check for spend permissions setup
+    if (
+      (lowerMessage.includes("setup") || lowerMessage.includes("create")) &&
+      (lowerMessage.includes("spend") ||
+        lowerMessage.includes("permission") ||
+        lowerMessage.includes("automation"))
+    ) {
+      return { type: "setup_spend_permission", confidence: 0.9 };
+    }
+
+    // Check for spend permission status
+    if (
+      (lowerMessage.includes("spend") ||
+        lowerMessage.includes("permission") ||
+        lowerMessage.includes("automation")) &&
+      (lowerMessage.includes("status") ||
+        lowerMessage.includes("info") ||
+        lowerMessage.includes("check"))
+    ) {
+      return { type: "spend_permission_status", confidence: 0.9 };
+    }
+
+    // Check for automation control
+    if (
+      lowerMessage.includes("start automation") ||
+      lowerMessage.includes("begin automation")
+    ) {
+      return { type: "start_automation", confidence: 0.95 };
+    }
+
+    if (
+      lowerMessage.includes("stop automation") ||
+      lowerMessage.includes("pause automation")
+    ) {
+      return { type: "stop_automation", confidence: 0.95 };
+    }
+
+    // Check for revoke permissions
+    if (
+      (lowerMessage.includes("revoke") ||
+        lowerMessage.includes("remove") ||
+        lowerMessage.includes("cancel")) &&
+      (lowerMessage.includes("permission") || lowerMessage.includes("spend"))
+    ) {
+      return { type: "revoke_permissions", confidence: 0.9 };
+    }
+
+    // Check for spend permission configuration input
+    // Patterns: "$5 per day for 30 days, solo" OR "buy 4 tickets for the next 7 days" OR "buy 1 ticket a day for 30 days"
+    const spendConfigPattern = /\$\d+.*(?:day|daily).*\d+\s*days?/i;
+    const buyTicketsPattern = /buy\s+\d+.*(?:ticket|for).*\d+\s*days?/i;
+    const ticketsPerDayPattern =
+      /\d+.*ticket.*(?:day|daily).*(?:for|next).*\d+\s*days?/i;
+
+    if (
+      spendConfigPattern.test(lowerMessage) ||
+      buyTicketsPattern.test(lowerMessage) ||
+      ticketsPerDayPattern.test(lowerMessage)
+    ) {
+      return {
+        type: "spend_config_input",
+        confidence: 0.95,
+        extractedData: { configText: originalMessage },
+      };
+    }
+
     return { type: "unknown", confidence: 0.3 };
   }
 
@@ -906,6 +979,11 @@ ${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}
 • "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)
 • "claim" → Withdraw winnings
 
+🤖 Automation:
+• "setup spend permission" → Enable automated buying
+• "start automation" → Begin daily purchases
+• "spend status" → Check automation status
+
 ${isGroupChat ? `👥 Pool: Combine chances with group` : `🎫 Solo: Keep 100% winnings`}
 
 ⚡ Just tell me what you want - I understand natural language
@@ -918,6 +996,90 @@ Quick Commands:
 • "buy 3 solo tickets" → Instant transaction
 • "buy pool tickets" → Join daily pool
 • "stats" → Your history
+• "claim" → Withdraw winnings
+
+⚡ Natural language supported
+🌐 Full site: https://frame.megapot.io`;
+    }
+  }
+
+  /**
+   * Get the context handler instance
+   */
+  getContextHandler(): ContextHandler {
+    return this.contextHandler;
+  }
+
+  /**
+   * Generate explanation of solo vs pool tickets with stats
+   */
+  async generateTicketTypeExplanation(
+    userAddress?: string,
+    isGroupChat: boolean = false,
+  ): Promise<string> {
+    try {
+      const lotteryStats = await this.megaPotManager.getStats(userAddress);
+      const allTimeStats = await this.fetchAllTimeStats();
+
+      const soloSection = `🎫 Solo Tickets (Individual Purchase)
+• You keep 100% of any winnings
+• Direct purchase from your wallet
+• Immediate ownership and control
+• Current price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
+• Your solo tickets: ${lotteryStats.individualTicketsPurchased || 0}`;
+
+      const poolSection = isGroupChat
+        ? `
+👥 Pool Tickets (Group Purchase)
+• Increases your group's chances of winning
+• Share costs and winnings proportionally based on risk exposure
+• Collective buying power for larger ticket volumes
+• Same ticket price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
+• Your pool contributions: ${lotteryStats.groupTicketsPurchased || 0} tickets
+
+📊 Pool Benefits:
+• Higher winning chances through volume
+• Proportional prize sharing based on contribution
+• Social lottery experience with friends
+• Automatic payout distribution`
+        : `
+👥 Pool Tickets (Group Purchase)
+• Only available in group chats
+• Increases group's chances of winning
+• Share costs and winnings with group members
+• Join a group conversation to access pool purchases`;
+
+      const statsSection = `
+📈 Current Round Stats:
+• Jackpot: $${lotteryStats.jackpotPool || "0"}
+• Total tickets sold: ${lotteryStats.ticketsSoldRound || 0}
+• Your total tickets: ${lotteryStats.totalTicketsPurchased || 0}
+• Your winning odds: 1 in ${lotteryStats.userOdds || "∞"}
+
+🏆 All-Time Performance:
+• Total jackpots won: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
+• Lucky winners: ${allTimeStats?.total_won || "19"} players
+• Total tickets sold: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}`;
+
+      return `${soloSection}${poolSection}${statsSection}
+
+💡 Which should you choose?
+• Solo: Maximum control and 100% winnings
+• Pool: Higher chances through volume, shared winnings
+
+🎰 Ready to play? Use the action buttons below!`;
+    } catch (error) {
+      console.error("Error generating ticket type explanation:", error);
+      return `🎫 Solo vs Pool Tickets
+
+Solo Tickets: You buy individually and keep all winnings
+Pool Tickets: Group members share costs and winnings, increasing collective chances
+
+Both types cost $1 USDC per ticket. Choose based on your preference for individual control vs. shared experience!`;
+    }
+  }
+}
+
 • "claim" → Withdraw winnings
 
 ⚡ Natural language supported

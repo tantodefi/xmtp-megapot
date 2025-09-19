@@ -38,6 +38,13 @@ An AI-powered XMTP agent for MegaPot lottery with natural language understanding
 
 **Interactive Experience**
 - Natural conversation flow with AI responses
+
+**Automated Spending (Spend Permissions)**
+- Flexible daily spending limits (minimum $1, any amount)
+- Custom duration (1-365 days) and purchase types (solo/pool/both)
+- Base Account spend permissions integration  
+- Natural language configuration: "$15 per day for 45 days, both"
+- Secure, user-controlled automation with easy revocation
 - Action buttons for quick access to features
 - Mini app integration at https://frame.megapot.io
 - Real-time updates and notifications
@@ -83,6 +90,9 @@ An AI-powered XMTP agent for MegaPot lottery with natural language understanding
 | `JACKPOT_POOL_CONTRACT_ADDRESS` | JackpotPool contract for group purchases | Yes |
 | `MEGAPOT_DATA_API_KEY` | MegaPot API key for enhanced stats | No |
 | `BASE_RPC_URL` | Base network RPC URL | No |
+| `CDP_API_KEY_ID` | CDP API Key ID for paymaster gas sponsorship | No (for automation) |
+| `CDP_API_KEY_SECRET` | CDP API Key Secret for paymaster | No (for automation) |
+| `PAYMASTER_URL` | Paymaster URL for gas sponsorship (automated purchases) | No (for automation) |
 
 ### MegaPot Contract Addresses
 

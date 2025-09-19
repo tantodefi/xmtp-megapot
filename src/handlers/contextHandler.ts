@@ -55,31 +55,11 @@ export class ContextHandler {
     updates: Partial<ConversationContext>,
   ): void {
     const contextKey = `${conversationId}_${userInboxId}`;
-    let context = this.contexts.get(contextKey);
+    const context = this.contexts.get(contextKey);
 
-    console.log(`🔧 updateContext called with:`, {
-      conversationId,
-      userInboxId,
-      updates,
-    });
-    console.log(`🔍 Existing context:`, context);
-
-    if (!context) {
-      // Create context if it doesn't exist
-      console.log(`🆕 Creating new context for ${contextKey}`);
-      context = {
-        conversationId,
-        userInboxId,
-        currentFlow: null,
-        lastInteractionTime: new Date(),
-        isGroupChat: updates.isGroupChat || false,
-      };
-      this.contexts.set(contextKey, context);
+    if (context) {
+      Object.assign(context, updates, { lastInteractionTime: new Date() });
     }
-
-    // Apply updates
-    Object.assign(context, updates, { lastInteractionTime: new Date() });
-    console.log(`✅ Context after update:`, context);
   }
 
   /**

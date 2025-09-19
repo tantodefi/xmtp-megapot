@@ -15,6 +15,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { PoolHandler } from "./handlers/poolHandler.js";
 import { SmartHandler, type MessageIntent } from "./handlers/smartHandler.js";
+import { SpendPermissionsHandler } from "./handlers/spendPermissionsHandler.js";
 import { MegaPotManager } from "./managers/MegaPotManager.js";
 import {
   ActionsCodec,
@@ -271,6 +272,17 @@ async function main() {
 
   console.log("✅ Agent created successfully!");
   console.log(`🔗 Agent inbox: ${agent.client.inboxId}`);
+
+  // Initialize spend permissions handler after agent is created
+  // Use a placeholder address for demo - in production this would be the agent's wallet address
+  const agentSpenderAddress = "0x0F75c463bEc345fcf3b6be5f878640e1599A320A"; // Demo address
+  const spendPermissionsHandler = new SpendPermissionsHandler(
+    agentSpenderAddress,
+  );
+  console.log(
+    `🔐 Spend permissions handler initialized with spender: ${agentSpenderAddress}`,
+  );
+
   console.log("\n💬 Smart MegaPot Agent is running!");
   console.log(
     `📝 Send messages to: http://xmtp.chat/dm/${agent.client.inboxId}`,
@@ -407,6 +419,7 @@ async function main() {
               agent,
               correctedIsGroupChat,
               userAddress,
+              spendPermissionsHandler,
             );
           } else if (message.contentType?.typeId === "intent") {
             console.log("🎯 Processing intent message");
@@ -514,6 +527,7 @@ async function handleSmartTextMessage(
   agent: any,
   isGroupChat: boolean,
   userAddress?: string,
+  spendPermissionsHandler?: SpendPermissionsHandler,
 ) {
   try {
     // Handle different message content types
@@ -1286,6 +1300,105 @@ async function handleSmartTextMessage(
         }
         break;
 
+      case "setup_spend_permission":
+        console.log("🔐 Setting up spend permission");
+        if (spendPermissionsHandler && userAddress) {
+          await handleSpendPermissionSetup(
+            conversation,
+            userAddress,
+            spendPermissionsHandler,
+          );
+        } else {
+          await conversation.send(
+            "❌ Spend permissions not available. Please try again later.",
+          );
+        }
+        break;
+
+      case "spend_permission_status":
+        console.log("📋 Checking spend permission status");
+        if (spendPermissionsHandler && userAddress) {
+          const statusMessage =
+            await spendPermissionsHandler.getSpendPermissionStatus(userAddress);
+          await conversation.send(statusMessage);
+        } else {
+          await conversation.send(
+            "❌ Unable to check spend permission status.",
+          );
+        }
+        break;
+
+      case "start_automation":
+        console.log("🤖 Starting automation");
+        if (spendPermissionsHandler && userAddress) {
+          const started = await spendPermissionsHandler.startAutomatedBuying(
+            userAddress,
+            conversation,
+            megaPotManager,
+            poolHandler,
+            agent,
+          );
+          if (!started) {
+            await conversation.send(
+              "❌ Failed to start automation. Please set up spend permissions first with 'setup spend permission'.",
+            );
+          }
+        } else {
+          await conversation.send(
+            "❌ Automation not available. Please try again later.",
+          );
+        }
+        break;
+
+      case "stop_automation":
+        console.log("⏸️ Stopping automation");
+        if (spendPermissionsHandler && userAddress) {
+          spendPermissionsHandler.stopAutomatedBuying(userAddress);
+          await conversation.send(
+            "⏸️ Automated buying has been paused. Your spend permissions remain active.\n\nSay 'start automation' to resume automated purchases.",
+          );
+        } else {
+          await conversation.send("❌ Unable to stop automation.");
+        }
+        break;
+
+      case "revoke_permissions":
+        console.log("🗑️ Revoking spend permissions");
+        if (spendPermissionsHandler && userAddress) {
+          const revoked =
+            await spendPermissionsHandler.revokeAllPermissions(userAddress);
+          if (revoked) {
+            await conversation.send(
+              "✅ All spend permissions have been revoked and automation stopped.\n\nYour wallet is now secure from automated spending. Set up new permissions anytime with 'setup spend permission'.",
+            );
+          } else {
+            await conversation.send(
+              "❌ Failed to revoke spend permissions. Please try again or revoke manually through your Base Account settings.",
+            );
+          }
+        } else {
+          await conversation.send("❌ Unable to revoke permissions.");
+        }
+        break;
+
+      case "spend_config_input":
+        console.log("⚙️ Processing spend configuration input");
+        if (
+          spendPermissionsHandler &&
+          userAddress &&
+          intent.extractedData?.configText
+        ) {
+          await handleSpendConfigInput(
+            conversation,
+            userAddress,
+            intent.extractedData.configText,
+            spendPermissionsHandler,
+          );
+        } else {
+          await conversation.send("❌ Unable to process spend configuration.");
+        }
+        break;
+
       default:
         // For other unknown intents, the AI response should be sufficient
         break;
@@ -1860,6 +1973,293 @@ function parseTicketNumber(text: string): number | null {
 
   const parsed = parseInt(text);
   return isNaN(parsed) ? null : parsed;
+}
+
+// Helper function to parse spend permission configuration from user input
+function parseSpendConfig(text: string): {
+  dailyLimit: number;
+  duration: number;
+  purchaseType: "solo" | "pool" | "both" | "alternating";
+  soloTicketsPerDay?: number;
+  poolTicketsPerDay?: number;
+} | null {
+  try {
+    const lowerText = text.toLowerCase();
+    let dailyLimit = 0;
+    let duration = 0;
+    let purchaseType: "solo" | "pool" | "both" | "alternating" = "solo";
+    let soloTicketsPerDay = 0;
+    let poolTicketsPerDay = 0;
+
+    // Method 1: Traditional dollar format "$5 per day for 30 days, solo"
+    const dollarMatch =
+      text.match(/\$(\d+(?:\.\d{1,2})?)/i) ||
+      text.match(/(\d+(?:\.\d{1,2})?)\s*(?:dollars?|usd)/i);
+
+    if (dollarMatch) {
+      dailyLimit = parseFloat(dollarMatch[1]);
+
+      // Extract duration - look for patterns like "30 days", "for 14 days", etc.
+      const durationMatch = text.match(
+        /(?:for\s+(?:the\s+)?(?:next\s+)?)?(\d+)\s*days?/i,
+      );
+
+      if (!durationMatch) return null;
+      duration = parseInt(durationMatch[1]);
+    } else {
+      // Method 2: Ticket-based format "buy 4 tickets for the next 7 days" or "buy 1 ticket a day for 30 days"
+
+      // Pattern: "buy X tickets for Y days" - total tickets over period
+      const totalTicketsMatch = text.match(
+        /buy\s+(\d+)\s+tickets?\s+for\s+(?:the\s+)?(?:next\s+)?(\d+)\s*days?/i,
+      );
+      if (totalTicketsMatch) {
+        const totalTickets = parseInt(totalTicketsMatch[1]);
+        duration = parseInt(totalTicketsMatch[2]);
+        dailyLimit = totalTickets / duration; // Average per day
+
+        if (dailyLimit < 1) dailyLimit = 1; // Minimum $1 per day
+      } else {
+        // Pattern: "buy X ticket(s) a day for Y days" - tickets per day
+        const ticketsPerDayMatch = text.match(
+          /(?:buy\s+)?(\d+)\s+tickets?\s+(?:a\s+day|per\s+day|daily)\s+for\s+(?:the\s+)?(?:next\s+)?(\d+)\s*days?/i,
+        );
+        if (ticketsPerDayMatch) {
+          const ticketsPerDay = parseInt(ticketsPerDayMatch[1]);
+          duration = parseInt(ticketsPerDayMatch[2]);
+          dailyLimit = ticketsPerDay; // Assuming $1 per ticket
+        } else {
+          // Pattern: "X ticket(s) a day for Y days" (without "buy")
+          const altTicketsPerDayMatch = text.match(
+            /(\d+)\s+tickets?\s+(?:a\s+day|per\s+day|daily).*?(?:for\s+)?(?:the\s+)?(?:next\s+)?(\d+)\s*days?/i,
+          );
+          if (altTicketsPerDayMatch) {
+            const ticketsPerDay = parseInt(altTicketsPerDayMatch[1]);
+            duration = parseInt(altTicketsPerDayMatch[2]);
+            dailyLimit = ticketsPerDay; // Assuming $1 per ticket
+          } else {
+            // Pattern: "buy X solo and Y pool ticket(s) a day for Z days" - combined purchases
+            const combinedTicketsMatch = text.match(
+              /buy\s+(\d+)\s+solo\s+and\s+(\d+)\s+pool\s+tickets?\s+(?:a\s+day|per\s+day|daily)\s+for\s+(?:the\s+)?(?:next\s+)?(\d+)\s*days?/i,
+            );
+            if (combinedTicketsMatch) {
+              soloTicketsPerDay = parseInt(combinedTicketsMatch[1]);
+              poolTicketsPerDay = parseInt(combinedTicketsMatch[2]);
+              duration = parseInt(combinedTicketsMatch[3]);
+              dailyLimit = soloTicketsPerDay + poolTicketsPerDay; // Total cost per day
+              purchaseType = "both"; // Both types daily (combined)
+            } else {
+              return null; // No valid pattern found
+            }
+          }
+        }
+      }
+    }
+
+    // Validate extracted values
+    if (dailyLimit < 1 || duration < 1 || duration > 365) {
+      return null;
+    }
+
+    // Extract purchase type with enhanced detection
+    // Check for combined purchases first (most specific)
+    if (soloTicketsPerDay > 0 && poolTicketsPerDay > 0) {
+      purchaseType = "both"; // Both types daily (combined)
+    } else if (lowerText.includes("both")) {
+      purchaseType = "both"; // Both types daily (combined)
+    } else if (
+      lowerText.includes("alternate") ||
+      lowerText.includes("alternating")
+    ) {
+      purchaseType = "alternating"; // Alternating between solo and pool
+    } else if (lowerText.includes("pool") || lowerText.includes("group")) {
+      purchaseType = "pool";
+    } else if (lowerText.includes("solo") || lowerText.includes("individual")) {
+      purchaseType = "solo";
+    } else {
+      // Fallback: Smart detection for combined purchases in other patterns
+      const combinedMatch =
+        text.match(/(\d+)\s+solo.*?(\d+)\s+pool/i) ||
+        text.match(/(\d+)\s+pool.*?(\d+)\s+solo/i);
+      if (combinedMatch) {
+        purchaseType = "both"; // Both types daily (combined)
+        const soloCount = parseInt(combinedMatch[1]);
+        const poolCount = parseInt(combinedMatch[2]);
+        soloTicketsPerDay = soloCount;
+        poolTicketsPerDay = poolCount;
+        dailyLimit = soloCount + poolCount; // Adjust daily limit for combined purchases
+      }
+    }
+
+    return {
+      dailyLimit,
+      duration,
+      purchaseType,
+      soloTicketsPerDay: soloTicketsPerDay > 0 ? soloTicketsPerDay : undefined,
+      poolTicketsPerDay: poolTicketsPerDay > 0 ? poolTicketsPerDay : undefined,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Handle spend configuration input from user
+ */
+async function handleSpendConfigInput(
+  conversation: Conversation,
+  userAddress: string,
+  configText: string,
+  spendPermissionsHandler: SpendPermissionsHandler,
+) {
+  try {
+    // Check for cancel command
+    if (configText.toLowerCase().includes("cancel")) {
+      await conversation.send("❌ Spend permission setup cancelled.");
+      return;
+    }
+
+    // Parse the user's configuration
+    const config = parseSpendConfig(configText);
+
+    if (!config) {
+      await conversation.send(
+        `❌ I couldn't understand that configuration format.
+
+Please use one of these formats:
+
+💰 **Dollar-based**: "$X per day for Y days, [type]"
+🎫 **Ticket-based**: "buy X tickets a day for Y days"
+🔀 **Combined**: "buy X solo and Y pool tickets a day for Z days"
+
+Examples:
+• "$5 per day for 30 days, solo"
+• "buy 4 tickets for the next 7 days"
+• "buy 1 ticket a day for 30 days"
+• "buy 1 solo and 1 pool ticket a day for 30 days" (both daily)
+• "$10 per day for 14 days, alternating" (solo/pool alternating)
+
+Try again or say "cancel" to exit.`,
+      );
+      return;
+    }
+
+    // Calculate tickets per day (assuming $1 per ticket)
+    const ticketsPerDay = Math.floor(config.dailyLimit);
+
+    const spendConfig = {
+      dailyLimit: config.dailyLimit,
+      ticketsPerDay: ticketsPerDay,
+      purchaseType: config.purchaseType,
+      duration: config.duration,
+      soloTicketsPerDay: config.soloTicketsPerDay,
+      poolTicketsPerDay: config.poolTicketsPerDay,
+    };
+
+    // Create the spend permission
+    try {
+      const permission =
+        await spendPermissionsHandler.requestMegaPotSpendPermission(
+          userAddress,
+          spendConfig,
+        );
+
+      let purchaseDescription = "";
+      if (
+        spendConfig.purchaseType === "both" &&
+        spendConfig.soloTicketsPerDay &&
+        spendConfig.poolTicketsPerDay
+      ) {
+        purchaseDescription = `${spendConfig.soloTicketsPerDay} solo + ${spendConfig.poolTicketsPerDay} pool tickets daily (2 transactions)`;
+      } else {
+        purchaseDescription = `${spendConfig.ticketsPerDay} ${spendConfig.purchaseType} tickets daily`;
+      }
+
+      await conversation.send(
+        `✅ Spend Permission Created Successfully!
+
+🔐 Permission Details:
+• Daily limit: $${spendConfig.dailyLimit} USDC
+• Purchase plan: ${purchaseDescription}
+• Duration: ${spendConfig.duration} days
+• Spender: ${permission.spender.slice(0, 8)}...${permission.spender.slice(-6)}
+
+🤖 Automated Features Now Available:
+• "start automation" - Begin daily ticket purchases
+• "spend status" - Check your permission status
+• "stop automation" - Pause automated buying
+• "revoke permissions" - Remove all permissions
+
+💡 **Next Steps:**
+1. Say "start automation" to begin automated purchases
+        2. ${
+          spendConfig.purchaseType === "both" &&
+          spendConfig.soloTicketsPerDay &&
+          spendConfig.poolTicketsPerDay
+            ? `I'll buy ${spendConfig.soloTicketsPerDay} solo AND ${spendConfig.poolTicketsPerDay} pool tickets daily`
+            : `I'll buy ${spendConfig.ticketsPerDay} ${spendConfig.purchaseType} tickets daily`
+        }
+3. Total budget: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)} over ${spendConfig.duration} days
+
+🌐 In production, this would require wallet approval through Base Account spend permissions.`,
+      );
+    } catch (error) {
+      await conversation.send(
+        `❌ Failed to create spend permission: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  } catch (error) {
+    console.error("Spend config input error:", error);
+    await conversation.send(
+      `❌ Error processing configuration: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
+}
+
+/**
+ * Handle spend permission setup with interactive configuration
+ */
+async function handleSpendPermissionSetup(
+  conversation: Conversation,
+  userAddress: string,
+  spendPermissionsHandler: SpendPermissionsHandler,
+) {
+  try {
+    await conversation.send(
+      `🔐 MegaPot Spend Permission Setup
+
+I'll help you set up automated lottery ticket purchases! This allows me to buy tickets on your behalf within your specified limits.
+
+⚙️ Configuration Formats:
+
+💰 **Dollar-based**: "$X per day for Y days, [type]"
+🎫 **Ticket-based**: "buy X tickets a day for Y days"
+🔀 **Combined**: "buy 1 solo and 1 pool ticket a day for Y days"
+
+🎫 Purchase Types:
+• "solo" - Keep 100% of winnings
+• "pool" - Join group pools, shared winnings  
+• "both" - Buy both solo AND pool tickets daily
+• "alternating" - Alternate between solo and pool daily
+
+📝 Examples:
+• "$5 per day for 30 days, solo"
+• "buy 4 tickets for the next 7 days"
+• "buy 1 ticket a day for 30 days"
+• "buy 1 solo and 1 pool ticket a day for the next 30 days"
+• "2 tickets daily for 14 days, both"
+
+Or say "cancel" to exit setup.`,
+    );
+
+    // Wait for user to provide configuration in the format requested above
+    // The handleSpendConfigInput function will process their response
+  } catch (error) {
+    console.error("Spend permission setup error:", error);
+    await conversation.send(
+      `❌ Failed to set up spend permissions: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
 }
 
 // Run the smart agent
