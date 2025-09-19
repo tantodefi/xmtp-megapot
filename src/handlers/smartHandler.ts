@@ -216,7 +216,7 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
       );
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4",
         messages: [
           {
             role: "system",
@@ -1079,26 +1079,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         ? await getPersonalizedGreeting(userAddress)
         : "Hello!";
 
-      return `🎰 MegaPot Lottery
-
-${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}
-
-📝 Commands:
-• "buy 3 solo tickets" → Instant transaction
-• "buy 2 pool tickets" → Join daily pool
-• "5" → Choose solo or pool
-• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)
-• "claim" → Withdraw winnings
-
-🤖 Automation:
-• "setup spend permission" → Enable automated buying
-• "start automation" → Begin daily purchases
-• "spend status" → Check automation status
-
-${isGroupChat ? `👥 Pool: Combine chances with group` : `🎫 Solo: Keep 100% winnings`}
-
-⚡ Just tell me what you want - I understand natural language
-🌐 Full site: https://frame.megapot.io`;
+      return `🎰 MegaPot Lottery\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io`;
     } catch (error) {
       console.error("Error generating contextual help:", error);
       return `🎰 MegaPot Lottery
