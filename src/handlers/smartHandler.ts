@@ -36,6 +36,8 @@ export interface MessageIntent {
     isCancellation?: boolean;
     clearIntent?: boolean;
     configText?: string;
+    duration?: number;
+    purchaseType?: "solo" | "pool";
   };
   response: string;
 }
@@ -690,17 +692,39 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       /\d+.*ticket.*(?:day|daily).*(?:for|next).*\d+\s*days?/i;
     const automatedBuyingPattern =
       /buy.*(?:ticket|solo|pool).*(?:day|daily).*\d+\s*days?/i;
+    const dailyTicketPattern =
+      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:a\s+)?(?:day|daily)\s+for\s+\d+\s*days?/i;
 
     if (
       spendConfigPattern.test(lowerMessage) ||
       buyTicketsPattern.test(lowerMessage) ||
       ticketsPerDayPattern.test(lowerMessage) ||
-      automatedBuyingPattern.test(lowerMessage)
+      automatedBuyingPattern.test(lowerMessage) ||
+      dailyTicketPattern.test(lowerMessage)
     ) {
+      // Extract ticket count and duration
+      const ticketMatch = lowerMessage.match(
+        /(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?/i,
+      );
+      const durationMatch = lowerMessage.match(/(?:for\s+)?(\d+)\s*days?/i);
+      const purchaseType = lowerMessage.includes("pool") ? "pool" : "solo";
+
+      const ticketCount = ticketMatch
+        ? ticketMatch[0].match(/\d+/)
+          ? parseInt(ticketMatch[0])
+          : 1
+        : 1;
+      const duration = durationMatch ? parseInt(durationMatch[1]) : 1;
+
       return {
         type: "setup_spend_permission",
         confidence: 0.95,
-        extractedData: { configText: originalMessage },
+        extractedData: {
+          configText: originalMessage,
+          ticketCount,
+          duration,
+          purchaseType,
+        },
       };
     }
 
