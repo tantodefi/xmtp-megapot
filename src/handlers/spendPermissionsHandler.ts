@@ -22,6 +22,9 @@ export interface SpendConfig {
 }
 
 export const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+export const SPEND_PERMISSION_MANAGER =
+  process.env.SPEND_PERMISSION_MANAGER ||
+  "0x0000000000000000000000000000000000000000";
 
 export class SpendPermissionsHandler {
   private userPermissions = new Map<string, SpendPermission[]>();
@@ -138,6 +141,16 @@ export class SpendPermissionsHandler {
       this.userPermissions.set(userAddress, userPermissions);
       this.userConfigs.set(userAddress, config);
 
+      // Check if spend permission manager is configured
+      if (
+        SPEND_PERMISSION_MANAGER ===
+        "0x0000000000000000000000000000000000000000"
+      ) {
+        throw new Error(
+          "SPEND_PERMISSION_MANAGER environment variable not set",
+        );
+      }
+
       // Prepare the spend permission transaction
       const spendTx = {
         version: "1.0",
@@ -171,7 +184,7 @@ export class SpendPermissionsHandler {
             },
           },
           {
-            to: this.spenderAddress as `0x${string}`,
+            to: SPEND_PERMISSION_MANAGER as `0x${string}`,
             data: "0x0000000000000000000000000000000000000000000000000000000000000000",
             value: "0x0",
             gas: "0x30D40",

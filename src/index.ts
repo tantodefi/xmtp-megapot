@@ -47,6 +47,7 @@ const MEGAPOT_USDC_ADDRESS = process.env.MEGAPOT_USDC_ADDRESS as string;
 const MEGAPOT_REFERRER_ADDRESS = process.env.MEGAPOT_REFERRER_ADDRESS as string;
 const JACKPOT_POOL_CONTRACT_ADDRESS = process.env
   .JACKPOT_POOL_CONTRACT_ADDRESS as string;
+const SPEND_PERMISSION_MANAGER = process.env.SPEND_PERMISSION_MANAGER as string;
 
 // Validate environment variables
 console.log("🔍 Checking environment variables...");
@@ -64,6 +65,10 @@ console.log("🎰 MEGAPOT_CONTRACT:", MEGAPOT_CONTRACT_ADDRESS || "NOT SET");
 console.log("💰 MEGAPOT_USDC:", MEGAPOT_USDC_ADDRESS || "NOT SET");
 console.log("👥 MEGAPOT_REFERRER:", MEGAPOT_REFERRER_ADDRESS || "NOT SET");
 console.log("🎯 JACKPOT_POOL:", JACKPOT_POOL_CONTRACT_ADDRESS || "NOT SET");
+console.log(
+  "🔐 SPEND_PERMISSION_MANAGER:",
+  SPEND_PERMISSION_MANAGER || "NOT SET",
+);
 
 if (!WALLET_KEY) {
   console.error("❌ WALLET_KEY environment variable is required");
@@ -98,6 +103,13 @@ if (!MEGAPOT_REFERRER_ADDRESS) {
 if (!JACKPOT_POOL_CONTRACT_ADDRESS) {
   console.error(
     "❌ JACKPOT_POOL_CONTRACT_ADDRESS environment variable is required",
+  );
+  process.exit(1);
+}
+
+if (!SPEND_PERMISSION_MANAGER) {
+  console.error(
+    "❌ SPEND_PERMISSION_MANAGER environment variable is required for automated buying",
   );
   process.exit(1);
 }
