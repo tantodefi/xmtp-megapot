@@ -688,14 +688,17 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     const buyTicketsPattern = /buy\s+\d+.*(?:ticket|for).*\d+\s*days?/i;
     const ticketsPerDayPattern =
       /\d+.*ticket.*(?:day|daily).*(?:for|next).*\d+\s*days?/i;
+    const automatedBuyingPattern =
+      /buy.*(?:ticket|solo|pool).*(?:day|daily).*\d+\s*days?/i;
 
     if (
       spendConfigPattern.test(lowerMessage) ||
       buyTicketsPattern.test(lowerMessage) ||
-      ticketsPerDayPattern.test(lowerMessage)
+      ticketsPerDayPattern.test(lowerMessage) ||
+      automatedBuyingPattern.test(lowerMessage)
     ) {
       return {
-        type: "spend_config_input",
+        type: "setup_spend_permission",
         confidence: 0.95,
         extractedData: { configText: originalMessage },
       };

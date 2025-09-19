@@ -138,6 +138,57 @@ export class SpendPermissionsHandler {
       this.userPermissions.set(userAddress, userPermissions);
       this.userConfigs.set(userAddress, config);
 
+      // Prepare the spend permission transaction
+      const spendTx = {
+        version: "1.0",
+        chainId: "0x2105", // Base mainnet
+        from: userAddress as `0x${string}`,
+        capabilities: {
+          reference: `megapot_spend_permission_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          app: "MegaPot",
+          icon: "https://megapot.io/favicon.ico",
+          domain: "megapot.io",
+          name: "MegaPot Lottery",
+          description: "MegaPot Lottery Assistant",
+          hostname: "megapot.io",
+          faviconUrl: "https://megapot.io/favicon.ico",
+          title: "MegaPot Lottery",
+        },
+        calls: [
+          {
+            to: USDC_BASE_ADDRESS as `0x${string}`,
+            data: "0x095ea7b3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            value: "0x0",
+            gas: "0xC350",
+            metadata: {
+              description: `Approve USDC spending for $${config.dailyLimit}/day`,
+              transactionType: "erc20_approve",
+              source: "MegaPot",
+              origin: "megapot.io",
+              hostname: "megapot.io",
+              faviconUrl: "https://megapot.io/favicon.ico",
+              title: "MegaPot Lottery",
+            },
+          },
+          {
+            to: this.spenderAddress as `0x${string}`,
+            data: "0x0000000000000000000000000000000000000000000000000000000000000000",
+            value: "0x0",
+            gas: "0x30D40",
+            metadata: {
+              description: `Set spend permission for $${config.dailyLimit}/day for ${config.duration} days`,
+              transactionType: "spend_permission",
+              appName: "MegaPot",
+              appIcon: "https://megapot.io/favicon.ico",
+              appDomain: "megapot.io",
+              hostname: "megapot.io",
+              faviconUrl: "https://megapot.io/favicon.ico",
+              title: "MegaPot Lottery",
+            },
+          },
+        ],
+      };
+
       console.log(
         `✅ Spend permission created for ${userAddress}: $${config.dailyLimit}/day`,
       );
