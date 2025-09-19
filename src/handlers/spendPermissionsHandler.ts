@@ -29,91 +29,12 @@ export const SPEND_PERMISSION_MANAGER =
 export class SpendPermissionsHandler {
   private userPermissions = new Map<string, SpendPermission[]>();
   private userConfigs = new Map<string, SpendConfig>();
-  private automatedBuying = new Map<string, NodeJS.Timeout>();
+  private automationTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(private spenderAddress: string) {}
 
   /**
-   * Execute spend calls via Base Account spend permissions
-   */
-  private async executeSpendCalls(
-    existingTransaction: any,
-    conversation: Conversation,
-    userAddress: string,
-    purchaseType: string,
-    ticketCount: number,
-  ): Promise<boolean> {
-    try {
-      // Use the existing transaction format from MegaPot/Pool handlers
-      // but update the metadata to indicate it's automated
-      // Build paymaster capabilities based on TBA chat example format
-      const paymasterCapabilities = process.env.PAYMASTER_URL
-        ? {
-            paymasterService: {
-              url: process.env.PAYMASTER_URL,
-              optional: true, // Graceful fallback if paymaster fails
-            },
-          }
-        : undefined;
-
-      const automatedTransaction = {
-        ...existingTransaction,
-        capabilities: {
-          ...existingTransaction.capabilities,
-          reference: `megapot_automated_${purchaseType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          app: "MegaPot Automated Purchase",
-          name: `🤖 Automated ${purchaseType.charAt(0).toUpperCase() + purchaseType.slice(1)} Purchase`,
-          description: `Automated purchase: ${ticketCount} ${purchaseType} tickets via spend permission`,
-          // Add paymaster service for gas sponsorship (TBA chat example format)
-          ...paymasterCapabilities,
-        },
-      };
-
-      // Update individual call metadata to indicate automation
-      if (automatedTransaction.calls) {
-        automatedTransaction.calls = automatedTransaction.calls.map(
-          (call: any, index: number) => ({
-            ...call,
-            // Remove gas field for paymaster-sponsored transactions
-            gas: undefined,
-            metadata: {
-              ...call.metadata,
-              automatedPurchase: true,
-              spendPermissionUser: userAddress,
-              purchaseType: purchaseType,
-              ticketCount: ticketCount,
-              gasSponsored: process.env.PAYMASTER_URL ? true : false,
-              paymasterUrl: process.env.PAYMASTER_URL,
-              description: call.metadata?.description
-                ? `🤖 Gas-Free Automated: ${call.metadata.description}`
-                : `🤖 Gas-Free Automated ${purchaseType} purchase step ${index + 1}`,
-            },
-          }),
-        );
-      }
-
-      const gasMessage = process.env.PAYMASTER_URL
-        ? "⛽ Gas-free transaction (sponsored)"
-        : "⚠️ Gas fees apply (no paymaster configured)";
-
-      await conversation.send(
-        `🤖 Automated ${purchaseType} purchase transaction ready:\n\n💰 ${ticketCount} ${purchaseType} tickets for $${ticketCount}\n🔐 Executed via spend permission\n${gasMessage}\n\n✅ Open your wallet to approve this automated transaction.`,
-      );
-      await conversation.send(automatedTransaction, ContentTypeWalletSendCalls);
-
-      console.log(
-        `📡 Gas-sponsored automated transaction sent for ${userAddress}: ${ticketCount} ${purchaseType} tickets`,
-      );
-      return true;
-    } catch (error) {
-      console.error("Failed to execute automated spend calls:", error);
-      return false;
-    }
-  }
-
-  /**
    * Request spend permission from user for MegaPot purchases
-   * This is a demo implementation showing the concept
    */
   async requestMegaPotSpendPermission(
     userAddress: string,
@@ -122,34 +43,6 @@ export class SpendPermissionsHandler {
     try {
       // Convert USD to USDC (6 decimals)
       const allowanceUSDC = BigInt(config.dailyLimit * 1_000_000);
-
-      // Demo implementation - in real implementation this would use Base Account SDK
-      const spendPermission: SpendPermission = {
-        account: userAddress,
-        spender: this.spenderAddress,
-        token: USDC_BASE_ADDRESS,
-        chainId: 8453,
-        allowance: allowanceUSDC,
-        periodInDays: 1,
-        signature: `demo_signature_${Date.now()}`,
-        extraData: JSON.stringify(config),
-      };
-
-      // Store permission and config
-      const userPermissions = this.userPermissions.get(userAddress) || [];
-      userPermissions.push(spendPermission);
-      this.userPermissions.set(userAddress, userPermissions);
-      this.userConfigs.set(userAddress, config);
-
-      // Check if spend permission manager is configured
-      if (
-        SPEND_PERMISSION_MANAGER ===
-        "0x0000000000000000000000000000000000000000"
-      ) {
-        throw new Error(
-          "SPEND_PERMISSION_MANAGER environment variable not set",
-        );
-      }
 
       // Prepare the spend permission transaction
       const spendTx = {
@@ -170,58 +63,62 @@ export class SpendPermissionsHandler {
         calls: [
           {
             to: SPEND_PERMISSION_MANAGER as `0x${string}`,
-            data: "0x0000000000000000000000000000000000000000000000000000000000000000",
+            data: "0x095ea7b300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
             value: "0x0",
-            gas: "0x30D40",
+            gas: "0xC350",
             metadata: {
-              description: `Set spend permission for $${config.dailyLimit}/day for ${config.duration} days`,
+              description: `Set up spend permission for ${config.dailyLimit} USDC per day`,
               transactionType: "spend_permission",
-              appName: "MegaPot",
-              appIcon: "https://megapot.io/favicon.ico",
-              appDomain: "megapot.io",
+              source: "MegaPot",
+              origin: "megapot.io",
               hostname: "megapot.io",
               faviconUrl: "https://megapot.io/favicon.ico",
               title: "MegaPot Lottery",
-              spendConfig: {
-                dailyLimit: config.dailyLimit,
-                ticketsPerDay: config.ticketsPerDay,
-                purchaseType: config.purchaseType,
-                duration: config.duration,
-                soloTicketsPerDay: config.soloTicketsPerDay,
-                poolTicketsPerDay: config.poolTicketsPerDay,
-              },
+            },
+          },
+          {
+            to: USDC_BASE_ADDRESS as `0x${string}`,
+            data: "0x095ea7b300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            value: "0x0",
+            gas: "0xC350",
+            metadata: {
+              description: `Approve USDC spending for ${config.dailyLimit} USDC per day`,
+              transactionType: "erc20_approve",
+              source: "MegaPot",
+              origin: "megapot.io",
+              hostname: "megapot.io",
+              faviconUrl: "https://megapot.io/favicon.ico",
+              title: "MegaPot Lottery",
             },
           },
         ],
       };
 
-      console.log(
-        `✅ Spend permission created for ${userAddress}: $${config.dailyLimit}/day`,
-      );
-      return spendPermission;
+      // Store permission and config
+      const userPermissions = this.userPermissions.get(userAddress) || [];
+      const permission: SpendPermission = {
+        account: userAddress,
+        spender: this.spenderAddress,
+        token: USDC_BASE_ADDRESS,
+        chainId: 8453,
+        allowance: allowanceUSDC,
+        periodInDays: 1,
+        signature: `demo_signature_${Date.now()}`,
+        extraData: JSON.stringify(config),
+      };
+      userPermissions.push(permission);
+      this.userPermissions.set(userAddress, userPermissions);
+      this.userConfigs.set(userAddress, config);
+
+      return permission;
     } catch (error) {
-      console.error("Failed to create spend permission:", error);
-      throw new Error("Failed to create spend permission");
+      console.error("Error requesting spend permission:", error);
+      throw error;
     }
   }
 
   /**
-   * Get active spend permissions for a user
-   */
-  async getUserSpendPermissions(
-    userAddress: string,
-  ): Promise<SpendPermission[]> {
-    try {
-      // Demo implementation - return stored permissions
-      return this.userPermissions.get(userAddress) || [];
-    } catch (error) {
-      console.error("Failed to fetch spend permissions:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Check if user has active spend permission with remaining allowance
+   * Check if user has active spend permission
    */
   async hasActiveSpendPermission(
     userAddress: string,
@@ -232,69 +129,75 @@ export class SpendPermissionsHandler {
     remainingSpend?: number;
   }> {
     try {
-      const permissions = await this.getUserSpendPermissions(userAddress);
+      const userPermissions = this.userPermissions.get(userAddress);
+      if (!userPermissions || userPermissions.length === 0) {
+        return { hasPermission: false };
+      }
 
-      for (const permission of permissions) {
-        // Demo implementation - assume permission is active with full allowance
-        const remainingUSD = Number(permission.allowance) / 1_000_000; // Convert from USDC to USD
+      // Get latest permission
+      const permission = userPermissions[userPermissions.length - 1];
+      const remainingSpend = Number(permission.allowance) / 1_000_000; // Convert to USD
 
-        if (remainingUSD >= requiredAmount) {
-          return {
-            hasPermission: true,
-            permission,
-            remainingSpend: remainingUSD,
-          };
+      return {
+        hasPermission: remainingSpend >= requiredAmount,
+        permission,
+        remainingSpend,
+      };
+    } catch (error) {
+      console.error("Error checking spend permission:", error);
+      return { hasPermission: false };
+    }
+  }
+
+  /**
+   * Get spend permission status for user
+   */
+  async getSpendPermissionStatus(userAddress: string): Promise<string> {
+    try {
+      const userPermissions = this.userPermissions.get(userAddress);
+      if (!userPermissions || userPermissions.length === 0) {
+        return "❌ No spend permissions found. Set up permissions with 'setup spend permission'.";
+      }
+
+      const permission = userPermissions[userPermissions.length - 1];
+      const config = this.userConfigs.get(userAddress);
+      const isAutomated = this.automationTimers.has(userAddress);
+
+      let purchaseDescription = "";
+      if (config) {
+        if (
+          config.purchaseType === "both" &&
+          config.soloTicketsPerDay &&
+          config.poolTicketsPerDay
+        ) {
+          purchaseDescription = `${config.soloTicketsPerDay} solo + ${config.poolTicketsPerDay} pool tickets daily (2 transactions)`;
+        } else {
+          purchaseDescription = `${config.ticketsPerDay} ${config.purchaseType} tickets daily`;
         }
       }
 
-      return { hasPermission: false };
+      return `🔐 Spend Permission Status
+
+💰 Daily Limit: $${Number(permission.allowance) / 1_000_000} USDC
+🎫 Purchase Plan: ${purchaseDescription}
+⏱️ Duration: ${config?.duration || "Unknown"} days
+🤖 Automation: ${isAutomated ? "✅ Active" : "❌ Inactive"}
+
+🔑 Spender: ${permission.spender.slice(0, 8)}...${permission.spender.slice(-6)}
+📅 Period: ${permission.periodInDays} day(s)
+
+Commands:
+• "start automation" - Begin daily purchases
+• "stop automation" - Pause automated buying
+• "revoke permissions" - Remove all permissions`;
     } catch (error) {
-      console.error("Failed to check spend permission status:", error);
-      return { hasPermission: false };
+      console.error("Error getting spend permission status:", error);
+      return "❌ Error retrieving spend permission status.";
     }
   }
 
   /**
-   * Prepare spend calls for MegaPot ticket purchase
-   */
-  async prepareMegaPotSpendCalls(
-    permission: SpendPermission,
-    ticketCount: number,
-    purchaseType: "solo" | "pool",
-    ticketPrice: number = 1,
-  ) {
-    try {
-      const totalAmount = ticketCount * ticketPrice;
-
-      // Demo implementation - return mock spend calls
-      const spendCalls = [
-        {
-          to: USDC_BASE_ADDRESS,
-          data: "0x095ea7b3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        },
-        {
-          to:
-            purchaseType === "solo"
-              ? "0xMegaPotContract"
-              : "0xJackpotPoolContract",
-          data: "0x0000000000000000000000000000000000000000000000000000000000000000",
-        },
-      ];
-
-      return {
-        spendCalls,
-        totalAmount,
-        ticketCount,
-        purchaseType,
-      };
-    } catch (error) {
-      console.error("Failed to prepare spend calls:", error);
-      throw new Error("Failed to prepare spend calls");
-    }
-  }
-
-  /**
-   * Start automated ticket buying for a user
+   * Start automated buying for user
    */
   async startAutomatedBuying(
     userAddress: string,
@@ -408,64 +311,63 @@ export class SpendPermissionsHandler {
         } else {
           // Single purchase type (solo, pool, or alternating)
           let purchaseType: "solo" | "pool";
+          let ticketCount = config.ticketsPerDay;
+
           if (config.purchaseType === "alternating") {
             // Alternate between solo and pool
-            const dayOfYear = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
-            purchaseType = dayOfYear % 2 === 0 ? "solo" : "pool";
+            const lastPurchase = this.getLastPurchaseType(userAddress);
+            purchaseType = lastPurchase === "solo" ? "pool" : "solo";
           } else {
-            purchaseType = config.purchaseType as "solo" | "pool";
+            purchaseType = config.purchaseType;
           }
 
-          const spendData = await this.prepareMegaPotSpendCalls(
-            permission,
-            config.ticketsPerDay,
-            purchaseType,
-          );
-
           await conversation.send(
-            `🤖 Automated Purchase: Buying ${config.ticketsPerDay} ${purchaseType} tickets for $${spendData.totalAmount}`,
+            `🤖 Automated Purchase (${purchaseType}): Buying ${ticketCount} tickets for $${ticketCount}`,
           );
 
           try {
-            // Execute the actual purchase through MegaPot contracts
             if (purchaseType === "solo" && megaPotManager && agent) {
+              // Execute real solo purchase
               const soloTx = await megaPotManager.preparePurchaseTransaction(
                 userAddress,
-                config.ticketsPerDay,
+                ticketCount,
                 conversation,
                 agent.client,
               );
 
-              // Execute via spend permission with real transaction
               await this.executeSpendCalls(
                 soloTx,
                 conversation,
                 userAddress,
                 "solo",
-                config.ticketsPerDay,
+                ticketCount,
+              );
+
+              console.log(
+                `🎫 Solo purchase executed: ${ticketCount} tickets for ${userAddress}`,
               );
             } else if (purchaseType === "pool" && poolHandler) {
+              // Execute real pool purchase
               const poolResult = await poolHandler.processPooledTicketPurchase(
                 userAddress,
-                config.ticketsPerDay,
+                ticketCount,
                 conversation,
               );
 
-              // Execute via spend permission with real transaction
               if (poolResult.transaction) {
                 await this.executeSpendCalls(
                   poolResult.transaction,
                   conversation,
                   userAddress,
                   "pool",
-                  config.ticketsPerDay,
+                  ticketCount,
                 );
               }
-            }
 
-            console.log(
-              `🤖 Automated purchase executed for ${userAddress}: ${config.ticketsPerDay} ${purchaseType} tickets`,
-            );
+              console.log(
+                `🏊 Pool purchase executed: ${ticketCount} tickets for ${userAddress}`,
+              );
+            }
           } catch (error) {
             console.error("Automated purchase failed:", error);
             await conversation.send(
@@ -474,128 +376,95 @@ export class SpendPermissionsHandler {
           }
         }
       } catch (error) {
-        console.error("Automated purchase failed:", error);
-        await conversation.send(
-          `❌ Automated purchase failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
+        console.error("Error in automated purchase:", error);
       }
     };
 
-    // Execute first purchase immediately, then set interval
+    // Start the timer
+    const timer = setInterval(automatedPurchase, intervalMs);
+    this.automationTimers.set(userAddress, timer);
+
+    // Execute first purchase immediately
     await automatedPurchase();
-    const interval = setInterval(automatedPurchase, intervalMs);
-    this.automatedBuying.set(userAddress, interval);
 
     await conversation.send(
-      `🤖 Automated buying started! I'll buy ${config.ticketsPerDay} ${config.purchaseType} tickets daily for ${config.duration} days.\n\n⚙️ Settings:\n• Daily limit: $${config.dailyLimit}\n• Purchase type: ${config.purchaseType}\n• Duration: ${config.duration} days\n\nSay "stop automation" to pause anytime.`,
+      "✅ Automated buying started! I'll execute purchases daily at this time.",
     );
-
     return true;
   }
 
   /**
-   * Stop automated buying for a user
+   * Stop automated buying for user
    */
   stopAutomatedBuying(userAddress: string): void {
-    const interval = this.automatedBuying.get(userAddress);
-    if (interval) {
-      clearInterval(interval);
-      this.automatedBuying.delete(userAddress);
-      console.log(`🛑 Automated buying stopped for ${userAddress}`);
+    const timer = this.automationTimers.get(userAddress);
+    if (timer) {
+      clearInterval(timer);
+      this.automationTimers.delete(userAddress);
     }
   }
 
   /**
-   * Get spend permission status for user
-   */
-  async getSpendPermissionStatus(userAddress: string): Promise<string> {
-    try {
-      const permissions = await this.getUserSpendPermissions(userAddress);
-      const config = this.userConfigs.get(userAddress);
-      const isAutomated = this.automatedBuying.has(userAddress);
-
-      if (permissions.length === 0) {
-        return `📋 Spend Permissions Status
-
-❌ No active spend permissions found.
-
-💡 Set up spend permissions to enable:
-• Automated daily ticket purchases
-• Instant transactions without wallet popups
-• Flexible spending limits
-
-Use "setup spend permission" to get started!`;
-      }
-
-      let statusMessage = `📋 Spend Permissions Status\n\n`;
-
-      for (const permission of permissions) {
-        try {
-          const dailyLimit = Number(permission.allowance) / 1_000_000;
-          // Demo implementation - assume full allowance remaining
-          const remainingSpend = dailyLimit;
-
-          statusMessage += `✅ Active Permission:
-• Daily limit: $${dailyLimit.toFixed(2)} USDC
-• Remaining today: $${remainingSpend.toFixed(2)} USDC
-• Status: Active (Demo)
-
-`;
-        } catch (statusError) {
-          statusMessage += `⚠️ Permission Status Check Failed\n\n`;
-        }
-      }
-
-      if (config) {
-        statusMessage += `⚙️ Configuration:
-• Tickets per day: ${config.ticketsPerDay}
-• Purchase type: ${config.purchaseType}
-• Duration: ${config.duration} days
-
-`;
-      }
-
-      if (isAutomated) {
-        statusMessage += `🤖 Automated Buying: ACTIVE
-• Next purchase: Within 24 hours
-• Say "stop automation" to pause
-
-`;
-      } else {
-        statusMessage += `⏸️ Automated Buying: PAUSED
-• Say "start automation" to begin
-
-`;
-      }
-
-      statusMessage += `🛠️ Commands:
-• "setup spend permission" - Create new permission
-• "start automation" - Begin automated purchases
-• "stop automation" - Pause automated purchases
-• "revoke permissions" - Remove all permissions`;
-
-      return statusMessage;
-    } catch (error) {
-      console.error("Failed to get spend permission status:", error);
-      return `❌ Failed to check spend permission status: ${error instanceof Error ? error.message : "Unknown error"}`;
-    }
-  }
-
-  /**
-   * Revoke all spend permissions for a user
+   * Revoke all spend permissions for user
    */
   async revokeAllPermissions(userAddress: string): Promise<boolean> {
     try {
-      // Demo implementation - just clear stored data
+      // Stop any active automation
       this.stopAutomatedBuying(userAddress);
+
+      // Clear permissions
       this.userPermissions.delete(userAddress);
       this.userConfigs.delete(userAddress);
 
-      console.log(`✅ All spend permissions revoked for ${userAddress}`);
       return true;
     } catch (error) {
-      console.error("Failed to revoke spend permissions:", error);
+      console.error("Error revoking permissions:", error);
       return false;
     }
+  }
+
+  /**
+   * Execute spend calls with proper permissions
+   */
+  private async executeSpendCalls(
+    transaction: any,
+    conversation: Conversation,
+    userAddress: string,
+    purchaseType: "solo" | "pool",
+    ticketCount: number,
+  ): Promise<void> {
+    try {
+      // Send the transaction to user's wallet
+      await conversation.send(transaction, ContentTypeWalletSendCalls);
+
+      // Store purchase type for alternating purchases
+      this.setLastPurchaseType(userAddress, purchaseType);
+
+      console.log(
+        `✅ ${purchaseType} purchase transaction sent: ${ticketCount} tickets for ${userAddress}`,
+      );
+    } catch (error) {
+      console.error("Error executing spend calls:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get last purchase type for alternating purchases
+   */
+  private getLastPurchaseType(userAddress: string): "solo" | "pool" {
+    const key = `lastPurchaseType_${userAddress}`;
+    return (localStorage.getItem(key) as "solo" | "pool") || "pool";
+  }
+
+  /**
+   * Set last purchase type for alternating purchases
+   */
+  private setLastPurchaseType(
+    userAddress: string,
+    purchaseType: "solo" | "pool",
+  ): void {
+    const key = `lastPurchaseType_${userAddress}`;
+    localStorage.setItem(key, purchaseType);
   }
 }

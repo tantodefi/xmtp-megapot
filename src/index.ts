@@ -2,6 +2,7 @@ import { Agent, f, withFilter } from "@xmtp/agent-sdk";
 import {
   ContentTypeReaction,
   ReactionCodec,
+  type Reaction,
 } from "@xmtp/content-type-reaction";
 import { RemoteAttachmentCodec } from "@xmtp/content-type-remote-attachment";
 import {
@@ -323,9 +324,40 @@ async function main() {
       24 * 60 * 60 * 1000,
     ); // Daily cleanup
 
-    // Start the message stream
+    // Start the message stream with reconnection logic
     console.log("📡 Starting message stream...");
-    const stream = await agent.client.conversations.streamAllMessages();
+    let stream = await agent.client.conversations.streamAllMessages();
+    let isStreaming = true;
+
+    // Set up reconnection logic
+    const reconnect = async () => {
+      if (!isStreaming) return;
+      try {
+        console.log("🔄 Attempting to reconnect...");
+        stream = await agent.client.conversations.streamAllMessages();
+        console.log("✅ Reconnected successfully!");
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error("❌ Error reconnecting:", errorMessage);
+        setTimeout(reconnect, 5000);
+      }
+    };
+
+    // Handle stream errors by restarting the stream
+    setInterval(async () => {
+      try {
+        if (!stream) {
+          console.log("🔄 Stream lost, attempting to reconnect...");
+          stream = await agent.client.conversations.streamAllMessages();
+          console.log("✅ Stream reconnected successfully!");
+        }
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error("❌ Stream error:", errorMessage);
+      }
+    }, 60000); // Check every minute
 
     console.log("🎧 Message stream started successfully!");
 
@@ -400,12 +432,13 @@ async function main() {
 
           // Send money bag reaction to ALL messages
           try {
+            // Send reaction optimistically
             await conversation.send(
               {
                 reference: message.id,
-                action: "added",
+                action: "added" as const,
                 content: "💰",
-                schema: "unicode",
+                schema: "unicode" as const,
               },
               ContentTypeReaction,
             );
