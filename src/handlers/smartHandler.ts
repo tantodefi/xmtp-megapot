@@ -686,6 +686,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
 
     // Check for spend permission configuration input
     // Patterns: "$5 per day for 30 days, solo" OR "buy 4 tickets for the next 7 days" OR "buy 1 ticket a day for 30 days"
+    // Check for spend permission patterns first
     const spendConfigPattern = /\$\d+.*(?:day|daily).*\d+\s*days?/i;
     const buyTicketsPattern = /buy\s+\d+.*(?:ticket|for).*\d+\s*days?/i;
     const ticketsPerDayPattern =
@@ -696,14 +697,18 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:a\s+)?(?:day|daily)\s+for\s+\d+\s*days?/i;
     const scheduledBuyPattern =
       /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+\d+\s*days?/i;
+    const scheduledBuyPattern2 =
+      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+(?:the\s+)?(?:next\s+)?\d+\s*days?/i;
 
+    // Check for spend permission patterns first
     if (
       spendConfigPattern.test(lowerMessage) ||
       buyTicketsPattern.test(lowerMessage) ||
       ticketsPerDayPattern.test(lowerMessage) ||
       automatedBuyingPattern.test(lowerMessage) ||
       dailyTicketPattern.test(lowerMessage) ||
-      scheduledBuyPattern.test(lowerMessage)
+      scheduledBuyPattern.test(lowerMessage) ||
+      scheduledBuyPattern2.test(lowerMessage)
     ) {
       // Extract ticket count and duration
       const ticketMatch = lowerMessage.match(
