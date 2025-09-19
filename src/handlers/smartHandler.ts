@@ -694,13 +694,16 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       /buy.*(?:ticket|solo|pool).*(?:day|daily).*\d+\s*days?/i;
     const dailyTicketPattern =
       /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:a\s+)?(?:day|daily)\s+for\s+\d+\s*days?/i;
+    const scheduledBuyPattern =
+      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+\d+\s*days?/i;
 
     if (
       spendConfigPattern.test(lowerMessage) ||
       buyTicketsPattern.test(lowerMessage) ||
       ticketsPerDayPattern.test(lowerMessage) ||
       automatedBuyingPattern.test(lowerMessage) ||
-      dailyTicketPattern.test(lowerMessage)
+      dailyTicketPattern.test(lowerMessage) ||
+      scheduledBuyPattern.test(lowerMessage)
     ) {
       // Extract ticket count and duration
       const ticketMatch = lowerMessage.match(

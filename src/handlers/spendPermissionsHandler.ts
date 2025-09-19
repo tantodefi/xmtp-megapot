@@ -169,21 +169,6 @@ export class SpendPermissionsHandler {
         },
         calls: [
           {
-            to: USDC_BASE_ADDRESS as `0x${string}`,
-            data: "0x095ea7b3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-            value: "0x0",
-            gas: "0xC350",
-            metadata: {
-              description: `Approve USDC spending for $${config.dailyLimit}/day`,
-              transactionType: "erc20_approve",
-              source: "MegaPot",
-              origin: "megapot.io",
-              hostname: "megapot.io",
-              faviconUrl: "https://megapot.io/favicon.ico",
-              title: "MegaPot Lottery",
-            },
-          },
-          {
             to: SPEND_PERMISSION_MANAGER as `0x${string}`,
             data: "0x0000000000000000000000000000000000000000000000000000000000000000",
             value: "0x0",
@@ -194,6 +179,21 @@ export class SpendPermissionsHandler {
               appName: "MegaPot",
               appIcon: "https://megapot.io/favicon.ico",
               appDomain: "megapot.io",
+              hostname: "megapot.io",
+              faviconUrl: "https://megapot.io/favicon.ico",
+              title: "MegaPot Lottery",
+            },
+          },
+          {
+            to: USDC_BASE_ADDRESS as `0x${string}`,
+            data: "0x095ea7b3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            value: "0x0",
+            gas: "0xC350",
+            metadata: {
+              description: `Approve USDC spending for $${config.dailyLimit}/day`,
+              transactionType: "erc20_approve",
+              source: "MegaPot",
+              origin: "megapot.io",
               hostname: "megapot.io",
               faviconUrl: "https://megapot.io/favicon.ico",
               title: "MegaPot Lottery",
