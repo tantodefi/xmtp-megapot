@@ -60,6 +60,82 @@ export class SmartHandler {
   }
 
   /**
+   * Get the context handler instance
+   */
+  getContextHandler(): ContextHandler {
+    return this.contextHandler;
+  }
+
+  /**
+   * Generate explanation of solo vs pool tickets with stats
+   */
+  async generateTicketTypeExplanation(
+    userAddress?: string,
+    isGroupChat: boolean = false,
+  ): Promise<string> {
+    try {
+      const lotteryStats = await this.megaPotManager.getStats(userAddress);
+      const allTimeStats = await this.fetchAllTimeStats();
+
+      const soloSection = `🎫 Solo Tickets (Individual Purchase)
+• You keep 100% of any winnings
+• Direct purchase from your wallet
+• Immediate ownership and control
+• Current price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
+• Your solo tickets: ${lotteryStats.individualTicketsPurchased || 0}`;
+
+      const poolSection = isGroupChat
+        ? `
+👥 Pool Tickets (Group Purchase)
+• Increases your group's chances of winning
+• Share costs and winnings proportionally based on risk exposure
+• Collective buying power for larger ticket volumes
+• Same ticket price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
+• Your pool contributions: ${lotteryStats.groupTicketsPurchased || 0} tickets
+
+📊 Pool Benefits:
+• Higher winning chances through volume
+• Proportional prize sharing based on contribution
+• Social lottery experience with friends
+• Automatic payout distribution`
+        : `
+👥 Pool Tickets (Group Purchase)
+• Only available in group chats
+• Increases group's chances of winning
+• Share costs and winnings with group members
+• Join a group conversation to access pool purchases`;
+
+      const statsSection = `
+📈 Current Round Stats:
+• Jackpot: $${lotteryStats.jackpotPool || "0"}
+• Total tickets sold: ${lotteryStats.ticketsSoldRound || 0}
+• Your total tickets: ${lotteryStats.totalTicketsPurchased || 0}
+• Your winning odds: 1 in ${lotteryStats.userOdds || "∞"}
+
+🏆 All-Time Performance:
+• Total jackpots won: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
+• Lucky winners: ${allTimeStats?.total_won || "19"} players
+• Total tickets sold: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}`;
+
+      return `${soloSection}${poolSection}${statsSection}
+
+💡 Which should you choose?
+• Solo: Maximum control and 100% winnings
+• Pool: Higher chances through volume, shared winnings
+
+🎰 Ready to play? Use the action buttons below!`;
+    } catch (error) {
+      console.error("Error generating ticket type explanation:", error);
+      return `🎫 Solo vs Pool Tickets
+
+Solo Tickets: You buy individually and keep all winnings
+Pool Tickets: Group members share costs and winnings, increasing collective chances
+
+Both types cost $1 USDC per ticket. Choose based on your preference for individual control vs. shared experience!`;
+    }
+  }
+
+  /**
    * Parse user message using LLM and determine intent with contextual response
    */
   async parseMessageIntent(
@@ -1000,141 +1076,6 @@ Quick Commands:
 
 ⚡ Natural language supported
 🌐 Full site: https://frame.megapot.io`;
-    }
-  }
-}
-    userAddress?: string,
-    isGroupChat: boolean = false,
-  ): Promise<string> {
-    try {
-      const lotteryStats = await this.megaPotManager.getStats(userAddress);
-      const allTimeStats = await this.fetchAllTimeStats();
-
-      const soloSection = `🎫 Solo Tickets (Individual Purchase)
-• You keep 100% of any winnings
-• Direct purchase from your wallet
-• Immediate ownership and control
-• Current price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
-• Your solo tickets: ${lotteryStats.individualTicketsPurchased || 0}`;
-
-      const poolSection = isGroupChat
-        ? `
-👥 Pool Tickets (Group Purchase)
-• Increases your group's chances of winning
-• Share costs and winnings proportionally based on risk exposure
-• Collective buying power for larger ticket volumes
-• Same ticket price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
-• Your pool contributions: ${lotteryStats.groupTicketsPurchased || 0} tickets
-
-📊 Pool Benefits:
-• Higher winning chances through volume
-• Proportional prize sharing based on contribution
-• Social lottery experience with friends
-• Automatic payout distribution`
-        : `
-👥 Pool Tickets (Group Purchase)
-• Only available in group chats
-• Increases group's chances of winning
-• Share costs and winnings with group members
-• Join a group conversation to access pool purchases`;
-
-      const statsSection = `
-📈 Current Round Stats:
-• Jackpot: $${lotteryStats.jackpotPool || "0"}
-• Total tickets sold: ${lotteryStats.ticketsSoldRound || 0}
-• Your total tickets: ${lotteryStats.totalTicketsPurchased || 0}
-• Your winning odds: 1 in ${lotteryStats.userOdds || "∞"}
-
-🏆 All-Time Performance:
-• Total jackpots won: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
-• Lucky winners: ${allTimeStats?.total_won || "19"} players
-• Total tickets sold: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}`;
-
-      return `${soloSection}${poolSection}${statsSection}
-
-💡 Which should you choose?
-• Solo: Maximum control and 100% winnings
-• Pool: Higher chances through volume, shared winnings
-
-🎰 Ready to play? Use the action buttons below!`;
-    } catch (error) {
-      console.error("Error generating ticket type explanation:", error);
-      return `🎫 Solo vs Pool Tickets
-
-Solo Tickets: You buy individually and keep all winnings
-Pool Tickets: Group members share costs and winnings, increasing collective chances
-
-Both types cost $1 USDC per ticket. Choose based on your preference for individual control vs. shared experience!`;
-    }
-  }
-}
-
-  /**
-   * Generate explanation of solo vs pool tickets with stats
-   */
-  async generateTicketTypeExplanation(
-    userAddress?: string,
-    isGroupChat: boolean = false,
-  ): Promise<string> {
-    try {
-      const lotteryStats = await this.megaPotManager.getStats(userAddress);
-      const allTimeStats = await this.fetchAllTimeStats();
-
-      const soloSection = `🎫 Solo Tickets (Individual Purchase)
-• You keep 100% of any winnings
-• Direct purchase from your wallet
-• Immediate ownership and control
-• Current price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
-• Your solo tickets: ${lotteryStats.individualTicketsPurchased || 0}`;
-
-      const poolSection = isGroupChat
-        ? `
-👥 Pool Tickets (Group Purchase)
-• Increases your group's chances of winning
-• Share costs and winnings proportionally based on risk exposure
-• Collective buying power for larger ticket volumes
-• Same ticket price: $${lotteryStats.ticketPrice || "1.00"} USDC per ticket
-• Your pool contributions: ${lotteryStats.groupTicketsPurchased || 0} tickets
-
-📊 Pool Benefits:
-• Higher winning chances through volume
-• Proportional prize sharing based on contribution
-• Social lottery experience with friends
-• Automatic payout distribution`
-        : `
-👥 Pool Tickets (Group Purchase)
-• Only available in group chats
-• Increases group's chances of winning
-• Share costs and winnings with group members
-• Join a group conversation to access pool purchases`;
-
-      const statsSection = `
-📈 Current Round Stats:
-• Jackpot: $${lotteryStats.jackpotPool || "0"}
-• Total tickets sold: ${lotteryStats.ticketsSoldRound || 0}
-• Your total tickets: ${lotteryStats.totalTicketsPurchased || 0}
-• Your winning odds: 1 in ${lotteryStats.userOdds || "∞"}
-
-🏆 All-Time Performance:
-• Total jackpots won: $${allTimeStats?.JackpotsRunTotal_USD?.toLocaleString() || "179M+"}
-• Lucky winners: ${allTimeStats?.total_won || "19"} players
-• Total tickets sold: ${allTimeStats?.total_tickets?.toLocaleString() || "282K+"}`;
-
-      return `${soloSection}${poolSection}${statsSection}
-
-💡 Which should you choose?
-• Solo: Maximum control and 100% winnings
-• Pool: Higher chances through volume, shared winnings
-
-🎰 Ready to play? Use the action buttons below!`;
-    } catch (error) {
-      console.error("Error generating ticket type explanation:", error);
-      return `🎫 Solo vs Pool Tickets
-
-Solo Tickets: You buy individually and keep all winnings
-Pool Tickets: Group members share costs and winnings, increasing collective chances
-
-Both types cost $1 USDC per ticket. Choose based on your preference for individual control vs. shared experience!`;
     }
   }
 }
