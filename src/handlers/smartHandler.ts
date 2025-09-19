@@ -1002,18 +1002,7 @@ Quick Commands:
 🌐 Full site: https://frame.megapot.io`;
     }
   }
-
-  /**
-   * Get the context handler instance
-   */
-  getContextHandler(): ContextHandler {
-    return this.contextHandler;
-  }
-
-  /**
-   * Generate explanation of solo vs pool tickets with stats
-   */
-  async generateTicketTypeExplanation(
+}
     userAddress?: string,
     isGroupChat: boolean = false,
   ): Promise<string> {
@@ -1079,20 +1068,6 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
     }
   }
 }
-
-• "claim" → Withdraw winnings
-
-⚡ Natural language supported
-🌐 Full site: https://frame.megapot.io`;
-    }
-  }
-
-  /**
-   * Get the context handler instance
-   */
-  getContextHandler(): ContextHandler {
-    return this.contextHandler;
-  }
 
   /**
    * Generate explanation of solo vs pool tickets with stats
