@@ -324,45 +324,9 @@ async function main() {
       24 * 60 * 60 * 1000,
     ); // Daily cleanup
 
-    // Start the agent first
-    console.log("🚀 Starting XMTP agent...");
-    await agent.start();
-    console.log("✅ Agent started successfully!");
-
-    // Start the message stream with reconnection logic
+    // Start the message stream
     console.log("📡 Starting message stream...");
-    let stream = await agent.client.conversations.streamAllMessages();
-    let isStreaming = true;
-
-    // Set up reconnection logic
-    const reconnect = async () => {
-      if (!isStreaming) return;
-      try {
-        console.log("🔄 Attempting to reconnect...");
-        stream = await agent.client.conversations.streamAllMessages();
-        console.log("✅ Reconnected successfully!");
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        console.error("❌ Error reconnecting:", errorMessage);
-        setTimeout(reconnect, 5000);
-      }
-    };
-
-    // Handle stream errors by restarting the stream
-    setInterval(async () => {
-      try {
-        if (!stream) {
-          console.log("🔄 Stream lost, attempting to reconnect...");
-          stream = await agent.client.conversations.streamAllMessages();
-          console.log("✅ Stream reconnected successfully!");
-        }
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        console.error("❌ Stream error:", errorMessage);
-      }
-    }, 60000); // Check every minute
+    const stream = await agent.client.conversations.streamAllMessages();
 
     console.log("🎧 Message stream started successfully!");
 
@@ -512,20 +476,6 @@ async function main() {
     })().catch((error) => {
       console.error("❌ Message stream error:", error);
     });
-  } catch (streamError) {
-    console.error("Error: set up message stream:", streamError);
-    throw streamError;
-  }
-
-  // Start the agent
-  console.log("🚀 Starting XMTP message stream...");
-  try {
-    console.log("⏳ Starting agent...");
-    await agent.start();
-    console.log("✅ Agent started successfully! Listening for messages...");
-    console.log("🎧 Message handlers are active and ready to receive messages");
-    console.log("🤖 Smart AI features are enabled!");
-    console.log("💰 Agent will react with 💰 to ALL messages!");
 
     // Keep the process alive
     console.log("🔄 Agent is now running and will stay active...");
@@ -535,13 +485,9 @@ async function main() {
     setInterval(() => {
       console.log("💓 Smart Agent heartbeat - AI-powered and ready...");
     }, 60000); // Every minute
-  } catch (error) {
-    console.error("Error: start agent:", error);
-    console.error(
-      "❌ Error details:",
-      error instanceof Error ? error.stack : String(error),
-    );
-    process.exit(1);
+  } catch (streamError) {
+    console.error("Error: set up message stream:", streamError);
+    throw streamError;
   }
 
   // Graceful shutdown
