@@ -1309,7 +1309,20 @@ async function handleSmartTextMessage(
 
       case "setup_spend_permission":
         console.log("🔐 Setting up spend permission");
-        if (spendPermissionsHandler && userAddress) {
+        if (
+          spendPermissionsHandler &&
+          userAddress &&
+          intent.extractedData?.configText
+        ) {
+          // User provided a valid configuration, process it directly
+          await handleSpendConfigInput(
+            conversation,
+            userAddress,
+            intent.extractedData.configText,
+            spendPermissionsHandler,
+          );
+        } else if (spendPermissionsHandler && userAddress) {
+          // No configuration provided, show setup instructions
           await handleSpendPermissionSetup(
             conversation,
             userAddress,
