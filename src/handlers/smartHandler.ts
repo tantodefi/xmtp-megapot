@@ -395,7 +395,61 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     const lowerResponse = response.toLowerCase();
     const lowerMessage = originalMessage.toLowerCase();
 
-    // Check for context-aware confirmation/cancellation first
+    // Check for spend permission patterns FIRST (highest priority)
+    const spendConfigPattern = /\$\d+.*(?:day|daily).*\d+\s*days?/i;
+    const buyTicketsPattern = /buy\s+\d+.*(?:ticket|for).*\d+\s*days?/i;
+    const ticketsPerDayPattern =
+      /\d+.*ticket.*(?:day|daily).*(?:for|next).*\d+\s*days?/i;
+    const automatedBuyingPattern =
+      /buy.*(?:ticket|solo|pool).*(?:day|daily).*\d+\s*days?/i;
+    const dailyTicketPattern =
+      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:a\s+)?(?:day|daily)\s+for\s+\d+\s*days?/i;
+    const scheduledBuyPattern =
+      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+\d+\s*days?/i;
+    const scheduledBuyPattern2 =
+      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+(?:the\s+)?(?:next\s+)?\d+\s*days?/i;
+
+    // Check for spend permission patterns first
+    if (
+      spendConfigPattern.test(lowerMessage) ||
+      buyTicketsPattern.test(lowerMessage) ||
+      ticketsPerDayPattern.test(lowerMessage) ||
+      automatedBuyingPattern.test(lowerMessage) ||
+      dailyTicketPattern.test(lowerMessage) ||
+      scheduledBuyPattern.test(lowerMessage) ||
+      scheduledBuyPattern2.test(lowerMessage)
+    ) {
+      // Extract ticket count and duration
+      const ticketMatch = lowerMessage.match(
+        /(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?/i,
+      );
+      const durationMatch = lowerMessage.match(/(?:for\s+)?(\d+)\s*days?/i);
+      const purchaseType = lowerMessage.includes("pool") ? "pool" : "solo";
+
+      const ticketCount = ticketMatch
+        ? ticketMatch[0].match(/\d+/)
+          ? parseInt(ticketMatch[0])
+          : 1
+        : 1;
+      const duration = durationMatch ? parseInt(durationMatch[1]) : 1;
+
+      console.log(
+        `🔐 SPEND PERMISSION DETECTED: "${originalMessage}" -> ${ticketCount} ${purchaseType} tickets for ${duration} days`,
+      );
+
+      return {
+        type: "setup_spend_permission",
+        confidence: 0.95,
+        extractedData: {
+          configText: originalMessage,
+          ticketCount,
+          duration,
+          purchaseType,
+        },
+      };
+    }
+
+    // Check for context-aware confirmation/cancellation
     if (conversationId && userInboxId) {
       const hasPending = this.contextHandler.hasPendingConfirmation(
         conversationId,
@@ -684,57 +738,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return { type: "revoke_permissions", confidence: 0.9 };
     }
 
-    // Check for spend permission configuration input
-    // Patterns: "$5 per day for 30 days, solo" OR "buy 4 tickets for the next 7 days" OR "buy 1 ticket a day for 30 days"
-    // Check for spend permission patterns first
-    const spendConfigPattern = /\$\d+.*(?:day|daily).*\d+\s*days?/i;
-    const buyTicketsPattern = /buy\s+\d+.*(?:ticket|for).*\d+\s*days?/i;
-    const ticketsPerDayPattern =
-      /\d+.*ticket.*(?:day|daily).*(?:for|next).*\d+\s*days?/i;
-    const automatedBuyingPattern =
-      /buy.*(?:ticket|solo|pool).*(?:day|daily).*\d+\s*days?/i;
-    const dailyTicketPattern =
-      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:a\s+)?(?:day|daily)\s+for\s+\d+\s*days?/i;
-    const scheduledBuyPattern =
-      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+\d+\s*days?/i;
-    const scheduledBuyPattern2 =
-      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+(?:the\s+)?(?:next\s+)?\d+\s*days?/i;
-
-    // Check for spend permission patterns first
-    if (
-      spendConfigPattern.test(lowerMessage) ||
-      buyTicketsPattern.test(lowerMessage) ||
-      ticketsPerDayPattern.test(lowerMessage) ||
-      automatedBuyingPattern.test(lowerMessage) ||
-      dailyTicketPattern.test(lowerMessage) ||
-      scheduledBuyPattern.test(lowerMessage) ||
-      scheduledBuyPattern2.test(lowerMessage)
-    ) {
-      // Extract ticket count and duration
-      const ticketMatch = lowerMessage.match(
-        /(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?/i,
-      );
-      const durationMatch = lowerMessage.match(/(?:for\s+)?(\d+)\s*days?/i);
-      const purchaseType = lowerMessage.includes("pool") ? "pool" : "solo";
-
-      const ticketCount = ticketMatch
-        ? ticketMatch[0].match(/\d+/)
-          ? parseInt(ticketMatch[0])
-          : 1
-        : 1;
-      const duration = durationMatch ? parseInt(durationMatch[1]) : 1;
-
-      return {
-        type: "setup_spend_permission",
-        confidence: 0.95,
-        extractedData: {
-          configText: originalMessage,
-          ticketCount,
-          duration,
-          purchaseType,
-        },
-      };
-    }
+    // Duplicate patterns removed - now handled at the top
 
     return { type: "unknown", confidence: 0.3 };
   }
