@@ -17,6 +17,7 @@ import {
   type Conversation,
   type XmtpEnv,
 } from "@xmtp/node-sdk";
+import { fromString } from "uint8arrays";
 import { createWalletClient, http, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -220,8 +221,8 @@ async function main() {
   const isProduction =
     process.env.RENDER || process.env.NODE_ENV === "production";
   const dbPath = isProduction
-    ? "/app/data/xmtp-agent-db"
-    : ".data/xmtp-agent-db";
+    ? "/app/data/xmtp-node-sdk-db"
+    : ".data/xmtp-node-sdk-db";
 
   console.log(
     `🌍 Environment: ${isProduction ? "Production (Render)" : "Development"}`,
@@ -242,7 +243,7 @@ async function main() {
     client = await Client.create(signer, {
       env: XMTP_ENV as XmtpEnv,
       dbPath: dbPath, // Use persistent database
-      dbEncryptionKey: Buffer.from(ENCRYPTION_KEY!, "hex"),
+      dbEncryptionKey: fromString(ENCRYPTION_KEY!, "hex"),
       codecs: [
         new ReactionCodec(),
         new RemoteAttachmentCodec(),
