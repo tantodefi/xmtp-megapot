@@ -2023,17 +2023,19 @@ function parseSpendConfig(text: string): {
     let soloTicketsPerDay = 0;
     let poolTicketsPerDay = 0;
 
-    // Method 1: Traditional dollar format "$5 per day for 30 days, solo"
+    // Method 1: Dollar format - multiple patterns
     const dollarMatch =
       text.match(/\$(\d+(?:\.\d{1,2})?)/i) ||
-      text.match(/(\d+(?:\.\d{1,2})?)\s*(?:dollars?|usd)/i);
+      text.match(/(\d+(?:\.\d{1,2})?)\s*(?:dollars?|usd)/i) ||
+      text.match(/buy\s+(\d+)\$\s*(?:for|next)/i) || // "Buy 1$ for next 2 days"
+      text.match(/(\d+)\$\s*(?:every\s+day|per\s+day|daily)/i); // "1$ every day"
 
     if (dollarMatch) {
       dailyLimit = parseFloat(dollarMatch[1]);
 
-      // Extract duration - look for patterns like "30 days", "for 14 days", etc.
+      // Extract duration - look for patterns like "30 days", "for 14 days", "next 2 days", etc.
       const durationMatch = text.match(
-        /(?:for\s+(?:the\s+)?(?:next\s+)?)?(\d+)\s*days?/i,
+        /(?:for\s+(?:the\s+)?(?:next\s+)?|next\s+)?(\d+)\s*days?/i,
       );
 
       if (!durationMatch) return null;
@@ -2159,20 +2161,17 @@ async function handleSpendConfigInput(
 
     if (!config) {
       await conversation.send(
-        `❌ I couldn't understand that configuration format.
+        `Could not understand that format. Please use:
 
-Please use one of these formats:
-
-💰 **Dollar-based**: "$X per day for Y days, [type]"
-🎫 **Ticket-based**: "buy X tickets a day for Y days"
-🔀 **Combined**: "buy X solo and Y pool tickets a day for Z days"
+💰 Dollar-based: "$X per day for Y days, [type]"
+🎫 Ticket-based: "buy X tickets a day for Y days"
+🔀 Combined: "buy X solo and Y pool tickets a day for Z days"
 
 Examples:
 • "$5 per day for 30 days, solo"
 • "buy 4 tickets for the next 7 days"
 • "buy 1 ticket a day for 30 days"
-• "buy 1 solo and 1 pool ticket a day for 30 days" (both daily)
-• "$10 per day for 14 days, alternating" (solo/pool alternating)
+• "buy 1 solo and 1 pool ticket a day for 30 days"
 
 Try again or say "cancel" to exit.`,
       );
