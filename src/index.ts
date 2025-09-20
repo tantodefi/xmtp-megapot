@@ -1320,6 +1320,9 @@ async function handleSmartTextMessage(
             userAddress,
             intent.extractedData.configText,
             spendPermissionsHandler,
+            megaPotManager,
+            poolHandler,
+            client,
           );
         } else if (spendPermissionsHandler && userAddress) {
           // No configuration provided, show setup instructions
@@ -1413,6 +1416,9 @@ async function handleSmartTextMessage(
             userAddress,
             intent.extractedData.configText,
             spendPermissionsHandler,
+            megaPotManager,
+            poolHandler,
+            client,
           );
         } else {
           await conversation.send("❌ Unable to process spend configuration.");
@@ -2131,6 +2137,9 @@ async function handleSpendConfigInput(
   userAddress: string,
   configText: string,
   spendPermissionsHandler: SpendPermissionsHandler,
+  megaPotManager?: any,
+  poolHandler?: any,
+  client?: any,
 ) {
   try {
     // Check for cancel command
@@ -2182,6 +2191,7 @@ Try again or say "cancel" to exit.`,
         await spendPermissionsHandler.requestMegaPotSpendPermission(
           userAddress,
           spendConfig,
+          megaPotManager,
         );
 
       let purchaseDescription = "";
@@ -2197,13 +2207,19 @@ Try again or say "cancel" to exit.`,
 
       // Send the spend permission transaction
       await conversation.send(
-        `🔐 Spend Permission Setup
+        `🔐 Automated MegaPot Setup
 
-Setting up automated purchases: ${purchaseDescription} for ${spendConfig.duration} days
-Daily limit: $${spendConfig.dailyLimit} USDC
-Total budget: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)}
+📋 Configuration:
+• ${purchaseDescription} for ${spendConfig.duration} days
+• Daily limit: $${spendConfig.dailyLimit} USDC  
+• Total budget: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)} USDC
 
-✅ Please approve the spend permission transaction in your wallet.`,
+🔑 What you're approving:
+• USDC spending permission for automated purchases
+• First ticket purchase (Day 1) - immediate
+• Automation starts automatically after approval
+
+✅ Please approve the transaction in your wallet.`,
       );
 
       // Send the actual transaction
@@ -2212,16 +2228,31 @@ Total budget: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)}
         ContentTypeWalletSendCalls,
       );
 
+      // Auto-start automation after permission setup
+      const autoStarted = await spendPermissionsHandler.startAutomatedBuying(
+        userAddress,
+        conversation,
+        megaPotManager,
+        poolHandler,
+        client,
+      );
+
       await conversation.send(
-        `✅ Spend Permission Transaction Sent!
+        `🎯 Setup Complete!
 
-🤖 After approval, automated features will be available:
-• "start automation" - Begin daily ticket purchases
-• "spend status" - Check your permission status
-• "stop automation" - Pause automated buying
-• "revoke permissions" - Remove all permissions
+✅ Transaction sent with:
+• USDC approval for automated spending
+• USDC approval + first ticket purchase (Day 1)
+• ${autoStarted ? "✅ Automation started automatically" : "❌ Automation failed to start"}
 
-💡 Next: Say "start automation" to begin automated purchases`,
+📅 Schedule:
+• Day 1: First ticket (included in transaction)
+• Days 2-${spendConfig.duration}: Automatic daily purchases at this time
+
+💡 Available commands:
+• "spend status" - Check automation status
+• "stop automation" - Pause daily buying
+• "revoke permissions" - Remove all permissions`,
       );
     } catch (error) {
       await conversation.send(

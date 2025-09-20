@@ -34,11 +34,90 @@ export class SpendPermissionsHandler {
   constructor(private spenderAddress: string) {}
 
   /**
+   * Build transaction calls for spend permission + first ticket purchase
+   */
+  private async buildTransactionCalls(
+    userAddress: string,
+    config: SpendConfig,
+    allowanceUSDC: bigint,
+    megaPotManager?: any,
+  ): Promise<any[]> {
+    const calls = [];
+
+    // 1. USDC Approval for automated purchases
+    calls.push({
+      to: USDC_BASE_ADDRESS as `0x${string}`,
+      data: `0x095ea7b3000000000000000000000000${SPEND_PERMISSION_MANAGER.slice(2)}${allowanceUSDC.toString(16).padStart(64, "0")}`,
+      value: "0x0",
+      gas: "0x15F90",
+      metadata: {
+        description: `Approve ${config.dailyLimit} USDC for automated MegaPot purchases`,
+        transactionType: "erc20_approve",
+        source: "MegaPot",
+        origin: "megapot.io",
+        hostname: "megapot.io",
+        faviconUrl: "https://megapot.io/favicon.ico",
+        title: "MegaPot Lottery",
+      },
+    });
+
+    // 2. First ticket purchase (if megaPotManager is available)
+    if (megaPotManager && config.ticketsPerDay > 0) {
+      try {
+        const ticketPurchaseData = await megaPotManager.prepareTicketPurchase(
+          config.ticketsPerDay,
+          userAddress,
+        );
+
+        // Add USDC approval for first purchase
+        calls.push({
+          to: ticketPurchaseData.approveCall.to as `0x${string}`,
+          data: ticketPurchaseData.approveCall.data as `0x${string}`,
+          value: ticketPurchaseData.approveCall.value as `0x${string}`,
+          gas: "0xC350",
+          metadata: {
+            description: `Approve USDC for first ticket purchase`,
+            transactionType: "erc20_approve",
+            source: "MegaPot",
+            origin: "megapot.io",
+            hostname: "megapot.io",
+            faviconUrl: "https://megapot.io/favicon.ico",
+            title: "MegaPot Lottery",
+          },
+        });
+
+        // Add ticket purchase
+        calls.push({
+          to: ticketPurchaseData.purchaseCall.to as `0x${string}`,
+          data: ticketPurchaseData.purchaseCall.data as `0x${string}`,
+          value: ticketPurchaseData.purchaseCall.value as `0x${string}`,
+          gas: "0x30D40",
+          metadata: {
+            description: `Purchase ${config.ticketsPerDay} MegaPot ticket${config.ticketsPerDay > 1 ? "s" : ""} (Day 1)`,
+            transactionType: "purchase_tickets",
+            source: "MegaPot",
+            origin: "megapot.io",
+            hostname: "megapot.io",
+            faviconUrl: "https://megapot.io/favicon.ico",
+            title: "MegaPot Lottery",
+          },
+        });
+      } catch (error) {
+        console.error("Error preparing first ticket purchase:", error);
+        // Continue with just the permission if ticket purchase fails
+      }
+    }
+
+    return calls;
+  }
+
+  /**
    * Request spend permission from user for MegaPot purchases
    */
   async requestMegaPotSpendPermission(
     userAddress: string,
     config: SpendConfig,
+    megaPotManager?: any,
   ): Promise<{ permission: SpendPermission; transaction: any }> {
     try {
       // Convert USD to USDC (6 decimals)
@@ -60,23 +139,12 @@ export class SpendPermissionsHandler {
           faviconUrl: "https://megapot.io/favicon.ico",
           title: "MegaPot Lottery",
         },
-        calls: [
-          {
-            to: USDC_BASE_ADDRESS as `0x${string}`,
-            data: `0x095ea7b3000000000000000000000000${SPEND_PERMISSION_MANAGER.slice(2)}${allowanceUSDC.toString(16).padStart(64, "0")}`,
-            value: "0x0",
-            gas: "0x15F90",
-            metadata: {
-              description: `Approve ${config.dailyLimit} USDC for automated MegaPot purchases`,
-              transactionType: "erc20_approve",
-              source: "MegaPot",
-              origin: "megapot.io",
-              hostname: "megapot.io",
-              faviconUrl: "https://megapot.io/favicon.ico",
-              title: "MegaPot Lottery",
-            },
-          },
-        ],
+        calls: await this.buildTransactionCalls(
+          userAddress,
+          config,
+          allowanceUSDC,
+          megaPotManager,
+        ),
       };
 
       // Store permission and config
