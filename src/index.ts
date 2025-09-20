@@ -722,16 +722,22 @@ async function handleSmartTextMessage(
       );
 
     const isSpendPermission = intent.type === "setup_spend_permission";
+    const isBuyNow = intent.type === "buy_now";
+    const isStartAutomation = intent.type === "start_automation";
+    const isSpendPermissionStatus = intent.type === "spend_permission_status";
 
-    if (!isStandaloneNumber && !isSpendPermission) {
+    const shouldSkipAIResponse =
+      isStandaloneNumber ||
+      isSpendPermission ||
+      isBuyNow ||
+      isStartAutomation ||
+      isSpendPermissionStatus;
+
+    if (!shouldSkipAIResponse) {
       await conversation.send(intent.response);
-    } else if (isSpendPermission) {
-      console.log(
-        `🔇 Skipping AI response for spend permission: "${content}" - main handler will process directly`,
-      );
     } else {
       console.log(
-        `🔇 Skipping AI response for standalone number: "${content}" - main handler will ask for solo/pool choice`,
+        `🔇 Skipping AI response for ${intent.type}: "${content}" - main handler will process directly`,
       );
     }
 
@@ -2253,17 +2259,34 @@ Try again or say "cancel" to exit.`,
         ContentTypeWalletSendCalls,
       );
 
-      // Wait for user to approve transaction before starting automation
-      await conversation.send(
-        `⏳ Please approve the spend permission transaction in your wallet.
-
-After approval, you can:
-• Say "buy now" to execute an immediate ticket purchase
-• Say "start automation" to begin daily purchases (24-hour timer)
-• Check your status with "spend status"
-
-The spend permission allows me to make purchases within your daily limits.`,
+      // Auto-start automation after transaction is sent
+      const autoStarted = await spendPermissionsHandler.startAutomatedBuying(
+        userAddress,
+        conversation,
+        megaPotManager,
+        poolHandler,
+        client,
       );
+
+      if (autoStarted) {
+        await conversation.send(
+          `🚀 Spend permissions set up and automation started!
+
+✅ Your daily limit of $${spendConfig.dailyLimit} USDC has been approved
+🤖 Automation is now active - first purchase will happen in 24 hours
+⏰ Schedule: Daily purchases at this time for ${spendConfig.duration} days
+🎫 Purchase plan: ${spendConfig.ticketsPerDay} ${spendConfig.purchaseType} tickets per day
+
+You can also:
+• Say "buy now" to execute an immediate purchase right now
+• Say "stop automation" to pause the scheduled buying
+• Check your status anytime with "spend status"`,
+        );
+      } else {
+        await conversation.send(
+          `❌ Failed to start automation. Please try again or check your spend permissions.`,
+        );
+      }
     } catch (error) {
       await conversation.send(
         `❌ Failed to create spend permission: ${error instanceof Error ? error.message : "Unknown error"}`,

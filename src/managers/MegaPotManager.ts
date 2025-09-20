@@ -277,9 +277,13 @@ export class MegaPotManager {
   ) {
     this.contractConfig = contractConfig;
 
+    // Check for paymaster configuration for gasless transactions
+    const paymasterUrl = process.env.PAYMASTER_URL;
+    const usePaymaster = !!paymasterUrl;
+
     this.client = createPublicClient({
       chain: base,
-      transport: http(rpcUrl),
+      transport: usePaymaster ? http(paymasterUrl) : http(rpcUrl),
     } as any);
 
     const account = privateKeyToAccount(walletKey);
@@ -287,10 +291,13 @@ export class MegaPotManager {
       this.wallet = createWalletClient({
         account,
         chain: base,
-        transport: http(rpcUrl),
+        transport: usePaymaster ? http(paymasterUrl) : http(rpcUrl),
       });
       console.log(
         `✅ MegaPotManager wallet initialized with address: ${this.wallet.account?.address}`,
+      );
+      console.log(
+        `💰 Gas sponsorship: ${usePaymaster ? "✅ Enabled (Paymaster)" : "❌ Disabled (User pays gas)"}`,
       );
     } catch (walletError) {
       console.error(
