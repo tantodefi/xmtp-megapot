@@ -868,11 +868,12 @@ Commands:
           errorMessage.includes("paymaster") ||
           errorMessage.includes("sponsoring") ||
           errorMessage.includes("approval failed") ||
-          errorMessage.includes("Purchase transaction failed")
+          errorMessage.includes("Purchase transaction failed") ||
+          errorMessage.includes("gas required exceeds allowance")
         ) {
           console.error(`❌ Paymaster issue detected: ${errorMessage}`);
           await conversation.send(
-            `❌ Automated purchase failed due to paymaster issue.\n\n🔧 **Paymaster Troubleshooting:**\n• Paymaster may not have sufficient funds\n• Paymaster URL may be incorrect\n• Paymaster may not be configured for this contract\n\n💡 **Manual Solution:**\nPlease try using "buy now" command to purchase tickets manually.\n\n📊 Error: ${errorMessage}`,
+            `❌ Automated purchase failed due to paymaster issue.\n\n🔧 **Paymaster Troubleshooting:**\n• Paymaster may not have sufficient funds\n• Paymaster may need contract allowlisting\n• Paymaster gas limits may be too low\n• Try using "buy now" command for manual purchase\n\n💡 **CDP Paymaster Setup:**\n1. Ensure your CDP paymaster has sufficient ETH/BASE tokens\n2. Add MegaPot contract to allowed contracts list\n3. Verify USDC contract is allowlisted\n\n📊 Error: ${errorMessage}`,
           );
         }
 

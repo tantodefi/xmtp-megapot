@@ -579,6 +579,9 @@ export class MegaPotManager {
           chain: base,
           to: usdcAddress,
           data: approveData,
+          gas: 100000n, // Set a reasonable gas limit for USDC approval
+          maxFeePerGas: 100000000n, // 0.1 gwei max fee
+          maxPriorityFeePerGas: 1000000n, // 0.001 gwei priority fee
         });
         console.log(`✅ USDC approval transaction: ${approveHash}`);
       } catch (approveError) {
@@ -594,7 +597,7 @@ export class MegaPotManager {
           totalCostUSDC: totalCostUSDC.toString(),
         });
         throw new Error(
-          `USDC approval failed. Paymaster may not be sponsoring transactions. Error: ${approveError instanceof Error ? approveError.message : String(approveError)}`,
+          `USDC approval failed. Paymaster may not be sponsoring transactions.\n\n🔧 CDP Paymaster Setup:\n1. Fund your paymaster with ETH/BASE tokens\n2. Add MegaPot contract (0xbEDd4F2beBE9E3E636161E644759f3cbe3d51B95) to allowlist\n3. Add USDC contract (0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) to allowlist\n4. Ensure paymaster has sufficient gas allowance\n\nOriginal error: ${approveError instanceof Error ? approveError.message : String(approveError)}`,
         );
       }
 
@@ -639,6 +642,9 @@ export class MegaPotManager {
             chain: base,
             to: contractAddress,
             data: purchaseData,
+            gas: 150000n, // Set a reasonable gas limit for MegaPot purchase
+            maxFeePerGas: 100000000n, // 0.1 gwei max fee
+            maxPriorityFeePerGas: 1000000n, // 0.001 gwei priority fee
           });
           purchaseHash = purchaseTx;
           referenceId = `megapot_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -657,7 +663,7 @@ export class MegaPotManager {
             totalCostUSDC: totalCostUSDC.toString(),
           });
           throw new Error(
-            `Purchase transaction failed. Paymaster may not be sponsoring transactions. Error: ${purchaseError instanceof Error ? purchaseError.message : String(purchaseError)}`,
+            `Purchase transaction failed. Paymaster may not be sponsoring transactions.\n\n🔧 CDP Paymaster Setup:\n1. Fund your paymaster with ETH/BASE tokens\n2. Add MegaPot contract (0xbEDd4F2beBE9E3E636161E644759f3cbe3d51B95) to allowlist\n3. Add USDC contract (0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) to allowlist\n4. Ensure paymaster has sufficient gas allowance\n\nOriginal error: ${purchaseError instanceof Error ? purchaseError.message : String(purchaseError)}`,
           );
         }
       } catch (error) {
