@@ -281,6 +281,9 @@ export class MegaPotManager {
     const paymasterUrl = process.env.PAYMASTER_URL;
     const usePaymaster = !!paymasterUrl;
 
+    console.log(`🔍 Paymaster URL: ${paymasterUrl || "Not set"}`);
+    console.log(`💰 Using paymaster: ${usePaymaster}`);
+
     this.client = createPublicClient({
       chain: base,
       transport: usePaymaster ? http(paymasterUrl) : http(rpcUrl),
@@ -570,14 +573,30 @@ export class MegaPotManager {
         [contractAddress, totalCostUSDC],
       );
 
-      const approveHash = await this.wallet.sendTransaction({
-        account: this.wallet.account!,
-        chain: base,
-        to: usdcAddress,
-        data: approveData,
-      });
-
-      console.log(`✅ USDC approval transaction: ${approveHash}`);
+      try {
+        const approveHash = await this.wallet.sendTransaction({
+          account: this.wallet.account!,
+          chain: base,
+          to: usdcAddress,
+          data: approveData,
+        });
+        console.log(`✅ USDC approval transaction: ${approveHash}`);
+      } catch (approveError) {
+        console.error(`❌ USDC approval failed:`, approveError);
+        console.error(`❌ Approval error details:`, {
+          error:
+            approveError instanceof Error
+              ? approveError.message
+              : String(approveError),
+          paymasterUrl: process.env.PAYMASTER_URL ? "Set" : "Not set",
+          walletAddress: this.wallet.account?.address,
+          usdcAddress,
+          totalCostUSDC: totalCostUSDC.toString(),
+        });
+        throw new Error(
+          `USDC approval failed. Paymaster may not be sponsoring transactions. Error: ${approveError instanceof Error ? approveError.message : String(approveError)}`,
+        );
+      }
 
       // Wait a moment for approval to be mined
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -614,16 +633,33 @@ export class MegaPotManager {
           ],
         );
 
-        const purchaseTx = await this.wallet.sendTransaction({
-          account: this.wallet.account!,
-          chain: base,
-          to: contractAddress,
-          data: purchaseData,
-        });
-        purchaseHash = purchaseTx;
-        referenceId = `megapot_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        console.log(`✅ Purchase transaction sent: ${purchaseHash}`);
-        console.log(`📋 Reference ID: ${referenceId}`);
+        try {
+          const purchaseTx = await this.wallet.sendTransaction({
+            account: this.wallet.account!,
+            chain: base,
+            to: contractAddress,
+            data: purchaseData,
+          });
+          purchaseHash = purchaseTx;
+          referenceId = `megapot_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          console.log(`✅ Purchase transaction sent: ${purchaseHash}`);
+          console.log(`📋 Reference ID: ${referenceId}`);
+        } catch (purchaseError) {
+          console.error(`❌ Purchase transaction failed:`, purchaseError);
+          console.error(`❌ Purchase error details:`, {
+            error:
+              purchaseError instanceof Error
+                ? purchaseError.message
+                : String(purchaseError),
+            paymasterUrl: process.env.PAYMASTER_URL ? "Set" : "Not set",
+            walletAddress: this.wallet.account?.address,
+            contractAddress,
+            totalCostUSDC: totalCostUSDC.toString(),
+          });
+          throw new Error(
+            `Purchase transaction failed. Paymaster may not be sponsoring transactions. Error: ${purchaseError instanceof Error ? purchaseError.message : String(purchaseError)}`,
+          );
+        }
       } catch (error) {
         console.error(`❌ Purchase transaction failed:`, error);
         throw new Error(

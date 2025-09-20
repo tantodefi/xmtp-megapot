@@ -856,10 +856,26 @@ Commands:
 
         return txHash;
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         console.error(
           `Error executing ${purchaseType} purchase directly:`,
           error,
         );
+
+        // Check if it's a paymaster-related error
+        if (
+          errorMessage.includes("paymaster") ||
+          errorMessage.includes("sponsoring") ||
+          errorMessage.includes("approval failed") ||
+          errorMessage.includes("Purchase transaction failed")
+        ) {
+          console.error(`❌ Paymaster issue detected: ${errorMessage}`);
+          await conversation.send(
+            `❌ Automated purchase failed due to paymaster issue.\n\n🔧 **Paymaster Troubleshooting:**\n• Paymaster may not have sufficient funds\n• Paymaster URL may be incorrect\n• Paymaster may not be configured for this contract\n\n💡 **Manual Solution:**\nPlease try using "buy now" command to purchase tickets manually.\n\n📊 Error: ${errorMessage}`,
+          );
+        }
+
         throw error;
       }
     } catch (error) {
