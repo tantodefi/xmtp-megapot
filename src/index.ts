@@ -714,15 +714,21 @@ async function handleSmartTextMessage(
       `🎯 AI detected intent: ${intent.type} (confidence: ${intent.confidence})`,
     );
 
-    // Send the AI-generated response (skip for standalone numbers that need solo/pool choice)
+    // Send the AI-generated response (skip for standalone numbers and spend permissions)
     const isStandaloneNumber =
       /^\d+$/.test(content.trim()) ||
       /^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)$/i.test(
         content.trim(),
       );
 
-    if (!isStandaloneNumber) {
+    const isSpendPermission = intent.type === "setup_spend_permission";
+
+    if (!isStandaloneNumber && !isSpendPermission) {
       await conversation.send(intent.response);
+    } else if (isSpendPermission) {
+      console.log(
+        `🔇 Skipping AI response for spend permission: "${content}" - main handler will process directly`,
+      );
     } else {
       console.log(
         `🔇 Skipping AI response for standalone number: "${content}" - main handler will ask for solo/pool choice`,
@@ -2205,21 +2211,15 @@ Try again or say "cancel" to exit.`,
         purchaseDescription = `${spendConfig.ticketsPerDay} ${spendConfig.purchaseType} tickets daily`;
       }
 
-      // Send the spend permission transaction
+      // Send one clean message with transaction
       await conversation.send(
-        `🔐 Automated MegaPot Setup
+        `🤖 Automated MegaPot: ${purchaseDescription} for ${spendConfig.duration} days
 
-📋 Configuration:
-• ${purchaseDescription} for ${spendConfig.duration} days
-• Daily limit: $${spendConfig.dailyLimit} USDC  
-• Total budget: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)} USDC
+💰 Total: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)} USDC (${spendConfig.duration} days × $${spendConfig.dailyLimit}/day)
+🎫 Includes: First ticket purchase + automation setup
+⏰ Schedule: Daily purchases at this time
 
-🔑 What you're approving:
-• USDC spending permission for automated purchases
-• First ticket purchase (Day 1) - immediate
-• Automation starts automatically after approval
-
-✅ Please approve the transaction in your wallet.`,
+✅ Approve transaction to start automated buying`,
       );
 
       // Send the actual transaction
@@ -2237,23 +2237,15 @@ Try again or say "cancel" to exit.`,
         client,
       );
 
-      await conversation.send(
-        `🎯 Setup Complete!
-
-✅ Transaction sent with:
-• USDC approval for automated spending
-• USDC approval + first ticket purchase (Day 1)
-• ${autoStarted ? "✅ Automation started automatically" : "❌ Automation failed to start"}
-
-📅 Schedule:
-• Day 1: First ticket (included in transaction)
-• Days 2-${spendConfig.duration}: Automatic daily purchases at this time
-
-💡 Available commands:
-• "spend status" - Check automation status
-• "stop automation" - Pause daily buying
-• "revoke permissions" - Remove all permissions`,
-      );
+      if (autoStarted) {
+        await conversation.send(
+          `✅ Automation active! Next purchase in 24 hours. Commands: "spend status" | "stop automation"`,
+        );
+      } else {
+        await conversation.send(
+          `⚠️ Transaction sent but automation failed to start. Say "start automation" manually.`,
+        );
+      }
     } catch (error) {
       await conversation.send(
         `❌ Failed to create spend permission: ${error instanceof Error ? error.message : "Unknown error"}`,

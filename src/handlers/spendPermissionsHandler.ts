@@ -300,11 +300,9 @@ Commands:
 
             try {
               // Execute real solo purchase through MegaPotManager
-              const soloTx = await megaPotManager.preparePurchaseTransaction(
-                userAddress,
+              const soloTx = await megaPotManager.prepareTicketPurchase(
                 soloTickets,
-                conversation,
-                client,
+                userAddress,
               );
 
               // Execute via spend permission with real transaction
@@ -381,11 +379,9 @@ Commands:
           try {
             if (purchaseType === "solo" && megaPotManager && client) {
               // Execute real solo purchase
-              const soloTx = await megaPotManager.preparePurchaseTransaction(
-                userAddress,
+              const soloTx = await megaPotManager.prepareTicketPurchase(
                 ticketCount,
-                conversation,
-                client,
+                userAddress,
               );
 
               await this.executeSpendCalls(

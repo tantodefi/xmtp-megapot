@@ -396,18 +396,19 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     const lowerMessage = originalMessage.toLowerCase();
 
     // Check for spend permission patterns FIRST (highest priority)
-    const spendConfigPattern = /\$\d+.*(?:day|daily).*\d+\s*days?/i;
+    const spendConfigPattern =
+      /\$?\d+\$?.*(?:day|daily|every\s+day).*\d+\s*days?/i;
     const buyTicketsPattern = /buy\s+\d+.*(?:ticket|for).*\d+\s*days?/i;
     const ticketsPerDayPattern =
-      /\d+.*ticket.*(?:day|daily).*(?:for|next).*\d+\s*days?/i;
+      /\d+.*ticket.*(?:day|daily|every\s+day).*(?:for|next).*\d+\s*days?/i;
     const automatedBuyingPattern =
-      /buy.*(?:ticket|solo|pool).*(?:day|daily).*\d+\s*days?/i;
+      /buy.*(?:ticket|solo|pool).*(?:day|daily|every\s+day).*\d+\s*days?/i;
     const dailyTicketPattern =
-      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:a\s+)?(?:day|daily)\s+for\s+\d+\s*days?/i;
+      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:a\s+)?(?:day|daily|every\s+day)\s+for\s+\d+\s*days?/i;
     const scheduledBuyPattern =
-      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+\d+\s*days?/i;
-    const scheduledBuyPattern2 =
-      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next)\s+(?:the\s+)?(?:next\s+)?\d+\s*days?/i;
+      /(?:buy|get)\s+(?:a|one|\d+)\s+(?:solo|pool)?\s*tickets?\s+(?:for|over|next|the\s+next)\s+\d+\s*days?/i;
+    const dollarAmountPattern =
+      /\$?\d+\$?\s*(?:every\s+day|per\s+day|daily)\s+for\s+\d+\s*days?/i;
 
     // Check for spend permission patterns first
     if (
@@ -417,7 +418,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       automatedBuyingPattern.test(lowerMessage) ||
       dailyTicketPattern.test(lowerMessage) ||
       scheduledBuyPattern.test(lowerMessage) ||
-      scheduledBuyPattern2.test(lowerMessage)
+      dollarAmountPattern.test(lowerMessage)
     ) {
       // Extract ticket count and duration
       const ticketMatch = lowerMessage.match(
