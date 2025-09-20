@@ -204,7 +204,7 @@ Commands:
     conversation: Conversation,
     megaPotManager?: any,
     poolHandler?: any,
-    agent?: any,
+    client?: any,
   ): Promise<boolean> {
     const config = this.userConfigs.get(userAddress);
     if (!config) {
@@ -240,7 +240,7 @@ Commands:
           const soloTickets = config.soloTicketsPerDay || 0;
           const poolTickets = config.poolTicketsPerDay || 0;
 
-          if (soloTickets > 0 && megaPotManager && agent) {
+          if (soloTickets > 0 && megaPotManager && client) {
             await conversation.send(
               `🤖 Automated Purchase (Solo): Buying ${soloTickets} solo tickets for $${soloTickets}`,
             );
@@ -251,7 +251,7 @@ Commands:
                 userAddress,
                 soloTickets,
                 conversation,
-                agent.client,
+                client,
               );
 
               // Execute via spend permission with real transaction
@@ -326,13 +326,13 @@ Commands:
           );
 
           try {
-            if (purchaseType === "solo" && megaPotManager && agent) {
+            if (purchaseType === "solo" && megaPotManager && client) {
               // Execute real solo purchase
               const soloTx = await megaPotManager.preparePurchaseTransaction(
                 userAddress,
                 ticketCount,
                 conversation,
-                agent.client,
+                client,
               );
 
               await this.executeSpendCalls(

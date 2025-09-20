@@ -1,4 +1,4 @@
-import { Agent, f, withFilter } from "@xmtp/agent-sdk";
+// Removed Agent import - using direct Client instead
 import {
   ContentTypeReaction,
   ReactionCodec,
@@ -10,7 +10,13 @@ import {
   WalletSendCallsCodec,
   type WalletSendCallsParams,
 } from "@xmtp/content-type-wallet-send-calls";
-import { Group, Signer, type Conversation } from "@xmtp/node-sdk";
+import {
+  Client,
+  Group,
+  Signer,
+  type Conversation,
+  type XmtpEnv,
+} from "@xmtp/node-sdk";
 import { createWalletClient, http, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -231,11 +237,12 @@ async function main() {
     console.log(`📁 Created database directory: ${dbDir}`);
   }
 
-  let agent;
+  let client;
   try {
-    agent = await Agent.create(signer as any, {
-      env: XMTP_ENV as "dev" | "production",
+    client = await Client.create(signer, {
+      env: XMTP_ENV as XmtpEnv,
       dbPath: dbPath, // Use persistent database
+      dbEncryptionKey: Buffer.from(ENCRYPTION_KEY!, "hex"),
       codecs: [
         new ReactionCodec(),
         new RemoteAttachmentCodec(),
@@ -283,8 +290,8 @@ async function main() {
     }
   }
 
-  console.log("✅ Agent created successfully!");
-  console.log(`🔗 Agent inbox: ${agent.client.inboxId}`);
+  console.log("✅ Client created successfully!");
+  console.log(`🔗 Client inbox: ${client.inboxId}`);
 
   // Initialize spend permissions handler after agent is created
   // Use a placeholder address for demo - in production this would be the agent's wallet address
@@ -297,9 +304,7 @@ async function main() {
   );
 
   console.log("\n💬 Smart MegaPot Agent is running!");
-  console.log(
-    `📝 Send messages to: http://xmtp.chat/dm/${agent.client.inboxId}`,
-  );
+  console.log(`📝 Send messages to: http://xmtp.chat/dm/${client.inboxId}`);
   console.log("\n🤖 Smart features enabled:");
   console.log("• AI-powered message understanding");
   console.log("• Contextual lottery information");
@@ -311,14 +316,9 @@ async function main() {
   console.log("🎧 Setting up message streaming...");
 
   try {
-    // Start the agent first to ensure proper initialization
-    console.log("🚀 Starting XMTP agent...");
-    await agent.start();
-    console.log("✅ Agent started successfully!");
-
-    // Sync conversations after agent is started
+    // Sync conversations first
     console.log("🔄 Syncing conversations...");
-    await agent.client.conversations.sync();
+    await client.conversations.sync();
     console.log("✅ Conversations synced successfully!");
 
     // Start cleanup timer for old pools
@@ -331,7 +331,7 @@ async function main() {
 
     // Start the message stream
     console.log("📡 Starting message stream...");
-    const stream = await agent.client.conversations.streamAllMessages();
+    const stream = await client.conversations.streamAllMessages();
 
     console.log("🎧 Message stream started successfully!");
 
@@ -339,12 +339,17 @@ async function main() {
     (async () => {
       for await (const message of stream) {
         try {
+          if (!message) {
+            console.log("🚫 Skipping null message");
+            continue;
+          }
+
           console.log(
             `🔍 NEW MESSAGE: "${message.content || "undefined"}" from ${message.senderInboxId} (type: ${message.contentType?.typeId || "unknown"})`,
           );
 
           // Skip if it's from ourselves
-          if (message.senderInboxId === agent.client.inboxId) {
+          if (message.senderInboxId === client.inboxId) {
             console.log("🚫 Skipping message from self");
             continue;
           }
@@ -357,10 +362,9 @@ async function main() {
           processedMessages.add(message.id);
 
           // Get the conversation for responding first
-          const conversation =
-            await agent.client.conversations.getConversationById(
-              message.conversationId,
-            );
+          const conversation = await client.conversations.getConversationById(
+            message.conversationId,
+          );
           if (!conversation) {
             console.log("🚫 Could not find conversation for message");
             continue;
@@ -392,10 +396,9 @@ async function main() {
           // Get user address for context
           let userAddress: string | undefined;
           try {
-            const inboxState =
-              await agent.client.preferences.inboxStateFromInboxIds([
-                message.senderInboxId,
-              ]);
+            const inboxState = await client.preferences.inboxStateFromInboxIds([
+              message.senderInboxId,
+            ]);
             const userIdentifier = inboxState[0]?.identifiers?.find(
               (id: any) => id.identifierKind === 0,
             );
@@ -435,7 +438,7 @@ async function main() {
               smartHandler,
               poolHandler,
               megaPotManager,
-              agent,
+              client,
               correctedIsGroupChat,
               userAddress,
               spendPermissionsHandler,
@@ -452,7 +455,7 @@ async function main() {
                 intentContent,
                 conversation,
                 megaPotManager,
-                agent,
+                client,
                 smartHandler,
                 poolHandler,
                 correctedIsGroupChat,
@@ -469,12 +472,14 @@ async function main() {
           }
         } catch (error) {
           console.error("❌ Error processing message:", error);
-          console.error("❌ Message details:", {
-            senderInboxId: message.senderInboxId,
-            conversationId: message.conversationId,
-            contentType: message.contentType?.typeId,
-            content: message.content,
-          });
+          if (message) {
+            console.error("❌ Message details:", {
+              senderInboxId: message.senderInboxId,
+              conversationId: message.conversationId,
+              contentType: message.contentType?.typeId,
+              content: message.content,
+            });
+          }
           // Continue processing other messages even if one fails
         }
       }
@@ -500,7 +505,7 @@ async function main() {
     console.log("\n🛑 Shutting down Smart MegaPot Agent...");
     try {
       megaPotManager.cleanup();
-      await agent.stop();
+      // Note: Client doesn't have a stop() method like Agent
     } catch (error) {
       console.error("❌ Error during shutdown:", error);
     }
@@ -525,7 +530,7 @@ async function handleSmartTextMessage(
   smartHandler: SmartHandler,
   poolHandler: PoolHandler,
   megaPotManager: MegaPotManager,
-  agent: any,
+  client: any,
   isGroupChat: boolean,
   userAddress?: string,
   spendPermissionsHandler?: SpendPermissionsHandler,
@@ -679,7 +684,7 @@ async function handleSmartTextMessage(
             userAddress,
             numTickets,
             conversation,
-            agent.client,
+            client,
           );
 
           await conversation.send(poolResult.message);
@@ -849,7 +854,7 @@ async function handleSmartTextMessage(
               userAddress,
               poolTicketCount,
               conversation,
-              agent.client,
+              client,
             );
             await conversation.send(poolResult.message);
             if (poolResult.success && poolResult.transactionData) {
@@ -875,7 +880,7 @@ async function handleSmartTextMessage(
               userAddress,
               conversation,
               megaPotManager,
-              agent,
+              client,
             );
           }
           // Clear the pending confirmation
@@ -933,7 +938,7 @@ async function handleSmartTextMessage(
             userAddress,
             conversation,
             megaPotManager,
-            agent,
+            client,
           );
           return;
         }
@@ -982,7 +987,7 @@ async function handleSmartTextMessage(
             userAddress,
             conversation,
             megaPotManager,
-            agent,
+            client,
           );
         } else if (intent.extractedData?.ticketCount) {
           console.log(
@@ -1053,7 +1058,7 @@ async function handleSmartTextMessage(
           userAddress || "",
           conversation,
           megaPotManager,
-          agent,
+          client,
         );
         break;
 
@@ -1109,7 +1114,7 @@ async function handleSmartTextMessage(
             userAddress,
             intent.extractedData.ticketCount,
             conversation,
-            agent.client,
+            client,
           );
 
           await conversation.send(poolResult.message);
@@ -1337,7 +1342,7 @@ async function handleSmartTextMessage(
             conversation,
             megaPotManager,
             poolHandler,
-            agent,
+            client,
           );
           if (!started) {
             await conversation.send(
@@ -1423,7 +1428,7 @@ async function handleIntentMessage(
   intentContent: IntentContent,
   conversation: any,
   megaPotManager: MegaPotManager,
-  agent: any,
+  client: any,
   smartHandler: SmartHandler,
   poolHandler: PoolHandler,
   isGroupChat: boolean,
@@ -1434,7 +1439,7 @@ async function handleIntentMessage(
 
   try {
     // Get the user's Ethereum address from their inbox ID
-    const inboxState = await agent.client.preferences.inboxStateFromInboxIds([
+    const inboxState = await client.preferences.inboxStateFromInboxIds([
       message.senderInboxId,
     ]);
 
@@ -1515,7 +1520,7 @@ async function handleIntentMessage(
           userAddress,
           conversation,
           megaPotManager,
-          agent,
+          client,
         );
         break;
       case "jackpot-info":
@@ -1554,7 +1559,7 @@ async function handleTicketPurchaseIntent(
   userAddress: string,
   conversation: any,
   megaPotManager: MegaPotManager,
-  agent: any,
+  client: any,
 ) {
   try {
     console.log(
@@ -1638,7 +1643,7 @@ async function handleStatsIntent(
   userAddress: string,
   conversation: any,
   megaPotManager: MegaPotManager,
-  agent: any,
+  client: any,
 ) {
   try {
     const stats = await megaPotManager.getStats(userAddress);
