@@ -286,7 +286,7 @@ Commands:
               );
 
               // Execute via spend permission with real transaction
-              await this.executeSpendCalls(
+              const txHash = await this.executeSpendCalls(
                 soloTx,
                 conversation,
                 userAddress,
@@ -294,19 +294,17 @@ Commands:
                 soloTickets,
               );
 
-              // Send confirmation with transaction reference and receipt link
-              const txHash = soloTx.referenceId || "Processing...";
+              // Send confirmation with receipt link
               await conversation.send(
                 `✅ Solo Purchase Completed!
 🎫 ${soloTickets} ticket${soloTickets > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${soloTickets}
-🔗 Transaction: ${txHash}
 📊 Receipt: ${getBasescanTxLink(txHash)}
 ⏰ Next automated purchase in 24 hours`,
               );
 
               console.log(
-                `🎫 Solo purchase executed: ${soloTickets} tickets for ${userAddress} (ref: ${soloTx.referenceId})`,
+                `🎫 Solo purchase executed: ${soloTickets} tickets for ${userAddress} (tx: ${txHash})`,
               );
             } catch (error) {
               console.error("Solo purchase failed:", error);
@@ -331,7 +329,7 @@ Commands:
 
               // Execute via spend permission with real transaction
               if (poolResult.transaction) {
-                await this.executeSpendCalls(
+                const txHash = await this.executeSpendCalls(
                   poolResult.transaction,
                   conversation,
                   userAddress,
@@ -339,21 +337,19 @@ Commands:
                   poolTickets,
                 );
 
-                // Send confirmation with transaction reference and receipt link
-                const txHash = poolResult.referenceId || "Processing...";
+                // Send confirmation with receipt link
                 await conversation.send(
                   `✅ Pool Purchase Completed!
 🏊 ${poolTickets} pool ticket${poolTickets > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${poolTickets}
-🔗 Transaction: ${txHash}
 📊 Receipt: ${getBasescanTxLink(txHash)}
 ⏰ Next automated purchase in 24 hours`,
                 );
-              }
 
-              console.log(
-                `🏊 Pool purchase executed: ${poolTickets} tickets for ${userAddress}`,
-              );
+                console.log(
+                  `🏊 Pool purchase executed: ${poolTickets} tickets for ${userAddress} (tx: ${txHash})`,
+                );
+              }
             } catch (error) {
               console.error("Pool purchase failed:", error);
               await conversation.send(
@@ -386,7 +382,7 @@ Commands:
                 userAddress,
               );
 
-              await this.executeSpendCalls(
+              const txHash = await this.executeSpendCalls(
                 soloTx,
                 conversation,
                 userAddress,
@@ -394,19 +390,17 @@ Commands:
                 ticketCount,
               );
 
-              // Send confirmation with transaction reference and receipt link
-              const txHash = soloTx.referenceId || "Processing...";
+              // Send confirmation with receipt link
               await conversation.send(
                 `✅ ${purchaseType === "solo" ? "Solo" : "Pool"} Purchase Completed!
 🎫 ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${ticketCount}
-🔗 Transaction: ${txHash}
 📊 Receipt: ${getBasescanTxLink(txHash)}
 ⏰ Next automated purchase in 24 hours`,
               );
 
               console.log(
-                `🎫 Solo purchase executed: ${ticketCount} tickets for ${userAddress} (ref: ${soloTx.referenceId})`,
+                `🎫 ${purchaseType === "solo" ? "Solo" : "Pool"} purchase executed: ${ticketCount} tickets for ${userAddress} (tx: ${txHash})`,
               );
             } else if (purchaseType === "pool" && poolHandler) {
               // Execute real pool purchase
@@ -417,7 +411,7 @@ Commands:
               );
 
               if (poolResult.transaction) {
-                await this.executeSpendCalls(
+                const txHash = await this.executeSpendCalls(
                   poolResult.transaction,
                   conversation,
                   userAddress,
@@ -425,21 +419,19 @@ Commands:
                   ticketCount,
                 );
 
-                // Send confirmation with transaction reference and receipt link
-                const txHash = poolResult.referenceId || "Processing...";
+                // Send confirmation with receipt link
                 await conversation.send(
                   `✅ Pool Purchase Completed!
 🏊 ${ticketCount} pool ticket${ticketCount > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${ticketCount}
-🔗 Transaction: ${txHash}
 📊 Receipt: ${getBasescanTxLink(txHash)}
 ⏰ Next automated purchase in 24 hours`,
                 );
-              }
 
-              console.log(
-                `🏊 Pool purchase executed: ${ticketCount} tickets for ${userAddress}`,
-              );
+                console.log(
+                  `🏊 Pool purchase executed: ${ticketCount} tickets for ${userAddress} (tx: ${txHash})`,
+                );
+              }
             }
           } catch (error) {
             console.error("Automated purchase failed:", error);
@@ -532,7 +524,7 @@ Commands:
                   userAddress,
                 );
 
-                await this.executeSpendCalls(
+                const txHash = await this.executeSpendCalls(
                   soloTx,
                   conversation,
                   userAddress,
@@ -540,19 +532,17 @@ Commands:
                   soloTickets,
                 );
 
-                // Send confirmation with transaction reference and receipt link
-                const txHash = soloTx.referenceId || "Processing...";
+                // Send confirmation with receipt link
                 await conversation.send(
                   `✅ Solo Purchase Completed!
 🎫 ${soloTickets} ticket${soloTickets > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${soloTickets}
-🔗 Transaction: ${txHash}
 📊 Receipt: ${getBasescanTxLink(txHash)}
 🤖 Automation is still active - next purchase in 24 hours`,
                 );
 
                 console.log(
-                  `🎫 Solo purchase executed: ${soloTickets} tickets for ${userAddress} (ref: ${soloTx.referenceId})`,
+                  `🎫 Solo purchase executed: ${soloTickets} tickets for ${userAddress} (tx: ${txHash})`,
                 );
               } catch (error) {
                 console.error("Solo purchase failed:", error);
@@ -576,7 +566,7 @@ Commands:
                   );
 
                 if (poolResult.transaction) {
-                  await this.executeSpendCalls(
+                  const txHash = await this.executeSpendCalls(
                     poolResult.transaction,
                     conversation,
                     userAddress,
@@ -584,21 +574,19 @@ Commands:
                     poolTickets,
                   );
 
-                  // Send confirmation with transaction reference and receipt link
-                  const txHash = poolResult.referenceId || "Processing...";
+                  // Send confirmation with receipt link
                   await conversation.send(
                     `✅ Pool Purchase Completed!
 🏊 ${poolTickets} pool ticket${poolTickets > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${poolTickets}
-🔗 Transaction: ${txHash}
 📊 Receipt: ${getBasescanTxLink(txHash)}
 🤖 Automation is still active - next purchase in 24 hours`,
                   );
-                }
 
-                console.log(
-                  `🏊 Pool purchase executed: ${poolTickets} tickets for ${userAddress}`,
-                );
+                  console.log(
+                    `🏊 Pool purchase executed: ${poolTickets} tickets for ${userAddress} (tx: ${txHash})`,
+                  );
+                }
               } catch (error) {
                 console.error("Pool purchase failed:", error);
                 await conversation.send(
@@ -629,7 +617,7 @@ Commands:
                   userAddress,
                 );
 
-                await this.executeSpendCalls(
+                const txHash = await this.executeSpendCalls(
                   soloTx,
                   conversation,
                   userAddress,
@@ -637,19 +625,17 @@ Commands:
                   ticketCount,
                 );
 
-                // Send confirmation with transaction reference and receipt link
-                const txHash = soloTx.referenceId || "Processing...";
+                // Send confirmation with receipt link
                 await conversation.send(
                   `✅ ${purchaseType === "solo" ? "Solo" : "Pool"} Purchase Completed!
 🎫 ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${ticketCount}
-🔗 Transaction: ${txHash}
 📊 Receipt: ${getBasescanTxLink(txHash)}
 🤖 Automation is still active - next purchase in 24 hours`,
                 );
 
                 console.log(
-                  `🎫 Solo purchase executed: ${ticketCount} tickets for ${userAddress} (ref: ${soloTx.referenceId})`,
+                  `🎫 ${purchaseType === "solo" ? "Solo" : "Pool"} purchase executed: ${ticketCount} tickets for ${userAddress} (tx: ${txHash})`,
                 );
               } else if (purchaseType === "pool" && poolHandler) {
                 const poolResult =
@@ -660,7 +646,7 @@ Commands:
                   );
 
                 if (poolResult.transaction) {
-                  await this.executeSpendCalls(
+                  const txHash = await this.executeSpendCalls(
                     poolResult.transaction,
                     conversation,
                     userAddress,
@@ -668,21 +654,19 @@ Commands:
                     ticketCount,
                   );
 
-                  // Send confirmation with transaction reference and receipt link
-                  const txHash = poolResult.referenceId || "Processing...";
+                  // Send confirmation with receipt link
                   await conversation.send(
                     `✅ Pool Purchase Completed!
 🏊 ${ticketCount} pool ticket${ticketCount > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${ticketCount}
-🔗 Transaction: ${txHash}
 📊 Receipt: ${getBasescanTxLink(txHash)}
 🤖 Automation is still active - next purchase in 24 hours`,
                   );
-                }
 
-                console.log(
-                  `🏊 Pool purchase executed: ${ticketCount} tickets for ${userAddress}`,
-                );
+                  console.log(
+                    `🏊 Pool purchase executed: ${ticketCount} tickets for ${userAddress} (tx: ${txHash})`,
+                  );
+                }
               }
             } catch (error) {
               console.error("Immediate purchase failed:", error);
@@ -743,20 +727,22 @@ Commands:
     userAddress: string,
     purchaseType: "solo" | "pool",
     ticketCount: number,
-  ): Promise<void> {
+  ): Promise<string> {
     try {
       let walletSendCalls: any;
+      let referenceId: string;
 
       // Check if this is from MegaPotManager (has approveCall and purchaseCall)
       if (transaction.approveCall && transaction.purchaseCall) {
         // Format MegaPotManager transaction for wallet send calls
+        referenceId =
+          transaction.referenceId || `megapot_purchase_${Date.now()}`;
         walletSendCalls = {
           version: "1.0",
           chainId: "0x2105", // Base mainnet
           from: userAddress as `0x${string}`,
           capabilities: {
-            reference:
-              transaction.referenceId || `megapot_purchase_${Date.now()}`,
+            reference: referenceId,
             app: "MegaPot",
             icon: "https://megapot.io/favicon.ico",
             domain: "megapot.io",
@@ -770,6 +756,9 @@ Commands:
         };
       } else {
         // Use transaction as-is (for pool handler or other cases)
+        referenceId =
+          transaction.capabilities?.reference ||
+          `megapot_purchase_${Date.now()}`;
         walletSendCalls = transaction;
       }
 
@@ -780,8 +769,11 @@ Commands:
       this.setLastPurchaseType(userAddress, purchaseType);
 
       console.log(
-        `✅ ${purchaseType} purchase transaction sent: ${ticketCount} tickets for ${userAddress} (tx: ${walletSendCalls.capabilities?.reference})`,
+        `✅ ${purchaseType} purchase transaction sent: ${ticketCount} tickets for ${userAddress} (ref: ${referenceId})`,
       );
+
+      // Return the reference ID for use in confirmation messages
+      return referenceId;
     } catch (error) {
       console.error("Error executing spend calls:", error);
       throw error;

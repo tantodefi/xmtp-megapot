@@ -2273,7 +2273,7 @@ Try again or say "cancel" to exit.`,
           `🚀 Spend permissions set up and automation started!
 
 ✅ Your daily limit of $${spendConfig.dailyLimit} USDC has been approved
-🤖 Automation is now active - first purchase will happen in 24 hours
+🤖 Automation is now active - first purchase completed immediately
 ⏰ Schedule: Daily purchases at this time for ${spendConfig.duration} days
 🎫 Purchase plan: ${spendConfig.ticketsPerDay} ${spendConfig.purchaseType} tickets per day
 
