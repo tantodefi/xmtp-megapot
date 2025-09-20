@@ -252,6 +252,58 @@ Commands:
 
     const intervalMs = 24 * 60 * 60 * 1000; // 24 hours
 
+    // Set up timer to check for approval and execute first purchase
+    const checkInterval = 30 * 1000; // Check every 30 seconds
+    const maxWaitTime = 5 * 60 * 1000; // Max wait time: 5 minutes
+    let elapsedTime = 0;
+
+    const checkForApproval = async () => {
+      elapsedTime += checkInterval;
+
+      const { hasPermission } = await this.hasActiveSpendPermission(
+        userAddress,
+        config.ticketsPerDay,
+      );
+
+      if (hasPermission) {
+        // Permission approved! Execute first purchase and start timer
+        await conversation.send(
+          "🎯 Executing first automated purchase to verify everything works...",
+        );
+
+        try {
+          await automatedPurchase();
+
+          // Start the timer for subsequent purchases
+          const timer = setInterval(automatedPurchase, intervalMs);
+          this.automationTimers.set(userAddress, timer);
+
+          await conversation.send(
+            "✅ Automated buying activated!\n\n🎫 First purchase completed successfully\n🤖 Daily purchases scheduled every 24 hours\n⏰ Next purchase tomorrow at this time\n\n📊 Check status anytime with 'spend status'",
+          );
+          return true;
+        } catch (error) {
+          console.error("Error in first automated purchase:", error);
+          await conversation.send(
+            "❌ Failed to execute first automated purchase. Please check your spend permissions.",
+          );
+          return false;
+        }
+      } else if (elapsedTime >= maxWaitTime) {
+        // Max wait time reached, stop checking
+        await conversation.send(
+          "⏰ Wait time exceeded. Please approve the spend permission transaction and use 'start automation' to begin purchases.",
+        );
+        return false;
+      } else {
+        // Still waiting, check again
+        console.log(
+          `⏳ Waiting for spend permission approval for user ${userAddress.slice(0, 8)}... (${elapsedTime / 1000}s elapsed)`,
+        );
+        setTimeout(checkForApproval, checkInterval);
+      }
+    };
+
     const automatedPurchase = async () => {
       try {
         const { hasPermission, permission, remainingSpend } =
@@ -445,34 +497,14 @@ Commands:
       }
     };
 
-    // Start the timer
-    const timer = setInterval(automatedPurchase, intervalMs);
-    this.automationTimers.set(userAddress, timer);
-
-    // Execute first purchase immediately to test the system
+    // Start the approval check timer
     await conversation.send(
-      "🎯 Executing first automated purchase to verify everything works...",
+      "⏳ Please approve the spend permission transaction in your wallet.\n\nAfter approval:\n• First purchase will be executed automatically\n• Automation will be activated\n• Daily purchases will start immediately\n\nNo additional transaction approvals needed!",
     );
 
-    try {
-      // Execute the first purchase immediately
-      await automatedPurchase();
-
-      // Start the timer for subsequent purchases
-      const timer = setInterval(automatedPurchase, intervalMs);
-      this.automationTimers.set(userAddress, timer);
-
-      await conversation.send(
-        "✅ Automated buying activated!\n\n🎫 First purchase completed successfully\n🤖 Daily purchases scheduled every 24 hours\n⏰ Next purchase tomorrow at this time\n\n📊 Check status anytime with 'spend status'",
-      );
-      return true;
-    } catch (error) {
-      console.error("Error in first automated purchase:", error);
-      await conversation.send(
-        "❌ Failed to execute first automated purchase. Please check your spend permissions.",
-      );
-      return false;
-    }
+    // Start the approval check timer
+    setTimeout(checkForApproval, checkInterval);
+    return true;
   }
 
   /**

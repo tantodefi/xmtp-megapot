@@ -2259,7 +2259,7 @@ Try again or say "cancel" to exit.`,
         ContentTypeWalletSendCalls,
       );
 
-      // Auto-start automation after transaction is sent
+      // Auto-start automation after transaction is sent (will wait for approval)
       const autoStarted = await spendPermissionsHandler.startAutomatedBuying(
         userAddress,
         conversation,
@@ -2269,18 +2269,9 @@ Try again or say "cancel" to exit.`,
       );
 
       if (autoStarted) {
-        await conversation.send(
-          `🚀 Spend permissions set up and automation started!
-
-✅ Your daily limit of $${spendConfig.dailyLimit} USDC has been approved
-🤖 Automation is now active - first purchase completed immediately
-⏰ Schedule: Daily purchases at this time for ${spendConfig.duration} days
-🎫 Purchase plan: ${spendConfig.ticketsPerDay} ${spendConfig.purchaseType} tickets per day
-
-You can also:
-• Say "buy now" to execute an immediate purchase right now
-• Say "stop automation" to pause the scheduled buying
-• Check your status anytime with "spend status"`,
+        // Automation setup started - will wait for user approval and then execute first purchase
+        console.log(
+          `✅ Automation setup initiated for user ${userAddress.slice(0, 8)}... Waiting for spend permission approval.`,
         );
       } else {
         await conversation.send(
