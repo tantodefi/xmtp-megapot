@@ -1357,6 +1357,33 @@ async function handleSmartTextMessage(
         }
         break;
 
+      case "buy_now":
+        console.log("🤖 Executing immediate purchase");
+        if (spendPermissionsHandler && userAddress) {
+          const executed =
+            await spendPermissionsHandler.executeImmediatePurchase(
+              userAddress,
+              conversation,
+              megaPotManager,
+              poolHandler,
+              client,
+            );
+          if (executed) {
+            await conversation.send(
+              "✅ Immediate purchase executed! You can now start automation with 'start automation' if you want daily purchases.",
+            );
+          } else {
+            await conversation.send(
+              "❌ Failed to execute immediate purchase. Please check your spend permissions.",
+            );
+          }
+        } else {
+          await conversation.send(
+            "❌ Immediate purchase not available. Please set up spend permissions first.",
+          );
+        }
+        break;
+
       case "start_automation":
         console.log("🤖 Starting automation");
         if (spendPermissionsHandler && userAddress) {
@@ -2215,10 +2242,9 @@ Try again or say "cancel" to exit.`,
         `🤖 Automated MegaPot: ${purchaseDescription} for ${spendConfig.duration} days
 
 💰 Total: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)} USDC (${spendConfig.duration} days × $${spendConfig.dailyLimit}/day)
-🎫 Includes: First ticket purchase + automation setup
 ⏰ Schedule: Daily purchases at this time
 
-✅ Approve transaction to start automated buying`,
+✅ Approve transaction to set up spend permissions`,
       );
 
       // Send the actual transaction
@@ -2227,24 +2253,17 @@ Try again or say "cancel" to exit.`,
         ContentTypeWalletSendCalls,
       );
 
-      // Auto-start automation after permission setup
-      const autoStarted = await spendPermissionsHandler.startAutomatedBuying(
-        userAddress,
-        conversation,
-        megaPotManager,
-        poolHandler,
-        client,
-      );
+      // Wait for user to approve transaction before starting automation
+      await conversation.send(
+        `⏳ Please approve the spend permission transaction in your wallet.
 
-      if (autoStarted) {
-        await conversation.send(
-          `✅ Automation active! Next purchase in 24 hours. Commands: "spend status" | "stop automation"`,
-        );
-      } else {
-        await conversation.send(
-          `⚠️ Transaction sent but automation failed to start. Say "start automation" manually.`,
-        );
-      }
+After approval, you can:
+• Say "buy now" to execute an immediate ticket purchase
+• Say "start automation" to begin daily purchases (24-hour timer)
+• Check your status with "spend status"
+
+The spend permission allows me to make purchases within your daily limits.`,
+      );
     } catch (error) {
       await conversation.send(
         `❌ Failed to create spend permission: ${error instanceof Error ? error.message : "Unknown error"}`,

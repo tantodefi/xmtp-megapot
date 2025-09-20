@@ -30,11 +30,12 @@ export class SpendPermissionsHandler {
   private userPermissions = new Map<string, SpendPermission[]>();
   private userConfigs = new Map<string, SpendConfig>();
   private automationTimers = new Map<string, NodeJS.Timeout>();
+  private lastPurchaseTypes = new Map<string, "solo" | "pool">();
 
   constructor(private spenderAddress: string) {}
 
   /**
-   * Build transaction calls for spend permission + first ticket purchase
+   * Build transaction calls for spend permission only
    */
   private async buildTransactionCalls(
     userAddress: string,
@@ -44,7 +45,7 @@ export class SpendPermissionsHandler {
   ): Promise<any[]> {
     const calls = [];
 
-    // 1. USDC Approval for automated purchases
+    // Only include the spend permission approval - ticket purchase will be handled separately
     calls.push({
       to: USDC_BASE_ADDRESS as `0x${string}`,
       data: `0x095ea7b3000000000000000000000000${SPEND_PERMISSION_MANAGER.slice(2)}${allowanceUSDC.toString(16).padStart(64, "0")}`,
@@ -60,53 +61,6 @@ export class SpendPermissionsHandler {
         title: "MegaPot Lottery",
       },
     });
-
-    // 2. First ticket purchase (if megaPotManager is available)
-    if (megaPotManager && config.ticketsPerDay > 0) {
-      try {
-        const ticketPurchaseData = await megaPotManager.prepareTicketPurchase(
-          config.ticketsPerDay,
-          userAddress,
-        );
-
-        // Add USDC approval for first purchase
-        calls.push({
-          to: ticketPurchaseData.approveCall.to as `0x${string}`,
-          data: ticketPurchaseData.approveCall.data as `0x${string}`,
-          value: ticketPurchaseData.approveCall.value as `0x${string}`,
-          gas: "0xC350",
-          metadata: {
-            description: `Approve USDC for first ticket purchase`,
-            transactionType: "erc20_approve",
-            source: "MegaPot",
-            origin: "megapot.io",
-            hostname: "megapot.io",
-            faviconUrl: "https://megapot.io/favicon.ico",
-            title: "MegaPot Lottery",
-          },
-        });
-
-        // Add ticket purchase
-        calls.push({
-          to: ticketPurchaseData.purchaseCall.to as `0x${string}`,
-          data: ticketPurchaseData.purchaseCall.data as `0x${string}`,
-          value: ticketPurchaseData.purchaseCall.value as `0x${string}`,
-          gas: "0x30D40",
-          metadata: {
-            description: `Purchase ${config.ticketsPerDay} MegaPot ticket${config.ticketsPerDay > 1 ? "s" : ""} (Day 1)`,
-            transactionType: "purchase_tickets",
-            source: "MegaPot",
-            origin: "megapot.io",
-            hostname: "megapot.io",
-            faviconUrl: "https://megapot.io/favicon.ico",
-            title: "MegaPot Lottery",
-          },
-        });
-      } catch (error) {
-        console.error("Error preparing first ticket purchase:", error);
-        // Continue with just the permission if ticket purchase fails
-      }
-    }
 
     return calls;
   }
@@ -234,15 +188,18 @@ export class SpendPermissionsHandler {
 💰 Daily Limit: $${Number(permission.allowance) / 1_000_000} USDC
 🎫 Purchase Plan: ${purchaseDescription}
 ⏱️ Duration: ${config?.duration || "Unknown"} days
-🤖 Automation: ${isAutomated ? "✅ Active" : "❌ Inactive"}
+🤖 Automation: ${isAutomated ? "✅ Active (24h timer)" : "❌ Inactive"}
 
 🔑 Spender: ${permission.spender.slice(0, 8)}...${permission.spender.slice(-6)}
 📅 Period: ${permission.periodInDays} day(s)
 
 Commands:
-• "start automation" - Begin daily purchases
+• "buy now" - Execute immediate purchase (requires transaction approval)
+• "start automation" - Begin 24-hour timer for daily purchases
 • "stop automation" - Pause automated buying
-• "revoke permissions" - Remove all permissions`;
+• "revoke permissions" - Remove all permissions
+
+💡 Tip: First approve the spend permission transaction, then use "buy now" for immediate purchase or "start automation" for daily purchases.`;
     } catch (error) {
       console.error("Error getting spend permission status:", error);
       return "❌ Error retrieving spend permission status.";
@@ -250,7 +207,7 @@ Commands:
   }
 
   /**
-   * Start automated buying for user
+   * Start automated buying for user (sets up timer, doesn't execute immediately)
    */
   async startAutomatedBuying(
     userAddress: string,
@@ -433,13 +390,188 @@ Commands:
     const timer = setInterval(automatedPurchase, intervalMs);
     this.automationTimers.set(userAddress, timer);
 
-    // Execute first purchase immediately
-    await automatedPurchase();
-
+    // Don't execute first purchase immediately - wait for timer
     await conversation.send(
-      "✅ Automated buying started! I'll execute purchases daily at this time.",
+      "✅ Automated buying timer set up! First purchase will happen in 24 hours.",
     );
     return true;
+  }
+
+  /**
+   * Execute immediate purchase (for manual start)
+   */
+  async executeImmediatePurchase(
+    userAddress: string,
+    conversation: Conversation,
+    megaPotManager?: any,
+    poolHandler?: any,
+    client?: any,
+  ): Promise<boolean> {
+    const config = this.userConfigs.get(userAddress);
+    if (!config) {
+      await conversation.send(
+        "❌ No spend configuration found. Please set up spend permissions first.",
+      );
+      return false;
+    }
+
+    try {
+      const { hasPermission, permission, remainingSpend } =
+        await this.hasActiveSpendPermission(userAddress, config.ticketsPerDay);
+
+      if (!hasPermission || !permission || !remainingSpend) {
+        await conversation.send(
+          `⚠️ Cannot execute immediate purchase - insufficient spend permission. Remaining: $${remainingSpend || 0}`,
+        );
+        return false;
+      }
+
+      // Execute the purchase logic (same as in automatedPurchase)
+      const automatedPurchase = async () => {
+        try {
+          // Handle different purchase types
+          if (config.purchaseType === "both") {
+            // Buy both solo AND pool tickets (2 separate transactions)
+            const soloTickets = config.soloTicketsPerDay || 0;
+            const poolTickets = config.poolTicketsPerDay || 0;
+
+            if (soloTickets > 0 && megaPotManager && client) {
+              await conversation.send(
+                `🤖 Immediate Purchase (Solo): Buying ${soloTickets} solo tickets for $${soloTickets}`,
+              );
+
+              try {
+                const soloTx = await megaPotManager.prepareTicketPurchase(
+                  soloTickets,
+                  userAddress,
+                );
+
+                await this.executeSpendCalls(
+                  soloTx,
+                  conversation,
+                  userAddress,
+                  "solo",
+                  soloTickets,
+                );
+
+                console.log(
+                  `🎫 Solo purchase executed: ${soloTickets} tickets for ${userAddress}`,
+                );
+              } catch (error) {
+                console.error("Solo purchase failed:", error);
+                await conversation.send(
+                  `❌ Solo purchase failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+                );
+              }
+            }
+
+            if (poolTickets > 0 && poolHandler) {
+              await conversation.send(
+                `🤖 Immediate Purchase (Pool): Buying ${poolTickets} pool tickets for $${poolTickets}`,
+              );
+
+              try {
+                const poolResult =
+                  await poolHandler.processPooledTicketPurchase(
+                    userAddress,
+                    poolTickets,
+                    conversation,
+                  );
+
+                if (poolResult.transaction) {
+                  await this.executeSpendCalls(
+                    poolResult.transaction,
+                    conversation,
+                    userAddress,
+                    "pool",
+                    poolTickets,
+                  );
+                }
+
+                console.log(
+                  `🏊 Pool purchase executed: ${poolTickets} tickets for ${userAddress}`,
+                );
+              } catch (error) {
+                console.error("Pool purchase failed:", error);
+                await conversation.send(
+                  `❌ Pool purchase failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+                );
+              }
+            }
+          } else {
+            // Single purchase type (solo, pool, or alternating)
+            let purchaseType: "solo" | "pool";
+            let ticketCount = config.ticketsPerDay;
+
+            if (config.purchaseType === "alternating") {
+              const lastPurchase = this.getLastPurchaseType(userAddress);
+              purchaseType = lastPurchase === "solo" ? "pool" : "solo";
+            } else {
+              purchaseType = config.purchaseType;
+            }
+
+            await conversation.send(
+              `🤖 Immediate Purchase (${purchaseType}): Buying ${ticketCount} tickets for $${ticketCount}`,
+            );
+
+            try {
+              if (purchaseType === "solo" && megaPotManager && client) {
+                const soloTx = await megaPotManager.prepareTicketPurchase(
+                  ticketCount,
+                  userAddress,
+                );
+
+                await this.executeSpendCalls(
+                  soloTx,
+                  conversation,
+                  userAddress,
+                  "solo",
+                  ticketCount,
+                );
+
+                console.log(
+                  `🎫 Solo purchase executed: ${ticketCount} tickets for ${userAddress}`,
+                );
+              } else if (purchaseType === "pool" && poolHandler) {
+                const poolResult =
+                  await poolHandler.processPooledTicketPurchase(
+                    userAddress,
+                    ticketCount,
+                    conversation,
+                  );
+
+                if (poolResult.transaction) {
+                  await this.executeSpendCalls(
+                    poolResult.transaction,
+                    conversation,
+                    userAddress,
+                    "pool",
+                    ticketCount,
+                  );
+                }
+
+                console.log(
+                  `🏊 Pool purchase executed: ${ticketCount} tickets for ${userAddress}`,
+                );
+              }
+            } catch (error) {
+              console.error("Immediate purchase failed:", error);
+              await conversation.send(
+                `❌ Purchase failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+              );
+            }
+          }
+        } catch (error) {
+          console.error("Error in immediate purchase:", error);
+        }
+      };
+
+      await automatedPurchase();
+      return true;
+    } catch (error) {
+      console.error("Error executing immediate purchase:", error);
+      return false;
+    }
   }
 
   /**
@@ -502,8 +634,7 @@ Commands:
    * Get last purchase type for alternating purchases
    */
   private getLastPurchaseType(userAddress: string): "solo" | "pool" {
-    const key = `lastPurchaseType_${userAddress}`;
-    return (localStorage.getItem(key) as "solo" | "pool") || "pool";
+    return this.lastPurchaseTypes.get(userAddress) || "pool";
   }
 
   /**
@@ -513,7 +644,6 @@ Commands:
     userAddress: string,
     purchaseType: "solo" | "pool",
   ): void {
-    const key = `lastPurchaseType_${userAddress}`;
-    localStorage.setItem(key, purchaseType);
+    this.lastPurchaseTypes.set(userAddress, purchaseType);
   }
 }

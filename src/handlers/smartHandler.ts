@@ -24,6 +24,7 @@ export interface MessageIntent {
     | "stop_automation"
     | "revoke_permissions"
     | "spend_config_input"
+    | "buy_now"
     | "unknown";
   confidence: number;
   extractedData?: {
@@ -712,6 +713,15 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         lowerMessage.includes("check"))
     ) {
       return { type: "spend_permission_status", confidence: 0.9 };
+    }
+
+    // Check for immediate purchase
+    if (
+      lowerMessage.includes("buy now") ||
+      lowerMessage.includes("purchase now") ||
+      lowerMessage.includes("execute purchase")
+    ) {
+      return { type: "buy_now", confidence: 0.95 };
     }
 
     // Check for automation control
