@@ -635,6 +635,18 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       };
     }
 
+    // Check for spend permission status (before check_stats to give it priority)
+    if (
+      (lowerMessage.includes("spend") ||
+        lowerMessage.includes("permission") ||
+        lowerMessage.includes("automation")) &&
+      (lowerMessage.includes("status") ||
+        lowerMessage.includes("info") ||
+        lowerMessage.includes("check"))
+    ) {
+      return { type: "spend_permission_status", confidence: 0.9 };
+    }
+
     if (
       lowerMessage.includes("stat") ||
       (lowerMessage.includes("ticket") && lowerMessage.includes("my"))
@@ -701,18 +713,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         lowerMessage.includes("automation"))
     ) {
       return { type: "setup_spend_permission", confidence: 0.9 };
-    }
-
-    // Check for spend permission status
-    if (
-      (lowerMessage.includes("spend") ||
-        lowerMessage.includes("permission") ||
-        lowerMessage.includes("automation")) &&
-      (lowerMessage.includes("status") ||
-        lowerMessage.includes("info") ||
-        lowerMessage.includes("check"))
-    ) {
-      return { type: "spend_permission_status", confidence: 0.9 };
     }
 
     // Check for immediate purchase
@@ -903,6 +903,18 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         confidence: 0.8,
         extractedData: { ticketCount },
       };
+    }
+
+    // Check for spend permission status (before check_stats to give it priority)
+    if (
+      (lowerMessage.includes("spend") ||
+        lowerMessage.includes("permission") ||
+        lowerMessage.includes("automation")) &&
+      (lowerMessage.includes("status") ||
+        lowerMessage.includes("info") ||
+        lowerMessage.includes("check"))
+    ) {
+      return { type: "spend_permission_status", confidence: 0.9 };
     }
 
     if (lowerMessage.includes("stat") || lowerMessage.includes("my")) {
