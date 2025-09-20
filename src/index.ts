@@ -311,7 +311,12 @@ async function main() {
   console.log("🎧 Setting up message streaming...");
 
   try {
-    // Sync conversations first
+    // Start the agent first to ensure proper initialization
+    console.log("🚀 Starting XMTP agent...");
+    await agent.start();
+    console.log("✅ Agent started successfully!");
+
+    // Sync conversations after agent is started
     console.log("🔄 Syncing conversations...");
     await agent.client.conversations.sync();
     console.log("✅ Conversations synced successfully!");
