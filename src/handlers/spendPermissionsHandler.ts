@@ -30,6 +30,10 @@ export const SPEND_PERMISSION_MANAGER =
  * Get transaction receipt link from Basescan
  */
 export const getBasescanTxLink = (txHash: string): string => {
+  if (txHash.startsWith("processing_")) {
+    // Transaction is still being processed
+    return "Transaction processing... Check back in a few moments for the receipt link";
+  }
   return `https://basescan.org/tx/${txHash}`;
 };
 
@@ -347,11 +351,12 @@ Commands:
               );
 
               // Send confirmation with receipt link
+              const receiptLink = getBasescanTxLink(txHash);
               await conversation.send(
                 `✅ Solo Purchase Completed!
 🎫 ${soloTickets} ticket${soloTickets > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${soloTickets}
-📊 Receipt: ${getBasescanTxLink(txHash)}
+📊 Receipt: ${receiptLink}
 ⏰ Next automated purchase in 24 hours`,
               );
 
@@ -390,11 +395,12 @@ Commands:
                 );
 
                 // Send confirmation with receipt link
+                const receiptLink = getBasescanTxLink(txHash);
                 await conversation.send(
                   `✅ Pool Purchase Completed!
 🏊 ${poolTickets} pool ticket${poolTickets > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${poolTickets}
-📊 Receipt: ${getBasescanTxLink(txHash)}
+📊 Receipt: ${receiptLink}
 ⏰ Next automated purchase in 24 hours`,
                 );
 
@@ -443,11 +449,12 @@ Commands:
               );
 
               // Send confirmation with receipt link
+              const receiptLink = getBasescanTxLink(txHash);
               await conversation.send(
                 `✅ ${purchaseType === "solo" ? "Solo" : "Pool"} Purchase Completed!
 🎫 ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${ticketCount}
-📊 Receipt: ${getBasescanTxLink(txHash)}
+📊 Receipt: ${receiptLink}
 ⏰ Next automated purchase in 24 hours`,
               );
 
@@ -472,11 +479,12 @@ Commands:
                 );
 
                 // Send confirmation with receipt link
+                const receiptLink = getBasescanTxLink(txHash);
                 await conversation.send(
                   `✅ Pool Purchase Completed!
 🏊 ${ticketCount} pool ticket${ticketCount > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${ticketCount}
-📊 Receipt: ${getBasescanTxLink(txHash)}
+📊 Receipt: ${receiptLink}
 ⏰ Next automated purchase in 24 hours`,
                 );
 
@@ -565,11 +573,12 @@ Commands:
                 );
 
                 // Send confirmation with receipt link
+                const receiptLink = getBasescanTxLink(txHash);
                 await conversation.send(
                   `✅ Solo Purchase Completed!
 🎫 ${soloTickets} ticket${soloTickets > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${soloTickets}
-📊 Receipt: ${getBasescanTxLink(txHash)}
+📊 Receipt: ${receiptLink}
 🤖 Automation is still active - next purchase in 24 hours`,
                 );
 
@@ -607,11 +616,12 @@ Commands:
                   );
 
                   // Send confirmation with receipt link
+                  const receiptLink = getBasescanTxLink(txHash);
                   await conversation.send(
                     `✅ Pool Purchase Completed!
 🏊 ${poolTickets} pool ticket${poolTickets > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${poolTickets}
-📊 Receipt: ${getBasescanTxLink(txHash)}
+📊 Receipt: ${receiptLink}
 🤖 Automation is still active - next purchase in 24 hours`,
                   );
 
@@ -658,11 +668,12 @@ Commands:
                 );
 
                 // Send confirmation with receipt link
+                const receiptLink = getBasescanTxLink(txHash);
                 await conversation.send(
                   `✅ ${purchaseType === "solo" ? "Solo" : "Pool"} Purchase Completed!
 🎫 ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${ticketCount}
-📊 Receipt: ${getBasescanTxLink(txHash)}
+📊 Receipt: ${receiptLink}
 🤖 Automation is still active - next purchase in 24 hours`,
                 );
 
@@ -687,11 +698,12 @@ Commands:
                   );
 
                   // Send confirmation with receipt link
+                  const receiptLink = getBasescanTxLink(txHash);
                   await conversation.send(
                     `✅ Pool Purchase Completed!
 🏊 ${ticketCount} pool ticket${ticketCount > 1 ? "s" : ""} purchased successfully
 💰 Cost: $${ticketCount}
-📊 Receipt: ${getBasescanTxLink(txHash)}
+📊 Receipt: ${receiptLink}
 🤖 Automation is still active - next purchase in 24 hours`,
                   );
 
@@ -804,8 +816,9 @@ Commands:
         `✅ ${purchaseType} purchase transaction sent: ${ticketCount} tickets for ${userAddress} (ref: ${referenceId})`,
       );
 
-      // Return the reference ID for use in confirmation messages
-      return referenceId;
+      // TODO: Implement mechanism to get actual transaction hash from blockchain
+      // For now, return the reference ID with a note that it's being processed
+      return `processing_${referenceId}`;
     } catch (error) {
       console.error("Error executing spend calls:", error);
       throw error;
