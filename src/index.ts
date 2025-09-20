@@ -324,6 +324,11 @@ async function main() {
       24 * 60 * 60 * 1000,
     ); // Daily cleanup
 
+    // Start the agent first
+    console.log("🚀 Starting XMTP agent...");
+    await agent.start();
+    console.log("✅ Agent started successfully!");
+
     // Start the message stream with reconnection logic
     console.log("📡 Starting message stream...");
     let stream = await agent.client.conversations.streamAllMessages();
