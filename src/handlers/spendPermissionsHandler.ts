@@ -39,7 +39,7 @@ export class SpendPermissionsHandler {
   async requestMegaPotSpendPermission(
     userAddress: string,
     config: SpendConfig,
-  ): Promise<SpendPermission> {
+  ): Promise<{ permission: SpendPermission; transaction: any }> {
     try {
       // Convert USD to USDC (6 decimals)
       const allowanceUSDC = BigInt(config.dailyLimit * 1_000_000);
@@ -110,7 +110,7 @@ export class SpendPermissionsHandler {
       this.userPermissions.set(userAddress, userPermissions);
       this.userConfigs.set(userAddress, config);
 
-      return permission;
+      return { permission, transaction: spendTx };
     } catch (error) {
       console.error("Error requesting spend permission:", error);
       throw error;

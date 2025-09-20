@@ -2165,7 +2165,7 @@ Try again or say "cancel" to exit.`,
 
     // Create the spend permission
     try {
-      const permission =
+      const permissionResult =
         await spendPermissionsHandler.requestMegaPotSpendPermission(
           userAddress,
           spendConfig,
@@ -2182,33 +2182,33 @@ Try again or say "cancel" to exit.`,
         purchaseDescription = `${spendConfig.ticketsPerDay} ${spendConfig.purchaseType} tickets daily`;
       }
 
+      // Send the spend permission transaction
       await conversation.send(
-        `✅ Spend Permission Created Successfully!
+        `🔐 Spend Permission Setup
 
-🔐 Permission Details:
-• Daily limit: $${spendConfig.dailyLimit} USDC
-• Purchase plan: ${purchaseDescription}
-• Duration: ${spendConfig.duration} days
-• Spender: ${permission.spender.slice(0, 8)}...${permission.spender.slice(-6)}
+Setting up automated purchases: ${purchaseDescription} for ${spendConfig.duration} days
+Daily limit: $${spendConfig.dailyLimit} USDC
+Total budget: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)}
 
-🤖 Automated Features Now Available:
+✅ Please approve the spend permission transaction in your wallet.`,
+      );
+
+      // Send the actual transaction
+      await conversation.send(
+        permissionResult.transaction,
+        ContentTypeWalletSendCalls,
+      );
+
+      await conversation.send(
+        `✅ Spend Permission Transaction Sent!
+
+🤖 After approval, automated features will be available:
 • "start automation" - Begin daily ticket purchases
 • "spend status" - Check your permission status
 • "stop automation" - Pause automated buying
 • "revoke permissions" - Remove all permissions
 
-💡 **Next Steps:**
-1. Say "start automation" to begin automated purchases
-        2. ${
-          spendConfig.purchaseType === "both" &&
-          spendConfig.soloTicketsPerDay &&
-          spendConfig.poolTicketsPerDay
-            ? `I'll buy ${spendConfig.soloTicketsPerDay} solo AND ${spendConfig.poolTicketsPerDay} pool tickets daily`
-            : `I'll buy ${spendConfig.ticketsPerDay} ${spendConfig.purchaseType} tickets daily`
-        }
-3. Total budget: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)} over ${spendConfig.duration} days
-
-🌐 In production, this would require wallet approval through Base Account spend permissions.`,
+💡 Next: Say "start automation" to begin automated purchases`,
       );
     } catch (error) {
       await conversation.send(
@@ -2239,9 +2239,9 @@ I'll help you set up automated lottery ticket purchases! This allows me to buy t
 
 ⚙️ Configuration Formats:
 
-💰 **Dollar-based**: "$X per day for Y days, [type]"
-🎫 **Ticket-based**: "buy X tickets a day for Y days"
-🔀 **Combined**: "buy 1 solo and 1 pool ticket a day for Y days"
+💰 Dollar-based: "$X per day for Y days, [type]"
+🎫 Ticket-based: "buy X tickets a day for Y days"
+🔀 Combined: "buy 1 solo and 1 pool ticket a day for Y days"
 
 🎫 Purchase Types:
 • "solo" - Keep 100% of winnings
