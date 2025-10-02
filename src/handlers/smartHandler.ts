@@ -650,7 +650,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           ticketCount,
           clearIntent: true, // Skip confirmation for clear intent
         },
-        response: `🎫 Preparing to buy ${ticketCount} solo ticket${ticketCount > 1 ? "s" : ""}...`,
+        response: `🎫 Preparing to buy ${ticketCount || 1} solo ticket${(ticketCount || 1) > 1 ? "s" : ""}...`,
       };
     }
 
@@ -670,7 +670,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           ticketCount,
           clearIntent: true, // Skip confirmation for clear intent
         },
-        response: `🎯 Preparing to buy ${ticketCount} pool ticket${ticketCount > 1 ? "s" : ""} for the group...`,
+        response: `🎯 Preparing to buy ${ticketCount || 1} pool ticket${(ticketCount || 1) > 1 ? "s" : ""} for the group...`,
       };
     }
 
@@ -712,7 +712,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "spend_permission_status",
         confidence: 0.9,
-        response: "📋 Checking your spend permission status...",
       };
     }
 
@@ -723,7 +722,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "check_stats",
         confidence: 0.8,
-        response: "📊 Fetching your lottery statistics...",
       };
     }
 
@@ -735,7 +733,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "jackpot_info",
         confidence: 0.8,
-        response: "🎰 Fetching current jackpot information...",
       };
     }
 
@@ -751,7 +748,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "help",
         confidence: 0.9,
-        response: "❓ Showing help information...",
       };
     }
 
@@ -766,7 +762,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.9,
-        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
       };
     }
 
@@ -1038,7 +1033,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "spend_permission_status",
         confidence: 0.9,
-        response: "📋 Checking your spend permission status...",
       };
     }
 
@@ -1046,7 +1040,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "check_stats",
         confidence: 0.7,
-        response: "📊 Fetching your lottery statistics...",
       };
     }
 
@@ -1054,7 +1047,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "jackpot_info",
         confidence: 0.7,
-        response: "🎰 Fetching current jackpot information...",
       };
     }
 
@@ -1062,7 +1054,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "help",
         confidence: 0.8,
-        response: "❓ Showing help information...",
       };
     }
 
@@ -1075,7 +1066,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.8,
-        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
       };
     }
 
