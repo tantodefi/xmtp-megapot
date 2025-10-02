@@ -182,12 +182,15 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
                   pendingConfirmation?.poolTicketCount,
                 pooledRequest: pendingConfirmation?.flow === "pool_purchase",
               },
+              response: `Perfect! Proceeding with your ${pendingConfirmation?.message || "purchase"}...`,
             };
           } else if (this.contextHandler.isCancellationMessage(message)) {
             return {
               type: "cancellation",
               confidence: 0.95,
               extractedData: { isCancellation: true },
+              response:
+                "No problem! Your purchase has been cancelled. Let me know if you'd like to try something else.",
             };
           }
         }
@@ -268,15 +271,8 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
         }
       }
 
-      return {
-        ...intent,
-        response: await this.formatResponse(
-          response,
-          intent.type,
-          lotteryStats,
-          userAddress,
-        ),
-      };
+      // intent already includes response from extractIntentFromResponse
+      return intent;
     } catch (error) {
       console.error("❌ Error parsing message intent:", error);
 
@@ -391,7 +387,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     originalMessage: string,
     conversationId?: string,
     userInboxId?: string,
-  ): Omit<MessageIntent, "response"> {
+  ): MessageIntent {
     const lowerResponse = response.toLowerCase();
     const lowerMessage = originalMessage.toLowerCase();
 
@@ -444,6 +440,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
             clearIntent: true,
             recipientUsername,
           },
+          response: `🎁 Buying ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for @${recipientUsername}`,
         };
       }
     }
@@ -465,6 +462,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           extractedData: {
             targetUsername,
           },
+          response: `📊 Getting stats for @${targetUsername}...`,
         };
       }
     }
