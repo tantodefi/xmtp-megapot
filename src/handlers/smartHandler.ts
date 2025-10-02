@@ -277,12 +277,7 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
       console.error("❌ Error parsing message intent:", error);
 
       // Fallback to rule-based parsing
-      const fallbackIntent = this.fallbackIntentParsing(message);
-      return {
-        ...fallbackIntent,
-        response:
-          "I'm having trouble processing your request right now, but I can still help! Try using the action buttons or ask about buying tickets, checking stats, or jackpot info.",
-      };
+      return this.fallbackIntentParsing(message);
     }
   }
 
@@ -712,6 +707,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "spend_permission_status",
         confidence: 0.9,
+        response: "📋 Checking your spend permission status...",
       };
     }
 
@@ -722,6 +718,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "check_stats",
         confidence: 0.8,
+        response: "📊 Fetching your lottery statistics...",
       };
     }
 
@@ -733,6 +730,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "jackpot_info",
         confidence: 0.8,
+        response: "🎰 Fetching current jackpot information...",
       };
     }
 
@@ -748,6 +746,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "help",
         confidence: 0.9,
+        response: "❓ Showing help information...",
       };
     }
 
@@ -762,6 +761,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.9,
+        response: "📋 Checking your spend permission status...",
       };
     }
 
@@ -773,6 +773,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "general_inquiry",
         confidence: 0.7,
+        response: "🎰 Fetching current jackpot information...",
         response: "🤔 I understand your question. Let me help clarify...",
       };
     }
@@ -785,6 +786,9 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "general_inquiry",
         confidence: 0.8,
+        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+        response: "❓ Showing help information...",
+        response: "📊 Fetching your lottery statistics...",
         response: "🔍 Analyzing conversation type...",
       };
     }
@@ -908,9 +912,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
   /**
    * Fallback intent parsing using rule-based approach
    */
-  private fallbackIntentParsing(
-    message: string,
-  ): Omit<MessageIntent, "response"> {
+  private fallbackIntentParsing(message: string): MessageIntent {
     const lowerMessage = message.toLowerCase();
 
     // Enhanced patterns for ticket purchases
@@ -1004,6 +1006,9 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "pooled_purchase",
         confidence: 0.8,
+        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+        response: "❓ Showing help information...",
+        response: "📊 Fetching your lottery statistics...",
         extractedData: {
           pooledRequest: true,
           ticketCount,
@@ -1017,6 +1022,9 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "buy_tickets",
         confidence: 0.8,
+        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+        response: "❓ Showing help information...",
+        response: "📊 Fetching your lottery statistics...",
         extractedData: { ticketCount },
       };
     }
@@ -1033,6 +1041,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "spend_permission_status",
         confidence: 0.9,
+        response: "📋 Checking your spend permission status...",
       };
     }
 
@@ -1040,6 +1049,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "check_stats",
         confidence: 0.7,
+        response: "🎰 Fetching current jackpot information...",
       };
     }
 
@@ -1047,6 +1057,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "jackpot_info",
         confidence: 0.7,
+        response: "🎰 Fetching current jackpot information...",
       };
     }
 
@@ -1054,6 +1065,9 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "help",
         confidence: 0.8,
+        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+        response: "❓ Showing help information...",
+        response: "📊 Fetching your lottery statistics...",
       };
     }
 
@@ -1066,6 +1080,9 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.8,
+        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+        response: "❓ Showing help information...",
+        response: "📊 Fetching your lottery statistics...",
       };
     }
 
@@ -1084,6 +1101,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           askForQuantity: true,
           askForPurchaseType: true,
         },
+        response:
+          "🎫 How many tickets would you like to purchase? (e.g., '5 tickets')",
       };
     }
 
@@ -1125,6 +1144,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           type: "buy_tickets",
           confidence: 0.9,
           extractedData: { ticketCount },
+          response: `🎫 Preparing to buy ${ticketCount} ticket${ticketCount > 1 ? "s" : ""}...`,
         };
       }
     }
