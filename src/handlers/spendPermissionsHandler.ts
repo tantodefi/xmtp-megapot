@@ -58,6 +58,24 @@ export class SpendPermissionsHandler {
   constructor(private spenderAddress: string) {}
 
   /**
+   * Send automation notification to user (in DM if possible)
+   */
+  private async sendAutomationNotification(
+    userAddress: string,
+    message: string,
+    dmConversation?: Conversation,
+  ): Promise<void> {
+    if (dmConversation) {
+      await dmConversation.send(message);
+    } else {
+      // Fallback to original conversation if no DM available
+      console.log(
+        `⚠️ No DM conversation available for ${userAddress}, automation notifications may appear in group chat`,
+      );
+    }
+  }
+
+  /**
    * Build transaction calls for spend permission only
    */
   private async buildTransactionCalls(

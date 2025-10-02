@@ -13,6 +13,7 @@ export interface ConversationContext {
   isGroupChat: boolean;
   lastIntent?: string;
   intentConfidence?: number;
+  recipientUsername?: string;
 }
 
 export class ContextHandler {
@@ -148,6 +149,7 @@ export class ContextHandler {
       context.pendingPoolTicketCount = undefined;
       context.confirmationMessage = undefined;
       context.currentFlow = null;
+      context.recipientUsername = undefined;
     }
   }
 

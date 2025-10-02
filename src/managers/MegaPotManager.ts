@@ -1701,7 +1701,9 @@ export class MegaPotManager {
     const num = parseFloat(amount);
     if (num === 0) return "0 USDC";
     if (num < 0.01) return `${num.toFixed(4)} USDC`;
-    return `${num.toFixed(2)} USDC`;
+
+    // Format large numbers with commas
+    return `${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
   }
 
   /**

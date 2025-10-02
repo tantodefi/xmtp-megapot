@@ -39,6 +39,8 @@ export interface MessageIntent {
     configText?: string;
     duration?: number;
     purchaseType?: "solo" | "pool";
+    recipientUsername?: string;
+    targetUsername?: string;
   };
   response: string;
 }
@@ -411,6 +413,67 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     const dollarAmountPattern =
       /\$?\d+\$?\s*(?:every\s+day|per\s+day|daily)\s+for\s+\d+\s*days?/i;
 
+    // Check for requests to force other users to buy tickets (should be rejected)
+    const forceOtherUserPattern =
+      /have\s+@\w+\s+buy|make\s+@\w+\s+buy|force\s+@\w+\s+to\s+buy|tell\s+@\w+\s+to\s+buy/i;
+    if (forceOtherUserPattern.test(lowerMessage)) {
+      console.log(
+        `🚫 BLOCKED: Request to force other user to buy tickets: "${originalMessage}"`,
+      );
+      return {
+        type: "unknown",
+        confidence: 0.9,
+      };
+    }
+
+    // Check for buying tickets for other users (as recipient)
+    const buyForOtherPattern = /buy\s+\d+.*ticket.*for\s+@\w+/i;
+    if (buyForOtherPattern.test(lowerMessage)) {
+      console.log(
+        `🎁 DETECTED: Buy tickets for other user: "${originalMessage}"`,
+      );
+      const ticketMatch = lowerMessage.match(/buy\s+(\d+)/i);
+      const recipientMatch = lowerMessage.match(/for\s+@(\w+)/i);
+
+      if (ticketMatch && recipientMatch) {
+        const ticketCount = parseInt(ticketMatch[1]);
+        const recipientUsername = recipientMatch[1];
+
+        return {
+          type: "buy_tickets",
+          confidence: 0.95,
+          extractedData: {
+            ticketCount,
+            clearIntent: true,
+            recipientUsername,
+          },
+          response: `🎁 Buying ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for @${recipientUsername}`,
+        };
+      }
+    }
+
+    // Check for showing stats for other users
+    const showStatsForOtherPattern = /show\s+stats\s+for\s+@\w+/i;
+    if (showStatsForOtherPattern.test(lowerMessage)) {
+      console.log(
+        `📊 DETECTED: Show stats for other user: "${originalMessage}"`,
+      );
+      const targetMatch = lowerMessage.match(/for\s+@(\w+)/i);
+
+      if (targetMatch) {
+        const targetUsername = targetMatch[1];
+
+        return {
+          type: "check_stats",
+          confidence: 0.95,
+          extractedData: {
+            targetUsername,
+          },
+          response: `📊 Getting stats for @${targetUsername}...`,
+        };
+      }
+    }
+
     // Check for spend permission patterns first
     if (
       spendConfigPattern.test(lowerMessage) ||
@@ -763,29 +826,20 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     lotteryStats: any,
     userAddress?: string,
   ): Promise<string> {
-    // Remove truncation - let full responses through
-    const baseResponse = response;
-
+    // For most intents, just return the AI response without adding extra information
+    // The main handler will add specific details only when needed for transactions
     switch (intentType) {
-      case "buy_tickets":
-        return `${baseResponse}\n\n🎫 Current ticket price: $${lotteryStats.ticketPrice || "1.00"} USDC on Base network.`;
-
-      case "jackpot_info":
-        return `${baseResponse}\n\n🎰 Jackpot: $${lotteryStats.jackpotPool || "0"} | Tickets sold: ${lotteryStats.ticketsSoldRound || 0}`;
-
-      case "pooled_purchase":
-        return `👍\n\n👥 In group chats, members can buy pool tickets together to increase collective winning chances!`;
-
       case "greeting":
         if (userAddress) {
           const personalizedGreeting =
             await getPersonalizedGreeting(userAddress);
           return `${personalizedGreeting} Welcome to the megapot lottery agent. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`;
         }
-        return `${baseResponse}\n\n🌐 Try the full experience: https://frame.megapot.io`;
+        return `${response}\n\n🌐 Try the full experience: https://frame.megapot.io`;
 
       default:
-        return baseResponse;
+        // Don't add extra information - let the AI response stand alone
+        return response;
     }
   }
 
@@ -1106,7 +1160,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         ? await getPersonalizedGreeting(userAddress)
         : "Hello!";
 
-      return `🎰 MegaPot Lottery\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io`;
+      return `🎰 MegaPot Lottery\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🎫 Solo vs Pool Tickets:\n• Solo: "buy 3 solo ticket(s)" - You keep 100% of any winnings\n• Pool: "buy 2 pool ticket(s)" - Join daily pool, winnings shared proportionally\n• Just "buy 3 tickets" → Choose solo or pool\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io`;
     } catch (error) {
       console.error("Error generating contextual help:", error);
       return `🎰 MegaPot Lottery

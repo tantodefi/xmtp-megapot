@@ -554,6 +554,7 @@ async function handleSmartTextMessage(
     console.log(`🤖 Processing message with AI: "${content}"`);
 
     // Check for group mentions (only respond in groups if mentioned or using slash commands)
+    // But allow responses to ongoing conversations (solo/pool choices, confirmations, etc.)
     const hasMention =
       lowerContent.includes("@megapot") ||
       lowerContent.includes("@megapot.base.eth") ||
@@ -562,7 +563,17 @@ async function handleSmartTextMessage(
       lowerContent.startsWith("/") ||
       !isGroupChat; // Always respond in DMs
 
-    if (isGroupChat && !hasMention) {
+    // Check if this is a response to an ongoing conversation (solo/pool choice, confirmation, etc.)
+    const isOngoingConversationResponse =
+      lowerContent.trim() === "solo" ||
+      lowerContent.trim() === "pool" ||
+      /^(yes|yeah|yep|ok|okay|confirm|proceed|continue|approve)$/i.test(
+        lowerContent.trim(),
+      ) ||
+      /^(no|nope|cancel|stop|nevermind)$/i.test(lowerContent.trim()) ||
+      /^\d+$/.test(lowerContent.trim()); // Numbers in ongoing ticket contexts
+
+    if (isGroupChat && !hasMention && !isOngoingConversationResponse) {
       console.log(
         "🚫 Skipping group message without @megapot mention or slash command",
       );
@@ -731,7 +742,10 @@ async function handleSmartTextMessage(
       isSpendPermission ||
       isBuyNow ||
       isStartAutomation ||
-      isSpendPermissionStatus;
+      isSpendPermissionStatus ||
+      intent.type === "confirmation" ||
+      intent.type === "cancellation" ||
+      intent.extractedData?.clearIntent === true;
 
     if (!shouldSkipAIResponse) {
       await conversation.send(intent.response);
@@ -739,6 +753,12 @@ async function handleSmartTextMessage(
       console.log(
         `🔇 Skipping AI response for ${intent.type}: "${content}" - main handler will process directly`,
       );
+    }
+
+    // Handle standalone numbers immediately - don't let AI response interfere
+    if (isStandaloneNumber) {
+      console.log(`🔢 Processing standalone number: "${content}"`);
+      return; // Exit early - the unknown case handler will process this
     }
 
     // Check if AI response contains confirmation request and extract ticket count
@@ -809,6 +829,7 @@ async function handleSmartTextMessage(
                 awaitingConfirmation: false,
                 isGroupChat: isGroupChat,
                 userAddress: userAddress,
+                recipientUsername: intent.extractedData?.recipientUsername,
               },
             );
 
@@ -847,18 +868,12 @@ async function handleSmartTextMessage(
         console.log(`🔍 Pending confirmation:`, pendingConfirmation);
         console.log(`🔍 User address: ${userAddress}`);
 
-        if (
-          pendingConfirmation &&
-          (pendingConfirmation.ticketCount ||
-            pendingConfirmation.poolTicketCount) &&
-          userAddress
-        ) {
+        if (pendingConfirmation && userAddress) {
           if (pendingConfirmation.flow === "pool_purchase") {
             const poolTicketCount = (pendingConfirmation.poolTicketCount ||
-              pendingConfirmation.ticketCount ||
               1) as number;
             console.log(
-              `🎫 Executing pool purchase: ${poolTicketCount} tickets`,
+              `🎫 Executing pool purchase: ${poolTicketCount} tickets (from pool context)`,
             );
             // Handle pool purchase confirmation
             const poolResult = await poolHandler.processPooledTicketPurchase(
@@ -880,12 +895,11 @@ async function handleSmartTextMessage(
                 `📋 Pool transaction sent with reference: ${poolResult.referenceId}`,
               );
             }
-          } else {
+          } else if (pendingConfirmation.flow === "ticket_purchase") {
             const soloTicketCount = (pendingConfirmation.ticketCount ||
-              pendingConfirmation.poolTicketCount ||
               1) as number;
             console.log(
-              `🎫 Executing solo purchase: ${soloTicketCount} tickets`,
+              `🎫 Executing solo purchase: ${soloTicketCount} tickets (from solo context)`,
             );
             // Handle solo ticket purchase confirmation
             await handleTicketPurchaseIntent(
@@ -894,6 +908,14 @@ async function handleSmartTextMessage(
               conversation,
               megaPotManager,
               client,
+              intent.extractedData?.recipientUsername,
+            );
+          } else {
+            console.log(
+              `⚠️ Unknown flow type in pending confirmation: ${pendingConfirmation.flow}`,
+            );
+            await conversation.send(
+              "❌ Unable to process confirmation - unknown purchase type. Please start a new purchase.",
             );
           }
           // Clear the pending confirmation
@@ -952,6 +974,7 @@ async function handleSmartTextMessage(
             conversation,
             megaPotManager,
             client,
+            currentContext?.recipientUsername,
           );
           return;
         }
@@ -1001,6 +1024,7 @@ async function handleSmartTextMessage(
             conversation,
             megaPotManager,
             client,
+            intent.extractedData?.recipientUsername,
           );
         } else if (intent.extractedData?.ticketCount) {
           console.log(
@@ -1072,6 +1096,7 @@ async function handleSmartTextMessage(
           conversation,
           megaPotManager,
           client,
+          intent.extractedData?.targetUsername,
         );
         break;
 
@@ -1298,6 +1323,7 @@ async function handleSmartTextMessage(
                 awaitingConfirmation: false,
                 isGroupChat: isGroupChat,
                 userAddress: userAddress,
+                recipientUsername: intent.extractedData?.recipientUsername,
               },
             );
 
@@ -1580,6 +1606,7 @@ async function handleIntentMessage(
           conversation,
           megaPotManager,
           client,
+          undefined, // IntentContent doesn't have extractedData
         );
         break;
       case "jackpot-info":
@@ -1619,16 +1646,39 @@ async function handleTicketPurchaseIntent(
   conversation: any,
   megaPotManager: MegaPotManager,
   client: any,
+  recipientUsername?: string,
 ) {
   try {
     console.log(
-      `🎫 Processing ${numTickets} ticket purchase intent for ${userAddress}`,
+      `🎫 Processing ${numTickets} ticket purchase intent for ${userAddress}${recipientUsername ? ` (gifting to @${recipientUsername})` : ""}`,
     );
+
+    // If buying for someone else, we need to resolve their username to address
+    let recipientAddress = userAddress;
+    let recipientDisplayName = "you";
+
+    if (recipientUsername) {
+      try {
+        // For now, we'll need to implement username resolution
+        // This would involve looking up the @username in the conversation members
+        // For simplicity, let's assume we need to ask for the recipient's address
+        await conversation.send(
+          `🎁 To buy tickets for @${recipientUsername}, I need their wallet address. Please provide it or ask them to share their XMTP wallet address with you.`,
+        );
+        return; // Exit early - need recipient address
+      } catch (error) {
+        console.error("Error resolving recipient username:", error);
+        await conversation.send(
+          `❌ Could not resolve @${recipientUsername}'s wallet address. Please ask them to provide their XMTP wallet address.`,
+        );
+        return;
+      }
+    }
 
     // Prepare the ticket purchase transactions
     const txData = await megaPotManager.prepareTicketPurchase(
       numTickets,
-      userAddress,
+      recipientAddress, // Use recipient address for the purchase
     );
     const totalCostUSDC = Number(txData.totalCostUSDC) / 1000000;
 
@@ -1682,9 +1732,11 @@ async function handleTicketPurchaseIntent(
       ],
     };
 
-    await conversation.send(
-      `🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}\n✅ Open wallet to approve transaction\n⚠️ Need USDC on Base network. Good luck! 🍀🎰`,
-    );
+    const purchaseMessage = recipientUsername
+      ? `🎁 Gift: ${numTickets} ticket${numTickets > 1 ? "s" : ""} for @${recipientUsername} ($${totalCostUSDC.toFixed(2)})\n✅ Open wallet to approve gift transaction\n⚠️ Need USDC on Base network. They'll receive the tickets! 🍀🎰`
+      : `🎫 ${numTickets} ticket${numTickets > 1 ? "s" : ""} for $${totalCostUSDC.toFixed(2)}\n✅ Open wallet to approve transaction\n⚠️ Need USDC on Base network. Good luck! 🍀🎰`;
+
+    await conversation.send(purchaseMessage);
 
     console.log(`📤 Sending wallet send calls for ${numTickets} tickets`);
     await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
@@ -1703,14 +1755,37 @@ async function handleStatsIntent(
   conversation: any,
   megaPotManager: MegaPotManager,
   client: any,
+  targetUsername?: string,
 ) {
   try {
-    const stats = await megaPotManager.getStats(userAddress);
+    // If showing stats for another user, we need to resolve their username to address
+    let targetAddress = userAddress;
+    let targetDisplayName = "Your";
+
+    if (targetUsername) {
+      try {
+        // For now, we'll need to implement username resolution
+        // This would involve looking up the @username in the conversation members
+        // For simplicity, let's assume we need to ask for the target user's address
+        await conversation.send(
+          `📊 To show stats for @${targetUsername}, I need their wallet address. Please ask them to share their XMTP wallet address with you.`,
+        );
+        return; // Exit early - need target address
+      } catch (error) {
+        console.error("Error resolving target username:", error);
+        await conversation.send(
+          `❌ Could not resolve @${targetUsername}'s wallet address. Please ask them to provide their XMTP wallet address.`,
+        );
+        return;
+      }
+    }
+
+    const stats = await megaPotManager.getStats(targetAddress);
 
     // Get enhanced winnings data (including daily prizes)
-    const winningsData = await megaPotManager.hasWinningsToClaim(userAddress);
+    const winningsData = await megaPotManager.hasWinningsToClaim(targetAddress);
 
-    let statsMessage = `📊 Your MegaPot Stats:
+    let statsMessage = `📊 ${targetDisplayName} MegaPot Stats:
 🎫 Tickets purchased: ${stats.totalTicketsPurchased}
 💵 Total spent: ${megaPotManager.formatAmount(stats.totalSpent)}
 🎉 Total won: ${megaPotManager.formatAmount(stats.totalWinnings)}
@@ -1722,12 +1797,12 @@ async function handleStatsIntent(
 • 📊 Total Claimable: $${winningsData.breakdown.contract.toFixed(2)} USDC
 
 🎰 Current Round:
-💰 Jackpot: $${stats.jackpotPool || "0"}
+💰 Jackpot: $${parseFloat(stats.jackpotPool || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 🎫 Ticket price: $${stats.ticketPrice || "1"}
 📈 Tickets sold: ${stats.ticketsSoldRound || 0}`;
 
     if (stats.userOdds) {
-      statsMessage += `\n🎯 Your odds: 1 in ${stats.userOdds}`;
+      statsMessage += `\n🎯 ${targetDisplayName.toLowerCase()} odds: 1 in ${stats.userOdds}`;
     }
 
     if (stats.endTime) {
@@ -1768,7 +1843,7 @@ async function handleJackpotInfoIntent(
     }
 
     const jackpotMessage = `🎰 MegaPot Jackpot Info:
-💰 Current jackpot: $${stats.jackpotPool || "0"}
+💰 Current jackpot: $${parseFloat(stats.jackpotPool || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 🎫 Ticket price: $${stats.ticketPrice || "1"}
 📈 Tickets sold: ${stats.ticketsSoldRound || 0}
 👥 Active players: ${stats.activePlayers || 0}
@@ -1909,6 +1984,11 @@ async function handleHelpIntent(conversation: any) {
 • "stats" → View your ticket history
 • "jackpot" → See current prize
 • "claim" → Withdraw winnings
+
+🎫 Solo vs Pool Tickets:
+• Solo: "buy 3 solo ticket(s)" - You keep 100% of any winnings
+• Pool: "buy 2 pool ticket(s)" - Join daily pool, winnings shared proportionally
+• Just "buy 3 tickets" → Choose solo or pool
 
 ${
   isGroupChat
