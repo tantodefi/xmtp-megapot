@@ -416,6 +416,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "unknown",
         confidence: 0.9,
+        response:
+          "❌ I cannot force other users to spend their money or buy tickets on their behalf. Each user must initiate their own ticket purchases using their own wallet and funds.",
       };
     }
 
@@ -504,6 +506,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           duration,
           purchaseType,
         },
+        response: `🔐 Setting up spend permissions for ${ticketCount} ${purchaseType} tickets per day for ${duration} days...`,
       };
     }
 
@@ -541,12 +544,15 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
                 pendingConfirmation?.poolTicketCount,
               pooledRequest: pendingConfirmation?.flow === "pool_purchase",
             },
+            response: `Perfect! Proceeding with your ${pendingConfirmation?.message || "purchase"}...`,
           };
         } else if (isSimpleCancellation) {
           return {
             type: "cancellation",
             confidence: 0.95,
             extractedData: { isCancellation: true },
+            response:
+              "No problem! Your purchase has been cancelled. Let me know if you'd like to try something else.",
           };
         } else {
           // If there's a pending purchase but this isn't a simple confirmation/cancellation,
@@ -644,6 +650,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           ticketCount,
           clearIntent: true, // Skip confirmation for clear intent
         },
+        response: `🎫 Preparing to buy ${ticketCount} solo ticket${ticketCount > 1 ? "s" : ""}...`,
       };
     }
 
@@ -663,6 +670,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           ticketCount,
           clearIntent: true, // Skip confirmation for clear intent
         },
+        response: `🎯 Preparing to buy ${ticketCount} pool ticket${ticketCount > 1 ? "s" : ""} for the group...`,
       };
     }
 
@@ -688,6 +696,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           ticketCount,
           askForPurchaseType: true, // Need to ask solo or pool
         },
+        response: `🎫 How many tickets would you like to purchase? (e.g., '5 tickets')`,
       };
     }
 
@@ -700,14 +709,22 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         lowerMessage.includes("info") ||
         lowerMessage.includes("check"))
     ) {
-      return { type: "spend_permission_status", confidence: 0.9 };
+      return {
+        type: "spend_permission_status",
+        confidence: 0.9,
+        response: "📋 Checking your spend permission status...",
+      };
     }
 
     if (
       lowerMessage.includes("stat") ||
       (lowerMessage.includes("ticket") && lowerMessage.includes("my"))
     ) {
-      return { type: "check_stats", confidence: 0.8 };
+      return {
+        type: "check_stats",
+        confidence: 0.8,
+        response: "📊 Fetching your lottery statistics...",
+      };
     }
 
     if (
@@ -715,15 +732,27 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("prize") ||
       lowerMessage.includes("pot")
     ) {
-      return { type: "jackpot_info", confidence: 0.8 };
+      return {
+        type: "jackpot_info",
+        confidence: 0.8,
+        response: "🎰 Fetching current jackpot information...",
+      };
     }
 
     if (lowerMessage.includes("claim") || lowerMessage.includes("winning")) {
-      return { type: "claim_winnings", confidence: 0.8 };
+      return {
+        type: "claim_winnings",
+        confidence: 0.8,
+        response: "💰 Checking for winnings to claim...",
+      };
     }
 
     if (lowerMessage.includes("help") || lowerMessage.includes("command")) {
-      return { type: "help", confidence: 0.9 };
+      return {
+        type: "help",
+        confidence: 0.9,
+        response: "❓ Showing help information...",
+      };
     }
 
     if (
@@ -734,7 +763,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("whaddup") ||
       lowerMessage.includes("sup")
     ) {
-      return { type: "greeting", confidence: 0.9 };
+      return {
+        type: "greeting",
+        confidence: 0.9,
+        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+      };
     }
 
     if (
@@ -742,7 +775,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("what") ||
       lowerMessage.includes("?")
     ) {
-      return { type: "general_inquiry", confidence: 0.7 };
+      return {
+        type: "general_inquiry",
+        confidence: 0.7,
+        response: "🤔 I understand your question. Let me help clarify...",
+      };
     }
 
     // Special case: user claims to be in group chat
@@ -750,15 +787,27 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("group chat") ||
       lowerMessage.includes("this is a group")
     ) {
-      return { type: "general_inquiry", confidence: 0.8 };
+      return {
+        type: "general_inquiry",
+        confidence: 0.8,
+        response: "🔍 Analyzing conversation type...",
+      };
     }
 
     // Handle solo/pool choice responses
     if (/^(solo|individual)$/i.test(originalMessage.trim())) {
-      return { type: "buy_tickets", confidence: 0.9 };
+      return {
+        type: "buy_tickets",
+        confidence: 0.9,
+        response: "🎫 Solo purchase selected. Preparing transaction...",
+      };
     }
     if (/^(pool|group)$/i.test(originalMessage.trim())) {
-      return { type: "pooled_purchase", confidence: 0.9 };
+      return {
+        type: "pooled_purchase",
+        confidence: 0.9,
+        response: "🎯 Pool purchase selected. Preparing group transaction...",
+      };
     }
 
     // Check for spend permissions setup
@@ -768,7 +817,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         lowerMessage.includes("permission") ||
         lowerMessage.includes("automation"))
     ) {
-      return { type: "setup_spend_permission", confidence: 0.9 };
+      return {
+        type: "setup_spend_permission",
+        confidence: 0.9,
+        response: "🔐 Setting up automated spending permissions...",
+      };
     }
 
     // Check for immediate purchase
@@ -777,7 +830,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("purchase now") ||
       lowerMessage.includes("execute purchase")
     ) {
-      return { type: "buy_now", confidence: 0.95 };
+      return {
+        type: "buy_now",
+        confidence: 0.95,
+        response: "⚡ Executing immediate purchase...",
+      };
     }
 
     // Check for automation control
@@ -785,14 +842,22 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("start automation") ||
       lowerMessage.includes("begin automation")
     ) {
-      return { type: "start_automation", confidence: 0.95 };
+      return {
+        type: "start_automation",
+        confidence: 0.95,
+        response: "🤖 Starting automated purchases...",
+      };
     }
 
     if (
       lowerMessage.includes("stop automation") ||
       lowerMessage.includes("pause automation")
     ) {
-      return { type: "stop_automation", confidence: 0.95 };
+      return {
+        type: "stop_automation",
+        confidence: 0.95,
+        response: "⏸️ Stopping automated purchases...",
+      };
     }
 
     // Check for revoke permissions
@@ -802,12 +867,21 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         lowerMessage.includes("cancel")) &&
       (lowerMessage.includes("permission") || lowerMessage.includes("spend"))
     ) {
-      return { type: "revoke_permissions", confidence: 0.9 };
+      return {
+        type: "revoke_permissions",
+        confidence: 0.9,
+        response: "🗑️ Revoking spend permissions...",
+      };
     }
 
     // Duplicate patterns removed - now handled at the top
 
-    return { type: "unknown", confidence: 0.3 };
+    return {
+      type: "unknown",
+      confidence: 0.3,
+      response:
+        "🤖 I'm not sure how to help with that. Try asking about buying tickets, checking stats, or jackpot info.",
+    };
   }
 
   /**
@@ -961,19 +1035,35 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         lowerMessage.includes("info") ||
         lowerMessage.includes("check"))
     ) {
-      return { type: "spend_permission_status", confidence: 0.9 };
+      return {
+        type: "spend_permission_status",
+        confidence: 0.9,
+        response: "📋 Checking your spend permission status...",
+      };
     }
 
     if (lowerMessage.includes("stat") || lowerMessage.includes("my")) {
-      return { type: "check_stats", confidence: 0.7 };
+      return {
+        type: "check_stats",
+        confidence: 0.7,
+        response: "📊 Fetching your lottery statistics...",
+      };
     }
 
     if (lowerMessage.includes("jackpot") || lowerMessage.includes("prize")) {
-      return { type: "jackpot_info", confidence: 0.7 };
+      return {
+        type: "jackpot_info",
+        confidence: 0.7,
+        response: "🎰 Fetching current jackpot information...",
+      };
     }
 
     if (lowerMessage.includes("help")) {
-      return { type: "help", confidence: 0.8 };
+      return {
+        type: "help",
+        confidence: 0.8,
+        response: "❓ Showing help information...",
+      };
     }
 
     if (
@@ -982,7 +1072,11 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       lowerMessage.includes("hi") ||
       lowerMessage.includes("whaddup")
     ) {
-      return { type: "greeting", confidence: 0.8 };
+      return {
+        type: "greeting",
+        confidence: 0.8,
+        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+      };
     }
 
     // Handle "yes" responses to ticket purchase questions
@@ -1045,7 +1139,12 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       }
     }
 
-    return { type: "unknown", confidence: 0.5 };
+    return {
+      type: "unknown",
+      confidence: 0.5,
+      response:
+        "🤖 I'm not sure how to help with that. Try asking about buying tickets, checking stats, or jackpot info.",
+    };
   }
 
   /**
