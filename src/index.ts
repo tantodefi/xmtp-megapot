@@ -889,7 +889,7 @@ async function handleSmartTextMessage(
 
             const displayName = await getDisplayName(userAddress);
             await conversation.send(
-              `${displayName}, looks like you want to buy ${ticketCount} tickets. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,
+              `${displayName}, would you like to buy ${ticketCount} solo or pool tickets? (reply 'solo' or 'pool')`,
             );
             return; // Context is now saved, wait for choice
           } else {
@@ -1045,7 +1045,7 @@ async function handleSmartTextMessage(
           // Ambiguous intent - ask for solo/pool choice
           const displayName = await getDisplayName(userAddress);
           await conversation.send(
-            `${displayName}, looks like you want to buy ${intent.extractedData.ticketCount} ticket${intent.extractedData.ticketCount > 1 ? "s" : ""}. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,
+            `${displayName}, would you like to buy ${intent.extractedData.ticketCount} solo or pool tickets? (reply 'solo' or 'pool')`,
           );
 
           // Save context for later
@@ -1393,7 +1393,7 @@ async function handleSmartTextMessage(
 
             const displayName = await getDisplayName(userAddress);
             await conversation.send(
-              `${displayName}, looks like you want to buy ${ticketCount} ticket${ticketCount > 1 ? "s" : ""}. Would you like that to be a solo or pool purchase?\n\n🎫 Solo: You keep 100% of any winnings\n🎯 Pool: Join the daily pool, increase collective chances, winnings shared proportionally\n\nReply with 'solo' or 'pool'.`,
+              `${displayName}, would you like to buy ${ticketCount} solo or pool tickets? (reply 'solo' or 'pool')`,
             );
           }
         }
