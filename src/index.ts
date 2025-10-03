@@ -218,11 +218,18 @@ async function main() {
 
   // Set up persistent database path to avoid creating new installations
   // Use Render's mounted disk at /app/data/ for persistence
+  // Get the database directory path
   const isProduction =
     process.env.RENDER || process.env.NODE_ENV === "production";
-  const dbPath = isProduction
-    ? "/app/data/xmtp-node-sdk-db/db"
-    : ".data/xmtp-node-sdk-db/db";
+  const baseDir = isProduction ? "/app/data" : ".data";
+  const dbPath = `${baseDir}/xmtp.db`;
+
+  // Log environment info
+  console.log(`🔧 Environment Info:
+• Production: ${isProduction ? "Yes" : "No"}
+• Base Directory: ${baseDir}
+• Database Path: ${dbPath}
+• Render Volume: ${process.env.RENDER_VOLUME_MOUNT_PATH || "Not mounted"}`);
 
   console.log(
     `🌍 Environment: ${isProduction ? "Production (Render)" : "Development"}`,
@@ -233,15 +240,46 @@ async function main() {
   const fs = await import("fs");
   const path = await import("path");
   const dbDir = path.dirname(dbPath);
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true, mode: 0o700 });
-    console.log(
-      `📁 Created database directory: ${dbDir} with secure permissions`,
-    );
-  } else {
-    // Ensure correct permissions on existing directory
-    fs.chmodSync(dbDir, 0o700);
-    console.log(`📁 Updated database directory permissions: ${dbDir}`);
+
+  try {
+    // Check if the base directory exists and is writable
+    try {
+      await fs.promises.access(baseDir, fs.constants.W_OK);
+      console.log(`✅ Base directory ${baseDir} exists and is writable`);
+    } catch (error) {
+      if (isProduction) {
+        console.error(
+          `❌ Production volume ${baseDir} is not accessible:`,
+          error,
+        );
+        throw new Error(
+          `Cannot access mounted volume at ${baseDir}. Please check Render disk configuration.`,
+        );
+      } else {
+        // In development, create the directory
+        await fs.promises.mkdir(baseDir, { recursive: true, mode: 0o755 });
+        console.log(`📁 Created development directory: ${baseDir}`);
+      }
+    }
+
+    // Log directory contents to help with debugging
+    const files = await fs.promises.readdir(baseDir);
+    console.log(`📂 Contents of ${baseDir}:`, files);
+
+    // Ensure database directory has correct permissions
+    await fs.promises.chmod(baseDir, 0o755);
+    console.log(`🔒 Updated base directory permissions: ${baseDir}`);
+
+    // If database file exists, ensure it has correct permissions
+    if (fs.existsSync(dbPath)) {
+      await fs.promises.chmod(dbPath, 0o644);
+      console.log(`📄 Updated database file permissions: ${dbPath}`);
+    }
+
+    console.log(`✅ Database setup complete at: ${dbPath}`);
+  } catch (error) {
+    console.error("❌ Error setting up database:", error);
+    throw error;
   }
 
   let client;
