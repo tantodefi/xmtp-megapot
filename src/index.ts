@@ -812,7 +812,7 @@ async function handleSmartTextMessage(
     // Handle standalone numbers immediately - don't let AI response interfere
     if (isStandaloneNumber) {
       console.log(`🔢 Processing standalone number: "${content}"`);
-      return; // Exit early - the unknown case handler will process this
+      // Don't return early - let the unknown case handler process this
     }
 
     // Check if AI response contains confirmation request and extract ticket count
