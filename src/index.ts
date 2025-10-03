@@ -221,21 +221,27 @@ async function main() {
   const isProduction =
     process.env.RENDER || process.env.NODE_ENV === "production";
   const dbPath = isProduction
-    ? "/app/data/xmtp-node-sdk-db"
-    : ".data/xmtp-node-sdk-db";
+    ? "/app/data/xmtp-node-sdk-db/db"
+    : ".data/xmtp-node-sdk-db/db";
 
   console.log(
     `🌍 Environment: ${isProduction ? "Production (Render)" : "Development"}`,
   );
   console.log(`💾 Using persistent database at: ${dbPath}`);
 
-  // Ensure database directory exists
+  // Ensure database directory exists with correct permissions
   const fs = await import("fs");
   const path = await import("path");
   const dbDir = path.dirname(dbPath);
   if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-    console.log(`📁 Created database directory: ${dbDir}`);
+    fs.mkdirSync(dbDir, { recursive: true, mode: 0o700 });
+    console.log(
+      `📁 Created database directory: ${dbDir} with secure permissions`,
+    );
+  } else {
+    // Ensure correct permissions on existing directory
+    fs.chmodSync(dbDir, 0o700);
+    console.log(`📁 Updated database directory permissions: ${dbDir}`);
   }
 
   let client;
