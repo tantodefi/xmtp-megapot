@@ -222,7 +222,8 @@ async function main() {
   const isProduction =
     process.env.RENDER || process.env.NODE_ENV === "production";
   const baseDir = isProduction ? "/app/data" : ".data";
-  const dbPath = `${baseDir}/xmtp.db`;
+  // Use existing database file name from volume
+  const dbPath = `${baseDir}/xmtp-node-sdk-db`;
 
   // Log environment info
   console.log(`🔧 Environment Info:
@@ -272,12 +273,25 @@ async function main() {
     throw error;
   }
 
+  // Validate and prepare encryption key
+  if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
+    throw new Error(
+      `Invalid encryption key format. Expected 64 hex characters, got ${ENCRYPTION_KEY?.length || 0}`,
+    );
+  }
+
+  // Convert encryption key to bytes
+  const dbEncryptionKey = fromString(ENCRYPTION_KEY, "hex");
+  console.log(
+    `🔐 Database encryption key prepared (${dbEncryptionKey.length} bytes)`,
+  );
+
   let client;
   try {
     client = await Client.create(signer, {
       env: XMTP_ENV as XmtpEnv,
-      dbPath: dbPath, // Use persistent database
-      dbEncryptionKey: fromString(ENCRYPTION_KEY!, "hex"),
+      dbPath: dbPath,
+      dbEncryptionKey,
       codecs: [
         new ReactionCodec(),
         new RemoteAttachmentCodec(),
