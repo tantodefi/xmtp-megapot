@@ -1703,7 +1703,7 @@ export class MegaPotManager {
     if (num < 0.01) return `${num.toFixed(4)} USDC`;
 
     // Format large numbers with commas
-    return `${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
+    return `${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true })} USDC`;
   }
 
   /**

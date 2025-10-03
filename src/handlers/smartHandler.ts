@@ -241,8 +241,8 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
       // Parse the LLM response to extract intent and data
       const intent = this.extractIntentFromResponse(
         message,
-        conversationId,
-        userInboxId,
+        conversationId || "",
+        userInboxId || "",
       );
 
       // Update context with the detected intent (but preserve standalone_number context)
@@ -633,7 +633,31 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       }
     }
 
-    // FIRST: Check for explicit solo purchase (clear intent - no confirmation needed)
+    // Check for solo/pool one-word responses in purchase flow
+    if (
+      (lowerMessage === "solo" || lowerMessage === "pool") &&
+      conversationId &&
+      userInboxId
+    ) {
+      const context = this.contextHandler.getContext(
+        conversationId,
+        userInboxId,
+      );
+      if (context?.pendingTicketCount) {
+        return {
+          type: "buy_tickets",
+          confidence: 0.95,
+          extractedData: {
+            ticketCount: context.pendingTicketCount,
+            clearIntent: true,
+            purchaseType: lowerMessage as "solo" | "pool",
+          },
+          response: `🎫 Preparing to buy ${context.pendingTicketCount} ${lowerMessage} ticket${context.pendingTicketCount > 1 ? "s" : ""}...`,
+        };
+      }
+    }
+
+    // Check for explicit solo purchase (clear intent - no confirmation needed)
     const hasSoloKeywords =
       lowerMessage.includes("solo") || lowerMessage.includes("individual");
     if (hasSoloKeywords && (isBuyIntent || lowerMessage.includes("ticket"))) {
@@ -910,6 +934,47 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
   private fallbackIntentParsing(message: string): MessageIntent {
     const lowerMessage = message.toLowerCase();
 
+    // Check for buying tickets for others
+    const buyForOtherMatch = message.match(/@(\w+)\s+buy.*ticket/i);
+    if (buyForOtherMatch) {
+      return {
+        type: "unknown",
+        confidence: 0.8,
+        response:
+          "❌ Sorry, I can't force other users to buy tickets. They need to approve their own transactions.",
+      };
+    }
+
+    // Check for buying tickets for recipient
+    const buyForRecipientMatch = message.match(/buy.*ticket.*for\s+@(\w+)/i);
+    if (buyForRecipientMatch) {
+      const recipientUsername = buyForRecipientMatch[1];
+      return {
+        type: "buy_tickets",
+        confidence: 0.8,
+        response: `🎫 Would you like to buy solo or pool tickets for @${recipientUsername}? (just reply 'solo' or 'pool')`,
+        extractedData: {
+          ticketCount: 1,
+          askForPurchaseType: true,
+          recipientUsername,
+        },
+      };
+    }
+
+    // Check for showing stats for others
+    const showStatsForMatch = message.match(
+      /(?:show|check|get).*stats.*for\s+@(\w+)/i,
+    );
+    if (showStatsForMatch) {
+      const targetUsername = showStatsForMatch[1];
+      return {
+        type: "check_stats",
+        confidence: 0.9,
+        response: `📊 Fetching lottery statistics for @${targetUsername}...`,
+        extractedData: { targetUsername },
+      };
+    }
+
     // Enhanced patterns for ticket purchases
     const ticketPurchasePatterns = [
       /\b(buy|purchase|get|want|give\s+me)\b.*\b(ticket|five|ten|two|three|four|six|seven|eight|nine|\d+)/i,
@@ -1004,7 +1069,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "pooled_purchase",
         confidence: 0.8,
-        response: "📊 Preparing to buy pool tickets...",
+        response:
+          "🎫 Would you like to buy solo or pool tickets? (just reply 'solo' or 'pool')",
         extractedData: {
           pooledRequest: true,
           ticketCount,
@@ -1018,8 +1084,12 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "buy_tickets",
         confidence: 0.8,
-        response: "📊 Fetching your lottery statistics...",
-        extractedData: { ticketCount: ticketCount || 1 },
+        response:
+          "🎫 Would you like to buy solo or pool tickets? (just reply 'solo' or 'pool')",
+        extractedData: {
+          ticketCount: ticketCount || 1,
+          askForPurchaseType: true,
+        },
       };
     }
 
@@ -1059,7 +1129,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "help",
         confidence: 0.8,
-        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+        response:
+          "👋 Welcome to MegaPot! Quick guide:\n• Solo tickets: 'buy 5 solo tickets'\n• Pool tickets: 'buy 5 pool tickets'\n• Check stats: 'show my stats'\n• Current jackpot: 'show jackpot'",
       };
     }
 
@@ -1072,7 +1143,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.8,
-        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
+        response:
+          "👋 Welcome to MegaPot! Quick guide:\n• Solo tickets: 'buy 5 solo tickets'\n• Pool tickets: 'buy 5 pool tickets'\n• Check stats: 'show my stats'\n• Current jackpot: 'show jackpot'",
       };
     }
 

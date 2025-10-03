@@ -63,16 +63,28 @@ export class SpendPermissionsHandler {
   private async sendAutomationNotification(
     userAddress: string,
     message: string,
-    dmConversation?: Conversation,
+    conversation: Conversation,
+    client?: any,
   ): Promise<void> {
-    if (dmConversation) {
-      await dmConversation.send(message);
-    } else {
-      // Fallback to original conversation if no DM available
+    try {
+      // Try to get user's inbox ID from their address
+      const inboxState = await client?.preferences?.inboxStateFromInboxIds([
+        userAddress,
+      ]);
+      if (inboxState && inboxState[0]?.identifiers[0]?.identifier) {
+        const userInboxId = inboxState[0].identifiers[0].identifier;
+        const dm = await client.conversations.newDm(userInboxId);
+        await dm.send(message);
+        return;
+      }
+    } catch (error) {
       console.log(
-        `⚠️ No DM conversation available for ${userAddress}, automation notifications may appear in group chat`,
+        `⚠️ Failed to send DM to ${userAddress}, falling back to original conversation: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+
+    // Fallback to original conversation if DM fails
+    await conversation.send(message);
   }
 
   /**

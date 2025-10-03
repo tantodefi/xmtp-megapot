@@ -39,7 +39,7 @@
     "@xmtp/content-type-remote-attachment": "^1.1.12",
     "@xmtp/content-type-transaction-reference": "^2.0.2",
     "@xmtp/content-type-wallet-send-calls": "^1.0.1",
-    "@xmtp/node-sdk": "4.0.3",
+    "@xmtp/node-sdk": "4.0.4",
     "axios": "^1.6.0",
     "openai": "^4.67.1",
     "uint8arrays": "^5.1.0",
