@@ -788,14 +788,16 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
 
 🎫 Two ways to buy tickets:
 • Solo tickets: Buy individually and keep 100% of winnings
+  ex: 'buy 5 solo tickets'
 • Pool tickets: Join group purchases to increase winning chances
+  ex: 'buy 5 pool tickets'
 
 📊 Key features:
 • Check your stats and ticket history
 • View current jackpot and odds
 • Set up automated purchases
 
-🌐 Try our full experience: https://frame.megapot.io
+🌐 Try our full experience: https://frame.megapot.io/?referral=c7m8NL7l&channelKey=megapot
 
 Use the action buttons below to get started!`,
       };
@@ -931,9 +933,9 @@ Use the action buttons below to get started!`,
         if (userAddress) {
           const personalizedGreeting =
             await getPersonalizedGreeting(userAddress);
-          return `${personalizedGreeting} Welcome to the megapot lottery agent. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io`;
+          return `${personalizedGreeting} Welcome to the megapot lottery agent. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io/?referral=c7m8NL7l&channelKey=megapot`;
         }
-        return `${response}\n\n🌐 Try the full experience: https://frame.megapot.io`;
+        return `${response}\n\n🌐 Try the full experience: https://frame.megapot.io/?referral=c7m8NL7l&channelKey=megapot`;
 
       default:
         // Don't add extra information - let the AI response stand alone
@@ -1160,14 +1162,16 @@ Use the action buttons below to get started!`,
 
 🎫 Two ways to buy tickets:
 • Solo tickets: Buy individually and keep 100% of winnings
+  ex: 'buy 5 solo tickets'
 • Pool tickets: Join group purchases to increase winning chances
+  ex: 'buy 5 pool tickets'
 
 📊 Key features:
 • Check your stats and ticket history
 • View current jackpot and odds
 • Set up automated purchases
 
-🌐 Try our full experience: https://frame.megapot.io
+🌐 Try our full experience: https://frame.megapot.io/?referral=c7m8NL7l&channelKey=megapot
 
 Use the action buttons below to get started!`,
       };
@@ -1349,7 +1353,7 @@ Use the action buttons below to get started!`,
         ? await getPersonalizedGreeting(userAddress)
         : "Hello!";
 
-      return `🎰 MegaPot Lottery\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🎫 Solo vs Pool Tickets:\n• Solo: "buy 3 solo ticket(s)" - You keep 100% of any winnings\n• Pool: "buy 2 pool ticket(s)" - Join daily pool, winnings shared proportionally\n• Just "buy 3 tickets" → Choose solo or pool\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io`;
+      return `🎰 MegaPot Lottery\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🎫 Solo vs Pool Tickets:\n• Solo: "buy 3 solo ticket(s)" - You keep 100% of any winnings\n• Pool: "buy 2 pool ticket(s)" - Join daily pool, winnings shared proportionally\n• Just "buy 3 tickets" → Choose solo or pool\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io/?referral=c7m8NL7l&channelKey=megapot`;
     } catch (error) {
       console.error("Error generating contextual help:", error);
       return `🎰 MegaPot Lottery
@@ -1361,7 +1365,7 @@ Quick Commands:
 • "claim" → Withdraw winnings
 
 ⚡ Natural language supported
-🌐 Full site: https://frame.megapot.io`;
+🌐 Full site: https://frame.megapot.io/?referral=c7m8NL7l&channelKey=megapot`;
     }
   }
 }
