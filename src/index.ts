@@ -267,9 +267,15 @@ async function main() {
     const files = await fs.promises.readdir(baseDir);
     console.log(`📂 Contents of ${baseDir}:`, files);
 
-    console.log(`✅ Database setup complete at: ${dbPath}`);
+    // Check if database files exist
+    const dbFiles = files.filter((f) => f.startsWith("xmtp-node-sdk-db"));
+    if (dbFiles.length > 0) {
+      console.log(`✅ Found existing database files: ${dbFiles.join(", ")}`);
+    } else {
+      console.log(`📁 No existing database files found, will create new ones`);
+    }
   } catch (error) {
-    console.error("❌ Error setting up database:", error);
+    console.error("❌ Error checking database directory:", error);
     throw error;
   }
 

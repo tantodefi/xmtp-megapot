@@ -903,7 +903,20 @@ Commands:
         ) {
           console.error(`❌ Paymaster issue detected: ${errorMessage}`);
           await conversation.send(
-            `❌ Automated purchase failed due to paymaster issue.\n\n🔧 **Paymaster Troubleshooting:**\n• Paymaster may not have sufficient funds\n• Paymaster may need contract allowlisting\n• Paymaster gas limits may be too low\n• Try using "buy now" command for manual purchase\n\n💡 **CDP Paymaster Setup:**\n1. Ensure your CDP paymaster has sufficient ETH/BASE tokens\n2. Add MegaPot contract to allowed contracts list\n3. Verify USDC contract is allowlisted\n\n📊 Error: ${errorMessage}`,
+            `❌ Automated purchase failed due to paymaster issue.
+
+🔧 Paymaster Troubleshooting:
+• Paymaster may not have sufficient funds
+• Paymaster may need contract allowlisting
+• Paymaster gas limits may be too low
+• Try using "buy now" command for manual purchase
+
+💡 CDP Paymaster Setup:
+1. Ensure your CDP paymaster has sufficient ETH/BASE tokens
+2. Add MegaPot contract to allowed contracts list
+3. Verify USDC contract is allowlisted
+
+📊 Error: ${errorMessage}`,
           );
         }
 

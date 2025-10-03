@@ -784,7 +784,20 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.9,
-        response: "📋 Checking your spend permission status...",
+        response: `👋 Welcome to MegaPot! I'm your AI-powered lottery assistant.
+
+🎫 Two ways to buy tickets:
+• Solo tickets: Buy individually and keep 100% of winnings
+• Pool tickets: Join group purchases to increase winning chances
+
+📊 Key features:
+• Check your stats and ticket history
+• View current jackpot and odds
+• Set up automated purchases
+
+🌐 Try our full experience: https://frame.megapot.io
+
+Use the action buttons below to get started!`,
       };
     }
 
@@ -1143,8 +1156,20 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.8,
-        response:
-          "👋 Welcome to MegaPot! Quick guide:\n• Solo tickets: 'buy 5 solo tickets'\n• Pool tickets: 'buy 5 pool tickets'\n• Check stats: 'show my stats'\n• Current jackpot: 'show jackpot'",
+        response: `👋 Welcome to MegaPot! I'm your AI-powered lottery assistant.
+
+🎫 Two ways to buy tickets:
+• Solo tickets: Buy individually and keep 100% of winnings
+• Pool tickets: Join group purchases to increase winning chances
+
+📊 Key features:
+• Check your stats and ticket history
+• View current jackpot and odds
+• Set up automated purchases
+
+🌐 Try our full experience: https://frame.megapot.io
+
+Use the action buttons below to get started!`,
       };
     }
 
