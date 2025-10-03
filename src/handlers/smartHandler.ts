@@ -620,13 +620,15 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     // Don't automatically set isBuyIntent based on ticket count alone
     // Let pool detection happen first
 
-    // Try to extract ticket count from LLM response if not found in original message
-    if (!ticketCount && lowerResponse) {
-      const llmTicketMatch = lowerResponse.match(/(\d+)\s*tickets?/i);
-      if (llmTicketMatch) {
-        const llmTicketCount = parseInt(llmTicketMatch[1]);
-        if (llmTicketCount >= 1 && llmTicketCount <= 100) {
-          ticketCount = llmTicketCount;
+    // Try to extract ticket count from message if not found yet
+    if (!ticketCount) {
+      const ticketMatch = originalMessage
+        .toLowerCase()
+        .match(/(\d+)\s*tickets?/i);
+      if (ticketMatch) {
+        const parsedCount = parseInt(ticketMatch[1]);
+        if (parsedCount >= 1 && parsedCount <= 100) {
+          ticketCount = parsedCount;
         }
       }
     }
@@ -1002,9 +1004,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "pooled_purchase",
         confidence: 0.8,
-        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
-        response: "❓ Showing help information...",
-        response: "📊 Fetching your lottery statistics...",
+        response: "📊 Preparing to buy pool tickets...",
         extractedData: {
           pooledRequest: true,
           ticketCount,
@@ -1060,8 +1060,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         type: "help",
         confidence: 0.8,
         response: "👋 Hello! Welcome to the MegaPot lottery agent!",
-        response: "❓ Showing help information...",
-        response: "📊 Fetching your lottery statistics...",
       };
     }
 
@@ -1075,8 +1073,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         type: "greeting",
         confidence: 0.8,
         response: "👋 Hello! Welcome to the MegaPot lottery agent!",
-        response: "❓ Showing help information...",
-        response: "📊 Fetching your lottery statistics...",
       };
     }
 

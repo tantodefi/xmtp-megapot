@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "npx tsc && echo '✅ TypeScript compilation successful'",
+    "build": "npx tsc --diagnostics --extendedDiagnostics --listFiles || (echo '❌ Build failed' && npx tsc --noEmit --pretty)",
     "build:check": "tsc --noEmit",
     "build:clean": "rm -rf dist && npx tsc",
     "build:npm": "npm run build",

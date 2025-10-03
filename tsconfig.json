@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "diagnostics": true,
+    "extendedDiagnostics": true,
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
