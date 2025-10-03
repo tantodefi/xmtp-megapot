@@ -240,7 +240,6 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
 
       // Parse the LLM response to extract intent and data
       const intent = this.extractIntentFromResponse(
-        response,
         message,
         conversationId,
         userInboxId,
@@ -378,12 +377,10 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
    * Extract intent from LLM response
    */
   private extractIntentFromResponse(
-    response: string,
     originalMessage: string,
     conversationId?: string,
     userInboxId?: string,
   ): MessageIntent {
-    const lowerResponse = response.toLowerCase();
     const lowerMessage = originalMessage.toLowerCase();
 
     // Check for spend permission patterns FIRST (highest priority)
@@ -773,7 +770,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "general_inquiry",
         confidence: 0.7,
-        response: "🎰 Fetching current jackpot information...",
         response: "🤔 I understand your question. Let me help clarify...",
       };
     }
@@ -786,9 +782,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "general_inquiry",
         confidence: 0.8,
-        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
-        response: "❓ Showing help information...",
-        response: "📊 Fetching your lottery statistics...",
         response: "🔍 Analyzing conversation type...",
       };
     }
@@ -936,7 +929,10 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         // Extract number from match
         const numberStr = match[1] || match[2];
         if (numberStr) {
-          ticketCount = this.parseNumberFromText(numberStr);
+          const parsedCount = this.parseNumberFromText(numberStr);
+          if (parsedCount) {
+            ticketCount = parsedCount;
+          }
         }
         break;
       }
@@ -1022,10 +1018,8 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "buy_tickets",
         confidence: 0.8,
-        response: "👋 Hello! Welcome to the MegaPot lottery agent!",
-        response: "❓ Showing help information...",
         response: "📊 Fetching your lottery statistics...",
-        extractedData: { ticketCount },
+        extractedData: { ticketCount: ticketCount || 1 },
       };
     }
 
@@ -1138,13 +1132,13 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     ];
 
     if (numericWords.includes(lowerMessage)) {
-      const ticketCount = this.parseNumberFromText(lowerMessage);
-      if (ticketCount) {
+      const parsedTicketCount = this.parseNumberFromText(lowerMessage);
+      if (parsedTicketCount) {
         return {
           type: "buy_tickets",
           confidence: 0.9,
-          extractedData: { ticketCount },
-          response: `🎫 Preparing to buy ${ticketCount} ticket${ticketCount > 1 ? "s" : ""}...`,
+          extractedData: { ticketCount: parsedTicketCount },
+          response: `🎫 Preparing to buy ${parsedTicketCount} ticket${parsedTicketCount > 1 ? "s" : ""}...`,
         };
       }
     }
