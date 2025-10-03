@@ -257,7 +257,7 @@ async function main() {
         );
       } else {
         // In development, create the directory
-        await fs.promises.mkdir(baseDir, { recursive: true, mode: 0o755 });
+        await fs.promises.mkdir(baseDir, { recursive: true });
         console.log(`📁 Created development directory: ${baseDir}`);
       }
     }
@@ -265,16 +265,6 @@ async function main() {
     // Log directory contents to help with debugging
     const files = await fs.promises.readdir(baseDir);
     console.log(`📂 Contents of ${baseDir}:`, files);
-
-    // Ensure database directory has correct permissions
-    await fs.promises.chmod(baseDir, 0o755);
-    console.log(`🔒 Updated base directory permissions: ${baseDir}`);
-
-    // If database file exists, ensure it has correct permissions
-    if (fs.existsSync(dbPath)) {
-      await fs.promises.chmod(dbPath, 0o644);
-      console.log(`📄 Updated database file permissions: ${dbPath}`);
-    }
 
     console.log(`✅ Database setup complete at: ${dbPath}`);
   } catch (error) {
