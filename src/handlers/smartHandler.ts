@@ -714,7 +714,9 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           ticketCount,
           askForPurchaseType: true, // Need to ask solo or pool
         },
-        response: `🎫 How many tickets would you like to purchase? (e.g., '5 tickets')`,
+        response: ticketCount
+          ? `Would you like to buy ${ticketCount} solo or pool tickets? (reply 'solo' or 'pool')`
+          : `🎫 How many tickets would you like to purchase? (e.g., '5 tickets')`,
       };
     }
 

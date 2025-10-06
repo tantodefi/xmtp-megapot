@@ -1033,7 +1033,28 @@ async function handleSmartTextMessage(
           return;
         }
 
-        if (intent.extractedData?.askForQuantity) {
+        if (intent.extractedData?.ticketCount && userAddress) {
+          // If we already have a ticket count, skip asking for quantity and go straight to solo/pool choice
+          const displayName =
+            (await getDisplayName(userAddress as string)) || "Friend";
+          await conversation.send(
+            `${displayName}, would you like to buy ${intent.extractedData.ticketCount} solo or pool tickets? (reply 'solo' or 'pool')`,
+          );
+
+          // Save context for later
+          const buyContextHandler = smartHandler.getContextHandler();
+          buyContextHandler.updateContext(
+            conversation.id,
+            message.senderInboxId,
+            {
+              pendingTicketCount: intent.extractedData.ticketCount,
+              lastIntent: "standalone_number",
+              awaitingConfirmation: false,
+              isGroupChat: isGroupChat,
+              userAddress: userAddress,
+            },
+          );
+        } else if (intent.extractedData?.askForQuantity) {
           await conversation.send(
             "🎫 How many tickets would you like to purchase? (e.g., '5 tickets')",
           );
