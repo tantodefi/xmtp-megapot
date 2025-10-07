@@ -170,7 +170,7 @@ function createSigner(privateKey: string): Signer {
 }
 
 async function main() {
-  console.log("🎰 Starting Smart MegaPot Agent...");
+  console.log("🎰 Starting Smart LottoBot...");
 
   // Initialize MegaPot manager with environment variables
   const megaPotManager = new MegaPotManager(
@@ -204,7 +204,7 @@ async function main() {
     10 * 60 * 1000,
   ); // 10 minutes
 
-  console.log("🤖 Smart MegaPot Agent initialized");
+  console.log("🤖 Smart LottoBot initialized");
   console.log(`📊 Using Mainnet Contract: ${MEGAPOT_CONTRACT_ADDRESS}`);
   console.log(`💰 Using USDC: ${MEGAPOT_USDC_ADDRESS}`);
   console.log(`🔑 Wallet: ${WALLET_KEY.substring(0, 10)}...`);
@@ -358,7 +358,7 @@ async function main() {
     `🔐 Spend permissions handler initialized with spender: ${agentSpenderAddress}`,
   );
 
-  console.log("\n💬 Smart MegaPot Agent is running!");
+  console.log("\n💬 Smart LottoBot is running!");
   console.log(`📝 Send messages to: http://xmtp.chat/dm/${client.inboxId}`);
   console.log("\n🤖 Smart features enabled:");
   console.log("• AI-powered message understanding");
@@ -557,7 +557,7 @@ async function main() {
 
   // Graceful shutdown
   process.on("SIGINT", async () => {
-    console.log("\n🛑 Shutting down Smart MegaPot Agent...");
+    console.log("\n🛑 Shutting down Smart LottoBot...");
     try {
       megaPotManager.cleanup();
       // Note: Client doesn't have a stop() method like Agent
@@ -1016,39 +1016,45 @@ async function handleSmartTextMessage(
               name: "LottoBot Group Purchase",
               description: `Buy tickets for ${memberCount} members`,
             },
-            calls: transactions.flatMap((tx) => [
-              {
-                to: tx.approveCall.to as `0x${string}`,
-                data: tx.approveCall.data as `0x${string}`,
-                value: tx.approveCall.value as `0x${string}`,
-                gas: "0xC350",
-                metadata: {
-                  description: `Approve USDC spending for group purchase`,
-                  transactionType: "erc20_approve",
-                  source: "LottoBot",
-                  origin: "megapot.io",
-                  hostname: "megapot.io",
-                  faviconUrl: "https://megapot.io/favicon.ico",
-                  title: "LottoBot Group Purchase",
+            calls: transactions.flatMap((tx, index) => {
+              // Only show descriptions for the first transaction
+              const isFirst = index === 0;
+              const metadata = {
+                transactionType: "erc20_approve",
+                source: "LottoBot",
+                origin: "megapot.io",
+                hostname: "megapot.io",
+                faviconUrl: "https://megapot.io/favicon.ico",
+                title: "LottoBot Group Purchase",
+              };
+
+              return [
+                {
+                  to: tx.approveCall.to as `0x${string}`,
+                  data: tx.approveCall.data as `0x${string}`,
+                  value: tx.approveCall.value as `0x${string}`,
+                  gas: "0xC350",
+                  metadata: {
+                    ...metadata,
+                    description: isFirst
+                      ? `Approve USDC spending for group purchase (${memberCount} members)`
+                      : undefined,
+                  },
                 },
-              },
-              {
-                to: tx.purchaseCall.to as `0x${string}`,
-                data: tx.purchaseCall.data as `0x${string}`,
-                value: tx.purchaseCall.value as `0x${string}`,
-                gas: "0x30D40",
-                metadata: {
-                  description: `Purchase tickets for group member`,
-                  transactionType: "purchase_tickets",
-                  appName: "LottoBot",
-                  appIcon: "https://megapot.io/favicon.ico",
-                  appDomain: "megapot.io",
-                  hostname: "megapot.io",
-                  faviconUrl: "https://megapot.io/favicon.ico",
-                  title: "LottoBot Group Purchase",
+                {
+                  to: tx.purchaseCall.to as `0x${string}`,
+                  data: tx.purchaseCall.data as `0x${string}`,
+                  value: tx.purchaseCall.value as `0x${string}`,
+                  gas: "0x30D40",
+                  metadata: {
+                    ...metadata,
+                    description: isFirst
+                      ? `Purchase tickets for ${memberCount} group members`
+                      : undefined,
+                  },
                 },
-              },
-            ]),
+              ];
+            }),
           };
 
           await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
@@ -1435,14 +1441,14 @@ async function handleSmartTextMessage(
           isGroupChat,
         );
         await conversation.send(helpMessage);
-        await sendMegaPotActions(conversation);
+        await sendLottoBotActions(conversation);
         break;
 
       case "greeting":
         console.log("👋 Sending welcome message");
         // Don't send another greeting message - the AI already sent one
         // Just send the action buttons
-        await sendMegaPotActions(conversation);
+        await sendLottoBotActions(conversation);
         break;
 
       case "pooled_purchase":
@@ -1454,7 +1460,7 @@ async function handleSmartTextMessage(
                 "👥 Group Pool: Increases group's chances, winnings shared proportionally based on risk exposure\n\n" +
                 "Reply with 'individual' or 'pool', or use the action buttons below.",
             );
-            await sendMegaPotActions(conversation);
+            await sendLottoBotActions(conversation);
           } else {
             await conversation.send(
               `👥 Group Pool Purchases\n\nBuy tickets through the group pool to increase your collective chances of winning!\n\nCommands:\n• "buy 5 tickets for group pool" - Purchase through jackpot pool\n• "pool status" - Check group pool statistics\n• "my pool share" - See your risk exposure\n\n💡 Pool purchases increase winning chances, with prizes distributed proportionally based on risk exposure!`,
@@ -1720,7 +1726,7 @@ async function handleSmartTextMessage(
       await conversation.send(
         "🤖 I encountered an error processing your message. Please try again or use the action buttons below.",
       );
-      await sendMegaPotActions(conversation);
+      await sendLottoBotActions(conversation);
     } catch (sendError) {
       console.error("Error: send error message:", sendError);
     }
@@ -1779,7 +1785,7 @@ async function handleIntentMessage(
               "👥 Group Pool: Increases group's chances, winnings shared proportionally based on risk exposure\n\n" +
               "Reply with 'individual' or 'pool', or use the action buttons below.",
           );
-          await sendMegaPotActions(conversation);
+          await sendLottoBotActions(conversation);
         } else {
           await conversation.send(
             "🎫 How many tickets would you like to purchase? (e.g., '5 tickets')",
@@ -1818,7 +1824,7 @@ async function handleIntentMessage(
           conversation instanceof Group,
         );
         await conversation.send(explanation);
-        await sendMegaPotActions(conversation);
+        await sendLottoBotActions(conversation);
         break;
       case "check-stats":
         await handleStatsIntent(
@@ -1908,14 +1914,14 @@ async function handleTicketPurchaseIntent(
       from: userAddress as `0x${string}`,
       capabilities: {
         reference: txData.referenceId,
-        app: "MegaPot",
-        icon: "https://megapot.io/favicon.ico",
-        domain: "megapot.io",
-        name: "MegaPot Lottery",
-        description: "MegaPot Lottery Assistant",
-        hostname: "megapot.io",
-        faviconUrl: "https://megapot.io/favicon.ico",
-        title: "MegaPot Lottery",
+        app: "LottoBot",
+        icon: "https://frame.megapot.io/favicon.ico",
+        domain: "frame.megapot.io",
+        name: "LottoBot",
+        description: "LottoBot Assistant",
+        hostname: "frame.megapot.io",
+        faviconUrl: "https://frame.megapot.io/favicon.ico",
+        title: "LottoBot",
       },
       calls: [
         {
@@ -1926,11 +1932,11 @@ async function handleTicketPurchaseIntent(
           metadata: {
             description: `Approve USDC spending for ${totalCostUSDC.toFixed(2)} USDC`,
             transactionType: "erc20_approve",
-            source: "MegaPot",
-            origin: "megapot.io",
-            hostname: "megapot.io",
-            faviconUrl: "https://megapot.io/favicon.ico",
-            title: "MegaPot Lottery",
+            source: "LottoBot",
+            origin: "frame.megapot.io",
+            hostname: "frame.megapot.io",
+            faviconUrl: "https://frame.megapot.io/favicon.ico",
+            title: "LottoBot",
           },
         },
         {
@@ -1939,14 +1945,14 @@ async function handleTicketPurchaseIntent(
           value: txData.purchaseCall.value as `0x${string}`,
           gas: "0x30D40",
           metadata: {
-            description: `Purchase ${numTickets} MegaPot ticket${numTickets > 1 ? "s" : ""}`,
+            description: `Purchase ${numTickets} ticket${numTickets > 1 ? "s" : ""}`,
             transactionType: "purchase_tickets",
-            appName: "MegaPot",
-            appIcon: "https://megapot.io/favicon.ico",
-            appDomain: "megapot.io",
-            hostname: "megapot.io",
-            faviconUrl: "https://megapot.io/favicon.ico",
-            title: "MegaPot Lottery",
+            appName: "LottoBot",
+            appIcon: "https://frame.megapot.io/favicon.ico",
+            appDomain: "frame.megapot.io",
+            hostname: "frame.megapot.io",
+            faviconUrl: "https://frame.megapot.io/favicon.ico",
+            title: "LottoBot",
           },
         },
       ],
@@ -2005,7 +2011,7 @@ async function handleStatsIntent(
     // Get enhanced winnings data (including daily prizes)
     const winningsData = await megaPotManager.hasWinningsToClaim(targetAddress);
 
-    let statsMessage = `📊 ${targetDisplayName} MegaPot Stats:
+    let statsMessage = `📊 ${targetDisplayName} LottoBot Stats:
 🎫 Tickets purchased: ${stats.totalTicketsPurchased}
 💵 Total spent: ${megaPotManager.formatAmount(stats.totalSpent)}
 🎉 Total won: ${megaPotManager.formatAmount(stats.totalWinnings)}
@@ -2062,7 +2068,7 @@ async function handleJackpotInfoIntent(
       console.error("Failed to fetch all-time stats:", error);
     }
 
-    const jackpotMessage = `🎰 MegaPot Jackpot Info:
+    const jackpotMessage = `🎰 LottoBot Jackpot Info:
 💰 Current jackpot: $${parseFloat(stats.jackpotPool || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 🎫 Ticket price: $${stats.ticketPrice || "1"}
 📈 Tickets sold: ${stats.ticketsSoldRound || 0}
@@ -2118,7 +2124,7 @@ async function handleClaimIntent(
 
     await conversation.send("🔍 Checking your winnings in both contracts...");
 
-    // Check winnings in both MegaPot and JackpotPool contracts
+    // Check winnings in both LottoBot and JackpotPool contracts
     const [megaPotWinnings, poolWinnings] = await Promise.all([
       megaPotManager.hasWinningsToClaim(userAddress),
       checkPoolWinnings(userAddress, poolHandler),
@@ -2130,7 +2136,7 @@ async function handleClaimIntent(
 
     if (!hasAnyWinnings) {
       await conversation.send(
-        `🎰 No Winnings Available\n\n🔍 Checked all sources:\n• 🎯 MegaPot Contract: $${megaPotWinnings.breakdown.contract.toFixed(2)}\n• 🎁 Daily Prizes: $${megaPotWinnings.breakdown.dailyPrizes.toFixed(2)}\n• 👥 JackpotPool: $${poolWinnings.amount.toFixed(2)}\n\n💡 Winnings appear after:\n• You win a lottery round (Contract)\n• You win daily prizes (API)\n• Pool wins and distributes prizes (JackpotPool)\n\n🎫 Keep playing for your chance to win!`,
+        `🎰 No Winnings Available\n\n🔍 Checked all sources:\n• 🎯 LottoBot Contract: $${megaPotWinnings.breakdown.contract.toFixed(2)}\n• 🎁 Daily Prizes: $${megaPotWinnings.breakdown.dailyPrizes.toFixed(2)}\n• 👥 JackpotPool: $${poolWinnings.amount.toFixed(2)}\n\n💡 Winnings appear after:\n• You win a lottery round (Contract)\n• You win daily prizes (API)\n• Pool wins and distributes prizes (JackpotPool)\n\n🎫 Keep playing for your chance to win!`,
       );
       return;
     }
@@ -2138,7 +2144,7 @@ async function handleClaimIntent(
     // User has winnings - show detailed breakdown
     let winningsMessage = `🎉 Winnings Found!\n\n`;
     if (megaPotWinnings.breakdown.contract > 0) {
-      winningsMessage += `💰 MegaPot Contract: $${megaPotWinnings.breakdown.contract.toFixed(2)} USDC\n`;
+      winningsMessage += `💰 LottoBot Contract: $${megaPotWinnings.breakdown.contract.toFixed(2)} USDC\n`;
     }
     if (megaPotWinnings.breakdown.dailyPrizes > 0) {
       winningsMessage += `🎁 Daily Prizes: $${megaPotWinnings.breakdown.dailyPrizes.toFixed(2)} USDC\n`;
@@ -2150,12 +2156,12 @@ async function handleClaimIntent(
 
     await conversation.send(winningsMessage);
 
-    // Send MegaPot claim transaction if user has contract winnings
+    // Send LottoBot claim transaction if user has contract winnings
     if (megaPotWinnings.breakdown.contract > 0) {
       const megaPotClaimTx =
         await megaPotManager.prepareClaimWinnings(userAddress);
       await conversation.send(
-        `💰 Claim MegaPot Contract Winnings: $${megaPotWinnings.breakdown.contract.toFixed(2)} USDC\n\n🎯 This claims jackpot winnings from the main MegaPot contract.\n\n✅ Open your wallet to approve this transaction.`,
+        `💰 Claim LottoBot Contract Winnings: $${megaPotWinnings.breakdown.contract.toFixed(2)} USDC\n\n🎯 This claims jackpot winnings from the main LottoBot contract.\n\n✅ Open your wallet to approve this transaction.`,
       );
       await conversation.send(megaPotClaimTx, ContentTypeWalletSendCalls);
     }
@@ -2163,7 +2169,7 @@ async function handleClaimIntent(
     // Show info about daily prizes (these might be auto-claimed or need different process)
     if (megaPotWinnings.breakdown.dailyPrizes > 0) {
       await conversation.send(
-        `🎁 Daily Prize Winnings: $${megaPotWinnings.breakdown.dailyPrizes.toFixed(2)} USDC\n\n💡 Daily prizes may be automatically distributed or require a different claim process. Check your wallet balance or the MegaPot website for more details.`,
+        `🎁 Daily Prize Winnings: $${megaPotWinnings.breakdown.dailyPrizes.toFixed(2)} USDC\n\n💡 Daily prizes may be automatically distributed or require a different claim process. Check your wallet balance or visit https://frame.megapot.io/?referral=c7m8NL7l for more details.`,
       );
     }
 
@@ -2180,7 +2186,7 @@ async function handleClaimIntent(
     }
 
     console.log(
-      `✅ Claim transactions sent - MegaPot: $${megaPotWinnings.amount.toFixed(2)}, Pool: $${poolWinnings.amount.toFixed(2)} to: ${userAddress}`,
+      `✅ Claim transactions sent - LottoBot: $${megaPotWinnings.amount.toFixed(2)}, Pool: $${poolWinnings.amount.toFixed(2)} to: ${userAddress}`,
     );
   } catch (error) {
     console.error("❌ Error in claim process:", error);
@@ -2193,7 +2199,7 @@ async function handleClaimIntent(
 async function handleHelpIntent(conversation: any) {
   const isGroupChat = conversation instanceof Group;
 
-  const helpMessage = `🎰 MegaPot Lottery Agent
+  const helpMessage = `🎰 LottoBot
 
 💸 Buy lottery tickets with USDC on Base network
 
@@ -2214,22 +2220,23 @@ ${
   isGroupChat
     ? `👥 Group Features:
 • Pool tickets combine chances with other members
-• Winnings shared based on contribution`
+• Winnings shared based on contribution
+• Buy tickets for everyone in group chat`
     : `🎫 Solo Features:
-• Keep 100% of any winnings
+• Keep 100% of winnings
 • Join groups for pool options`
 }
 
 💰 Current jackpot: Check buttons below
 ⚡ Instant transactions when intent is clear
 
-🌐 Full experience: https://frame.megapot.io`;
+🌐 Full experience: https://frame.megapot.io/?referral=c7m8NL7l`;
 
   await conversation.send(helpMessage);
-  await sendMegaPotActions(conversation);
+  await sendLottoBotActions(conversation);
 }
 
-async function sendMegaPotActions(conversation: any) {
+async function sendLottoBotActions(conversation: any) {
   const isGroupChat = conversation.constructor.name === "Group";
 
   // Only send action buttons in DMs
@@ -2550,7 +2557,7 @@ Try again or say "cancel" to exit.`,
 
       // Send one clean message with transaction
       await conversation.send(
-        `🤖 Automated MegaPot: ${purchaseDescription} for ${spendConfig.duration} days
+        `🤖 Automated LottoBot: ${purchaseDescription} for ${spendConfig.duration} days
 
 💰 Total: $${(spendConfig.dailyLimit * spendConfig.duration).toFixed(2)} USDC (${spendConfig.duration} days × $${spendConfig.dailyLimit}/day)
 ⏰ Schedule: Daily purchases at this time
@@ -2606,7 +2613,7 @@ async function handleSpendPermissionSetup(
 ) {
   try {
     await conversation.send(
-      `🔐 MegaPot Spend Permission Setup
+      `🔐 LottoBot Spend Permission Setup
 
 I'll help you set up automated lottery ticket purchases! This allows me to buy tickets on your behalf within your specified limits.
 
