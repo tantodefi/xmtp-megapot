@@ -416,13 +416,34 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
 
     // Check for buying tickets for everyone in group
     const buyForEveryonePattern =
-      /buy.*ticket.*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person)/i;
+      /(?:buy|get).*(?:everyone|all|each\s+member|each\s+person).*(?:ticket|in\s+group|in\s+chat)|(?:buy|get).*(?:ticket).*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person|in\s+group|in\s+chat)/i;
     if (buyForEveryonePattern.test(lowerMessage)) {
       console.log(
         `👥 DETECTED: Buy tickets for everyone: "${originalMessage}"`,
       );
-      const ticketMatch = lowerMessage.match(/buy\s+(\d+)/i) || ["", "1"];
-      const ticketCount = parseInt(ticketMatch[1]) || 1;
+      // Try multiple patterns to extract ticket count
+      const ticketPatterns = [
+        /(?:buy|get)\s+(\d+)/i,
+        /(\d+)\s+tickets?/i,
+        /a\s+ticket/i, // Match "a ticket" = 1
+        /one\s+ticket/i, // Match "one ticket" = 1
+      ];
+
+      let ticketCount = 1; // Default to 1 ticket
+      for (const pattern of ticketPatterns) {
+        const match = lowerMessage.match(pattern);
+        if (match) {
+          if (match[1]) {
+            const num = parseInt(match[1]);
+            if (!isNaN(num) && num > 0) {
+              ticketCount = num;
+              break;
+            }
+          }
+          // If we matched "a ticket" or "one ticket", keep default of 1
+          break;
+        }
+      }
 
       // Get member count from context
       const context =
