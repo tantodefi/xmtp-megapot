@@ -2087,6 +2087,11 @@ ${
 async function sendMegaPotActions(conversation: any) {
   const isGroupChat = conversation.constructor.name === "Group";
 
+  // Only send action buttons in DMs
+  if (isGroupChat) {
+    return;
+  }
+
   const actions = [
     {
       id: "buy-tickets",

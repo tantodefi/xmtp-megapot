@@ -414,6 +414,48 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       };
     }
 
+    // Check for direct solo/pool ticket purchases
+    const soloTicketPattern = /buy\s+(\d+)\s+solo\s+tickets?/i;
+    const poolTicketPattern = /buy\s+(\d+)\s+pool\s+tickets?/i;
+
+    if (soloTicketPattern.test(lowerMessage)) {
+      console.log(
+        `🎫 DETECTED: Direct solo ticket purchase: "${originalMessage}"`,
+      );
+      const ticketMatch = lowerMessage.match(soloTicketPattern);
+      const ticketCount = parseInt(ticketMatch?.[1] || "1");
+
+      return {
+        type: "buy_tickets",
+        confidence: 0.95,
+        extractedData: {
+          ticketCount,
+          clearIntent: true,
+          purchaseType: "solo",
+        },
+        response: "",
+      };
+    }
+
+    if (poolTicketPattern.test(lowerMessage)) {
+      console.log(
+        `🎫 DETECTED: Direct pool ticket purchase: "${originalMessage}"`,
+      );
+      const ticketMatch = lowerMessage.match(poolTicketPattern);
+      const ticketCount = parseInt(ticketMatch?.[1] || "1");
+
+      return {
+        type: "pooled_purchase",
+        confidence: 0.95,
+        extractedData: {
+          ticketCount,
+          clearIntent: true,
+          purchaseType: "pool",
+        },
+        response: "",
+      };
+    }
+
     // Check for buying tickets for everyone in group
     const buyForEveryonePattern =
       /(?:buy|get).*(?:everyone|all|each\s+member|each\s+person).*(?:ticket|in\s+group|in\s+chat)|(?:buy|get).*(?:ticket).*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person|in\s+group|in\s+chat)/i;
