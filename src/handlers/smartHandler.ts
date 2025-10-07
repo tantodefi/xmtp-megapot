@@ -41,6 +41,7 @@ export interface MessageIntent {
     purchaseType?: "solo" | "pool";
     recipientUsername?: string;
     targetUsername?: string;
+    buyForEveryone?: boolean;
   };
   response: string;
 }
@@ -236,7 +237,7 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
 
       const response =
         completion.choices[0]?.message?.content ||
-        "I'm here to help with MegaPot lottery! Try asking about buying tickets, checking stats, or jackpot info.";
+        "I'm here to help with LottoBot! Try asking about buying tickets, checking stats, or jackpot info.";
 
       // Parse the LLM response to extract intent and data
       const intent = this.extractIntentFromResponse(
@@ -293,7 +294,7 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
       ? "\n- This is a GROUP CHAT. Users can buy POOL TICKETS together to increase their collective chances of winning."
       : "\n- This is a DIRECT MESSAGE conversation.";
 
-    return `You are MegaPot, an AI assistant for a lottery system on Base blockchain. Your role is to:
+    return `You are LottoBot (@lottobot.base.eth), an AI assistant for a lottery system on Base blockchain. Your role is to:
 
 1. ANALYZE user messages and determine their intent
 2. PROVIDE helpful, concise responses (max 2-3 sentences)
@@ -413,30 +414,72 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       };
     }
 
+    // Check for buying tickets for everyone in group
+    const buyForEveryonePattern =
+      /buy.*ticket.*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person)/i;
+    if (buyForEveryonePattern.test(lowerMessage)) {
+      console.log(
+        `👥 DETECTED: Buy tickets for everyone: "${originalMessage}"`,
+      );
+      const ticketMatch = lowerMessage.match(/buy\s+(\d+)/i) || ["", "1"];
+      const ticketCount = parseInt(ticketMatch[1]) || 1;
+
+      // Get member count from context
+      const context =
+        conversationId && userInboxId
+          ? this.contextHandler.getContext(conversationId, userInboxId)
+          : null;
+      const memberCount = context?.groupMemberCount || 0;
+
+      // If member count is 0, we need to fetch it from the conversation
+      if (memberCount === 0) {
+        console.log(
+          `🔄 No member count in context, fetching from conversation...`,
+        );
+        // TODO: Fetch member count from conversation and update context
+      }
+
+      // Calculate total cost
+      const totalCost = ticketCount * memberCount;
+
+      return {
+        type: "buy_tickets",
+        confidence: 0.95,
+        extractedData: {
+          ticketCount,
+          clearIntent: true,
+          buyForEveryone: true,
+        },
+        response: `👥 Preparing group purchase:
+• ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} per member
+• Cost: $${ticketCount}.00 USDC per person
+• Members: ${memberCount} total
+• Total cost: $${totalCost}.00 USDC
+
+✅ Open your wallet to approve this batch transaction. Each member will receive their own tickets!`,
+      };
+    }
+
     // Check for buying tickets for other users (as recipient)
-    const buyForOtherPattern = /buy\s+\d+.*ticket.*for\s+@\w+/i;
-    if (buyForOtherPattern.test(lowerMessage)) {
+    const buyForOtherPattern = /buy\s+(\d+).*ticket.*for\s+@(\w+)/i;
+    const buyForOtherMatch = lowerMessage.match(buyForOtherPattern);
+    if (buyForOtherMatch) {
       console.log(
         `🎁 DETECTED: Buy tickets for other user: "${originalMessage}"`,
       );
-      const ticketMatch = lowerMessage.match(/buy\s+(\d+)/i);
-      const recipientMatch = lowerMessage.match(/for\s+@(\w+)/i);
+      const ticketCount = parseInt(buyForOtherMatch[1]) || 1;
+      const recipientUsername = buyForOtherMatch[2];
 
-      if (ticketMatch && recipientMatch) {
-        const ticketCount = parseInt(ticketMatch[1]);
-        const recipientUsername = recipientMatch[1];
-
-        return {
-          type: "buy_tickets",
-          confidence: 0.95,
-          extractedData: {
-            ticketCount,
-            clearIntent: true,
-            recipientUsername,
-          },
-          response: `🎁 Buying ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for @${recipientUsername}`,
-        };
-      }
+      return {
+        type: "buy_tickets",
+        confidence: 0.95,
+        extractedData: {
+          ticketCount,
+          clearIntent: true,
+          recipientUsername,
+        },
+        response: `🎁 Buying ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for @${recipientUsername}`,
+      };
     }
 
     // Check for showing stats for other users
@@ -784,7 +827,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.9,
-        response: `👋 Welcome to MegaPot! I'm your AI-powered lottery assistant.
+        response: `👋 Welcome to LottoBot! I'm your AI-powered lottery assistant (@lottobot.base.eth).
 
 🎫 Two ways to buy tickets:
 • Solo tickets: Buy individually and keep 100% of winnings
@@ -796,6 +839,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
 • Check your stats and ticket history
 • View current jackpot and odds
 • Set up automated purchases
+• Buy tickets for everyone in group chat
 
 🌐 Try our full experience: https://frame.megapot.io/?referral=c7m8NL7l
 
@@ -955,7 +999,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
         if (userAddress) {
           const personalizedGreeting =
             await getPersonalizedGreeting(userAddress);
-          return `${personalizedGreeting} Welcome to the megapot lottery agent. You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io/?referral=c7m8NL7l`;
+          return `${personalizedGreeting} Welcome to LottoBot (@lottobot.base.eth)! You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io/?referral=c7m8NL7l`;
         }
         return `${response}\n\n🌐 Try the full experience: https://frame.megapot.io/?referral=c7m8NL7l`;
 
@@ -1167,7 +1211,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
         type: "help",
         confidence: 0.8,
         response:
-          "👋 Welcome to MegaPot! Quick guide:\n• Solo tickets: 'buy 5 solo tickets'\n• Pool tickets: 'buy 5 pool tickets'\n• Check stats: 'show my stats'\n• Current jackpot: 'show jackpot'",
+          "👋 Welcome to LottoBot (@lottobot.base.eth)! Quick guide:\n• Solo tickets: 'buy 5 solo tickets'\n• Pool tickets: 'buy 5 pool tickets'\n• Check stats: 'show my stats'\n• Current jackpot: 'show jackpot'",
       };
     }
 
@@ -1180,7 +1224,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
       return {
         type: "greeting",
         confidence: 0.8,
-        response: `👋 Welcome to MegaPot! I'm your AI-powered lottery assistant.
+        response: `👋 Welcome to LottoBot! I'm your AI-powered lottery assistant (@lottobot.base.eth).
 
 🎫 Two ways to buy tickets:
 • Solo tickets: Buy individually and keep 100% of winnings
@@ -1192,6 +1236,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
 • Check your stats and ticket history
 • View current jackpot and odds
 • Set up automated purchases
+• Buy tickets for everyone in group chat
 
 🌐 Try our full experience: https://frame.megapot.io/?referral=c7m8NL7l
 
@@ -1375,10 +1420,10 @@ Use the action buttons below to get started!`,
         ? await getPersonalizedGreeting(userAddress)
         : "Hello!";
 
-      return `🎰 MegaPot Lottery\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🎫 Solo vs Pool Tickets:\n• Solo: "buy 3 solo ticket(s)" - You keep 100% of any winnings\n• Pool: "buy 2 pool ticket(s)" - Join daily pool, winnings shared proportionally\n• Just "buy 3 tickets" → Choose solo or pool\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io/?referral=c7m8NL7l`;
+      return `🎰 LottoBot (@lottobot.base.eth)\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🎫 Solo vs Pool Tickets:\n• Solo: "buy 3 solo ticket(s)" - You keep 100% of any winnings\n• Pool: "buy 2 pool ticket(s)" - Join daily pool, winnings shared proportionally\n• Just "buy 3 tickets" → Choose solo or pool\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io/?referral=c7m8NL7l`;
     } catch (error) {
       console.error("Error generating contextual help:", error);
-      return `🎰 MegaPot Lottery
+      return `🎰 LottoBot (@lottobot.base.eth)
 
 Quick Commands:
 • "buy 3 solo tickets" → Instant transaction

@@ -14,6 +14,7 @@ export interface ConversationContext {
   lastIntent?: string;
   intentConfidence?: number;
   recipientUsername?: string;
+  groupMemberCount?: number;
 }
 
 export class ContextHandler {
