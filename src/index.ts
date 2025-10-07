@@ -767,6 +767,44 @@ async function handleSmartTextMessage(
       }
     }
 
+    // Check for direct solo/pool ticket purchases first
+    const soloTicketMatch = /buy\s+(\d+)\s+solo\s+tickets?/i.exec(content);
+    const poolTicketMatch = /buy\s+(\d+)\s+pool\s+tickets?/i.exec(content);
+
+    if (soloTicketMatch && userAddress) {
+      const ticketCount = parseInt(soloTicketMatch[1]);
+      console.log(`🎫 Direct solo ticket purchase: ${ticketCount} tickets`);
+      await handleTicketPurchaseIntent(
+        ticketCount,
+        userAddress,
+        conversation,
+        megaPotManager,
+        client,
+      );
+      return;
+    }
+
+    if (poolTicketMatch && userAddress) {
+      const ticketCount = parseInt(poolTicketMatch[1]);
+      console.log(`🎫 Direct pool ticket purchase: ${ticketCount} tickets`);
+      const poolResult = await poolHandler.processPooledTicketPurchase(
+        conversation.id,
+        message.senderInboxId,
+        userAddress,
+        ticketCount,
+        conversation,
+        client,
+      );
+      await conversation.send(poolResult.message);
+      if (poolResult.success && poolResult.transactionData) {
+        await conversation.send(
+          poolResult.transactionData,
+          ContentTypeWalletSendCalls,
+        );
+      }
+      return;
+    }
+
     // Use AI to parse message intent and generate response
     const intent = await smartHandler.parseMessageIntent(
       content,

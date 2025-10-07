@@ -445,18 +445,20 @@ To participate:
       pool.totalContributed += totalCost;
       pool.lastActivity = new Date();
 
-      // Calculate member's share percentage
-      const memberShare =
-        pool.totalTickets > 0
-          ? ((member.ticketsPurchased / pool.totalTickets) * 100).toFixed(2)
-          : "0.00";
+      // Get current pool stats from contract
+      const poolStats = await this.getPoolStatsFromContract();
+      const totalPoolTickets = poolStats.totalTickets;
+
+      // Calculate member's share percentage including this purchase
+      const newTotalTickets = totalPoolTickets + numTickets;
+      const memberShare = ((numTickets / newTotalTickets) * 100).toFixed(2);
 
       const userDisplayName = await getDisplayName(userAddress);
       const preparingMessage = `🎯 Pool Purchase Transaction Prepared!
 
 🎫 ${userDisplayName}: ${numTickets} tickets for $${totalCost.toFixed(2)}
-📊 Pool share: ${memberShare}% (${member.ticketsPurchased}/${pool.totalTickets} tickets)
-💰 Risk exposure: $${member.amountContributed.toFixed(2)}
+📊 Pool share: ${memberShare}% (${numTickets}/${newTotalTickets} tickets)
+💰 Risk exposure: $${totalCost.toFixed(2)}
 
 ⚠️ Important: Pool tickets are held by the pool contract and won't appear in your regular ticket stats or the miniapp until prizes are distributed.
 
