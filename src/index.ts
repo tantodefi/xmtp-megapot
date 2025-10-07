@@ -2151,13 +2151,13 @@ async function sendMegaPotActions(conversation: any) {
   const actionsContent: ActionsContent = {
     id: uniqueActionId,
     description: isGroupChat
-      ? "🤖 Smart MegaPot lottery assistant. Individual or group pool purchases:"
-      : "🤖 Smart MegaPot lottery assistant. Choose an action:",
+      ? "🤖 Smart LottoBot. Individual or group pool purchases:"
+      : "🤖 Smart LottoBot. Choose an action:",
     actions,
   };
 
   console.log(
-    `🎯 Sending Smart MegaPot inline actions (${isGroupChat ? "GROUP" : "DM"} - ${actions.length} buttons) with ID: ${uniqueActionId}`,
+    `🎯 Sending Smart LottoBot inline actions (${isGroupChat ? "GROUP" : "DM"} - ${actions.length} buttons) with ID: ${uniqueActionId}`,
   );
   if (isGroupChat) {
     console.log(
