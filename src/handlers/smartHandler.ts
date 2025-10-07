@@ -808,6 +808,28 @@ Use the action buttons below to get started!`,
       lowerMessage.includes("what") ||
       lowerMessage.includes("?")
     ) {
+      // Check if this is a question about solo vs pool tickets
+      const context =
+        conversationId && userInboxId
+          ? this.contextHandler.getContext(conversationId, userInboxId)
+          : null;
+      const isAskingAboutTicketTypes =
+        context?.lastIntent === "standalone_number" ||
+        context?.pendingTicketCount;
+
+      if (isAskingAboutTicketTypes) {
+        return {
+          type: "general_inquiry",
+          confidence: 0.9,
+          response: `🎫 Solo vs Pool Tickets:
+
+• Solo tickets: Buy individually and keep 100% of any winnings
+• Pool tickets: Join group purchases to share costs and increase winning chances
+
+Reply 'solo' or 'pool' to continue with your purchase.`,
+        };
+      }
+
       return {
         type: "general_inquiry",
         confidence: 0.7,
