@@ -949,6 +949,113 @@ async function handleSmartTextMessage(
 
     // Handle specific actions based on intent
     switch (intent.type) {
+      case "buy_tickets":
+        // Check if this is a buy for everyone intent
+        if (
+          intent.extractedData?.buyForEveryone &&
+          isGroupChat &&
+          userAddress
+        ) {
+          console.log("👥 Processing buy for everyone intent");
+          const ticketCount = intent.extractedData.ticketCount || 1;
+
+          // Get group members
+          const members = await conversation.members();
+          const memberCount = members.length;
+          console.log(`👥 Found ${memberCount} members in group`);
+
+          // Prepare transactions for each member
+          const transactions = [];
+          for (const member of members) {
+            // Get member's Ethereum address
+            const memberIdentifier = member.accountIdentifiers.find(
+              (id: any) => id.identifierKind === 0, // IdentifierKind.Ethereum
+            );
+            if (!memberIdentifier) continue;
+
+            const memberAddress = memberIdentifier.identifier;
+            console.log(
+              `👤 Preparing transaction for member: ${memberAddress}`,
+            );
+
+            // Prepare transaction for this member
+            const txData = await megaPotManager.prepareTicketPurchase(
+              ticketCount,
+              memberAddress,
+            );
+            transactions.push(txData);
+          }
+
+          // Calculate total cost
+          const totalCost = ticketCount * memberCount;
+          const displayName = await getDisplayName(userAddress);
+
+          // Send message with transaction details
+          await conversation.send(
+            `👥 Group Purchase Prepared!
+
+🎫 Buying ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for each member:
+• ${memberCount} members total
+• ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} each
+• Total cost: $${totalCost}.00 USDC
+
+✅ Open your wallet to approve the batch transaction.
+⚡ Each member will receive their own tickets!`,
+          );
+
+          // Send the batch transaction
+          const walletSendCalls = {
+            version: "1.0",
+            chainId: `0x${base.id.toString(16)}`,
+            from: userAddress as `0x${string}`,
+            capabilities: {
+              reference: `megapot_group_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              app: "LottoBot",
+              icon: "https://megapot.io/favicon.ico",
+              domain: "megapot.io",
+              name: "LottoBot Group Purchase",
+              description: `Buy tickets for ${memberCount} members`,
+            },
+            calls: transactions.flatMap((tx) => [
+              {
+                to: tx.approveCall.to as `0x${string}`,
+                data: tx.approveCall.data as `0x${string}`,
+                value: tx.approveCall.value as `0x${string}`,
+                gas: "0xC350",
+                metadata: {
+                  description: `Approve USDC spending for group purchase`,
+                  transactionType: "erc20_approve",
+                  source: "LottoBot",
+                  origin: "megapot.io",
+                  hostname: "megapot.io",
+                  faviconUrl: "https://megapot.io/favicon.ico",
+                  title: "LottoBot Group Purchase",
+                },
+              },
+              {
+                to: tx.purchaseCall.to as `0x${string}`,
+                data: tx.purchaseCall.data as `0x${string}`,
+                value: tx.purchaseCall.value as `0x${string}`,
+                gas: "0x30D40",
+                metadata: {
+                  description: `Purchase tickets for group member`,
+                  transactionType: "purchase_tickets",
+                  appName: "LottoBot",
+                  appIcon: "https://megapot.io/favicon.ico",
+                  appDomain: "megapot.io",
+                  hostname: "megapot.io",
+                  faviconUrl: "https://megapot.io/favicon.ico",
+                  title: "LottoBot Group Purchase",
+                },
+              },
+            ]),
+          };
+
+          await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
+          return;
+        }
+        break;
+
       case "confirmation":
         console.log("✅ Processing confirmation for pending purchase");
         const contextHandler = smartHandler.getContextHandler();

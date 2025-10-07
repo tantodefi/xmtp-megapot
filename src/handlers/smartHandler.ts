@@ -6,26 +6,28 @@ import {
 } from "../utils/displayName.js";
 import { ContextHandler } from "./contextHandler.js";
 
+export type MessageIntentType =
+  | "buy_tickets"
+  | "check_stats"
+  | "jackpot_info"
+  | "claim_winnings"
+  | "help"
+  | "greeting"
+  | "general_inquiry"
+  | "pooled_purchase"
+  | "confirmation"
+  | "cancellation"
+  | "setup_spend_permission"
+  | "spend_permission_status"
+  | "start_automation"
+  | "stop_automation"
+  | "revoke_permissions"
+  | "spend_config_input"
+  | "buy_now"
+  | "unknown";
+
 export interface MessageIntent {
-  type:
-    | "buy_tickets"
-    | "check_stats"
-    | "jackpot_info"
-    | "claim_winnings"
-    | "help"
-    | "greeting"
-    | "general_inquiry"
-    | "pooled_purchase"
-    | "confirmation"
-    | "cancellation"
-    | "setup_spend_permission"
-    | "spend_permission_status"
-    | "start_automation"
-    | "stop_automation"
-    | "revoke_permissions"
-    | "spend_config_input"
-    | "buy_now"
-    | "unknown";
+  type: MessageIntentType;
   confidence: number;
   extractedData?: {
     ticketCount?: number;
@@ -173,8 +175,8 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
                 conversationId,
                 userInboxId,
               );
-            return {
-              type: "confirmation",
+            const confirmationResponse = {
+              type: "confirmation" as const,
               confidence: 0.95,
               extractedData: {
                 isConfirmation: true,
@@ -185,14 +187,16 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
               },
               response: `Perfect! Proceeding with your ${pendingConfirmation?.message || "purchase"}...`,
             };
+            return confirmationResponse;
           } else if (this.contextHandler.isCancellationMessage(message)) {
-            return {
-              type: "cancellation",
+            const cancellationResponse = {
+              type: "cancellation" as const,
               confidence: 0.95,
               extractedData: { isCancellation: true },
               response:
                 "No problem! Your purchase has been cancelled. Let me know if you'd like to try something else.",
             };
+            return cancellationResponse;
           }
         }
       }
@@ -499,7 +503,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         console.log(
           `🔄 No member count in context, fetching from conversation...`,
         );
-        // TODO: Fetch member count from conversation and update context
+        // We'll let the main handler fetch the member count since it has direct access to the conversation object
       }
 
       // Calculate total cost
