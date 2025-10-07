@@ -294,7 +294,7 @@ Both types cost $1 USDC per ticket. Choose based on your preference for individu
       ? "\n- This is a GROUP CHAT. Users can buy POOL TICKETS together to increase their collective chances of winning."
       : "\n- This is a DIRECT MESSAGE conversation.";
 
-    return `You are LottoBot (@lottobot.base.eth), an AI assistant for a lottery system on Base blockchain. Your role is to:
+    return `You are LottoBot, an AI assistant for a lottery system on Base blockchain. Your role is to:
 
 1. ANALYZE user messages and determine their intent
 2. PROVIDE helpful, concise responses (max 2-3 sentences)
@@ -827,7 +827,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       return {
         type: "greeting",
         confidence: 0.9,
-        response: `👋 Welcome to LottoBot! I'm your AI-powered lottery assistant (@lottobot.base.eth).
+        response: `👋 Welcome to LottoBot! I'm your AI-powered lottery assistant.
 
 🎫 Two ways to buy tickets:
 • Solo tickets: Buy individually and keep 100% of winnings
@@ -999,7 +999,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
         if (userAddress) {
           const personalizedGreeting =
             await getPersonalizedGreeting(userAddress);
-          return `${personalizedGreeting} Welcome to LottoBot (@lottobot.base.eth)! You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try the full experience: https://frame.megapot.io/?referral=c7m8NL7l`;
+          return `${personalizedGreeting} Welcome to LottoBot! You can buy tickets, check your stats, or inquire about the jackpot. What would you like to do today?\n\n🌐 Try our full experience: https://frame.megapot.io/?referral=c7m8NL7l`;
         }
         return `${response}\n\n🌐 Try the full experience: https://frame.megapot.io/?referral=c7m8NL7l`;
 
@@ -1211,7 +1211,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
         type: "help",
         confidence: 0.8,
         response:
-          "👋 Welcome to LottoBot (@lottobot.base.eth)! Quick guide:\n• Solo tickets: 'buy 5 solo tickets'\n• Pool tickets: 'buy 5 pool tickets'\n• Check stats: 'show my stats'\n• Current jackpot: 'show jackpot'",
+          "👋 Welcome to LottoBot! Quick guide:\n• Solo tickets: buy 5 solo tickets\n• Pool tickets: buy 5 pool tickets\n• Check stats: show my stats\n• Current jackpot: show jackpot",
       };
     }
 
@@ -1224,7 +1224,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
       return {
         type: "greeting",
         confidence: 0.8,
-        response: `👋 Welcome to LottoBot! I'm your AI-powered lottery assistant (@lottobot.base.eth).
+        response: `👋 Welcome to LottoBot! I'm your AI-powered lottery assistant.
 
 🎫 Two ways to buy tickets:
 • Solo tickets: Buy individually and keep 100% of winnings
@@ -1420,10 +1420,10 @@ Use the action buttons below to get started!`,
         ? await getPersonalizedGreeting(userAddress)
         : "Hello!";
 
-      return `🎰 LottoBot (@lottobot.base.eth)\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🎫 Solo vs Pool Tickets:\n• Solo: "buy 3 solo ticket(s)" - You keep 100% of any winnings\n• Pool: "buy 2 pool ticket(s)" - Join daily pool, winnings shared proportionally\n• Just "buy 3 tickets" → Choose solo or pool\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io/?referral=c7m8NL7l`;
+      return `🎰 LottoBot\n\n${greeting} Jackpot: $${lotteryStats.jackpotPool || "0"}\n\n📝 Commands:\n• "buy 3 solo tickets" → Instant transaction\n• "buy 2 pool tickets" → Join daily pool\n• "5" → Choose solo or pool\n• "stats" → Your history (${lotteryStats.totalTicketsPurchased || 0} tickets)\n• "claim" → Withdraw winnings\n\n🎫 Solo vs Pool Tickets:\n• Solo: "buy 3 solo ticket(s)" - You keep 100% of any winnings\n• Pool: "buy 2 pool ticket(s)" - Join daily pool, winnings shared proportionally\n• Just "buy 3 tickets" → Choose solo or pool\n\n🤖 Automation:\n• "setup spend permission" → Enable automated buying\n• "start automation" → Begin daily purchases\n• "spend status" → Check automation status\n\n${isGroupChat ? "👥 Pool: Combine chances with group" : "🎫 Solo: Keep 100% winnings"}\n\n⚡ Just tell me what you want - I understand natural language\n🌐 Full site: https://frame.megapot.io/?referral=c7m8NL7l`;
     } catch (error) {
       console.error("Error generating contextual help:", error);
-      return `🎰 LottoBot (@lottobot.base.eth)
+      return `🎰 LottoBot
 
 Quick Commands:
 • "buy 3 solo tickets" → Instant transaction
