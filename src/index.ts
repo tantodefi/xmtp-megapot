@@ -950,6 +950,33 @@ async function handleSmartTextMessage(
     // Handle specific actions based on intent
     switch (intent.type) {
       case "buy_tickets":
+        // If we have a ticket count but no purchase type, ask for solo/pool choice
+        if (
+          intent.extractedData?.ticketCount &&
+          userAddress &&
+          !intent.extractedData?.purchaseType
+        ) {
+          const displayName = await getDisplayName(userAddress);
+          await conversation.send(
+            `${displayName}, would you like to buy ${intent.extractedData.ticketCount} solo or pool tickets? (reply 'solo' or 'pool')`,
+          );
+
+          // Save context for later
+          const buyContextHandler = smartHandler.getContextHandler();
+          buyContextHandler.updateContext(
+            conversation.id,
+            message.senderInboxId,
+            {
+              pendingTicketCount: intent.extractedData.ticketCount,
+              lastIntent: "standalone_number",
+              awaitingConfirmation: false,
+              isGroupChat: isGroupChat,
+              userAddress: userAddress,
+            },
+          );
+          return;
+        }
+
         // Check if this is a buy for everyone intent
         if (
           intent.extractedData?.buyForEveryone &&
