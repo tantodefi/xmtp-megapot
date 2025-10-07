@@ -610,9 +610,9 @@ async function handleSmartTextMessage(
     // Check for group mentions (only respond in groups if mentioned or using slash commands)
     // But allow responses to ongoing conversations (solo/pool choices, confirmations, etc.)
     const hasMention =
-      lowerContent.includes("@megapot") ||
-      lowerContent.includes("@megapot.base.eth") ||
-      lowerContent.includes("@megapot.eth") ||
+      lowerContent.includes("@lottobot") ||
+      lowerContent.includes("@lottobot.base.eth") ||
+      lowerContent.includes("@lottobot.eth") ||
       lowerContent.startsWith("/help") ||
       lowerContent.startsWith("/") ||
       !isGroupChat; // Always respond in DMs
@@ -629,7 +629,7 @@ async function handleSmartTextMessage(
 
     if (isGroupChat && !hasMention && !isOngoingConversationResponse) {
       console.log(
-        "🚫 Skipping group message without @megapot mention or slash command",
+        "🚫 Skipping group message without @lottobot mention or slash command",
       );
       return;
     }
