@@ -15,6 +15,7 @@ export interface ConversationContext {
   intentConfidence?: number;
   recipientUsername?: string;
   groupMemberCount?: number;
+  buyForEveryone?: boolean;
 }
 
 export class ContextHandler {

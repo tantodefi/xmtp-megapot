@@ -715,6 +715,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
             ticketCount: context.pendingTicketCount,
             clearIntent: true,
             purchaseType: lowerMessage as "solo" | "pool",
+            buyForEveryone: context.buyForEveryone,
           },
           response: `🎫 Preparing to buy ${context.pendingTicketCount} ${lowerMessage} ticket${context.pendingTicketCount > 1 ? "s" : ""}...`,
         };
@@ -1232,7 +1233,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
         type: "help",
         confidence: 0.8,
         response:
-          "👋 Welcome to LottoBot! Quick guide:\n• Solo tickets: buy 5 solo tickets\n• Pool tickets: buy 5 pool tickets\n• Check stats: show my stats\n• Current jackpot: show jackpot",
+          "👋 Welcome to LottoBot! Quick guide:\n• Solo tickets: buy 5 solo tickets\n• Pool tickets: buy 5 pool tickets\n• Check stats: show my stats\n• Current jackpot: show jackpot\n\n🌐 Try our full experience: https://frame.megapot.io/?referral=c7m8NL7l",
       };
     }
 
