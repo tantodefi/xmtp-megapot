@@ -460,73 +460,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       };
     }
 
-    // Check for buying tickets for everyone in group
-    const buyForEveryonePattern =
-      /(?:buy|get).*(?:everyone|all|each\s+member|each\s+person).*(?:ticket|in\s+group|in\s+chat)|(?:buy|get).*(?:ticket).*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person|in\s+group|in\s+chat)/i;
-    if (buyForEveryonePattern.test(lowerMessage)) {
-      console.log(
-        `👥 DETECTED: Buy tickets for everyone: "${originalMessage}"`,
-      );
-      // Try multiple patterns to extract ticket count
-      const ticketPatterns = [
-        /(?:buy|get)\s+(\d+)/i,
-        /(\d+)\s+tickets?/i,
-        /a\s+ticket/i, // Match "a ticket" = 1
-        /one\s+ticket/i, // Match "one ticket" = 1
-      ];
-
-      let ticketCount = 1; // Default to 1 ticket
-      for (const pattern of ticketPatterns) {
-        const match = lowerMessage.match(pattern);
-        if (match) {
-          if (match[1]) {
-            const num = parseInt(match[1]);
-            if (!isNaN(num) && num > 0) {
-              ticketCount = num;
-              break;
-            }
-          }
-          // If we matched "a ticket" or "one ticket", keep default of 1
-          break;
-        }
-      }
-
-      // Get member count from context
-      const context =
-        conversationId && userInboxId
-          ? this.contextHandler.getContext(conversationId, userInboxId)
-          : null;
-      const memberCount = context?.groupMemberCount || 0;
-
-      // If member count is 0, we need to fetch it from the conversation
-      if (memberCount === 0) {
-        console.log(
-          `🔄 No member count in context, fetching from conversation...`,
-        );
-        // We'll let the main handler fetch the member count since it has direct access to the conversation object
-      }
-
-      // Calculate total cost
-      const totalCost = ticketCount * memberCount;
-
-      return {
-        type: "buy_tickets",
-        confidence: 0.95,
-        extractedData: {
-          ticketCount,
-          clearIntent: true,
-          buyForEveryone: true,
-        },
-        response: `👥 Preparing group purchase:
-• ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} per member
-• Cost: $${ticketCount}.00 USDC per person
-• Members: ${memberCount} total
-• Total cost: $${totalCost}.00 USDC
-
-✅ Open your wallet to approve this batch transaction. Each member will receive their own tickets!`,
-      };
-    }
-
     // Check for buying tickets for other users (as recipient)
     const buyForOtherPattern = /buy\s+(\d+).*ticket.*for\s+@(\w+)/i;
     const buyForOtherMatch = lowerMessage.match(buyForOtherPattern);
@@ -816,6 +749,27 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         !/\btickets\b/.test(lowerMessage)
       ) {
         ticketCount = 1;
+      }
+
+      // Check if this is a buy for everyone request
+      const buyForEveryonePattern =
+        /(?:buy|get).*(?:everyone|all|each\s+member|each\s+person).*(?:ticket|in\s+group|in\s+chat)|(?:buy|get).*(?:ticket).*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person|in\s+group|in\s+chat)/i;
+
+      if (buyForEveryonePattern.test(lowerMessage)) {
+        console.log(
+          `👥 DETECTED: Buy tickets for everyone: "${originalMessage}"`,
+        );
+        const numTickets = ticketCount || 1;
+        return {
+          type: "buy_tickets",
+          confidence: 0.95,
+          extractedData: {
+            ticketCount: numTickets,
+            buyForEveryone: true,
+            clearIntent: true,
+          },
+          response: "", // Let index.ts handle the group purchase flow
+        };
       }
 
       // Otherwise, we need to ask for purchase type
