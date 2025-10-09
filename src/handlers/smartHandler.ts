@@ -818,27 +818,6 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         ticketCount = 1;
       }
 
-      // Check if this is a buy for everyone request
-      const buyForEveryonePattern =
-        /(?:buy|get).*(?:everyone|all|each\s+member|each\s+person).*(?:ticket|in\s+group|in\s+chat)|(?:buy|get).*(?:ticket).*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person|in\s+group|in\s+chat)/i;
-
-      if (buyForEveryonePattern.test(lowerMessage)) {
-        console.log(
-          `👥 DETECTED: Buy tickets for everyone: "${originalMessage}"`,
-        );
-        const numTickets = ticketCount || 1;
-        return {
-          type: "buy_tickets",
-          confidence: 0.95,
-          extractedData: {
-            ticketCount: numTickets,
-            buyForEveryone: true,
-            clearIntent: true,
-          },
-          response: "", // Let index.ts handle the group purchase flow
-        };
-      }
-
       // Otherwise, we need to ask for purchase type
       const numTickets = ticketCount || 1;
       return {
