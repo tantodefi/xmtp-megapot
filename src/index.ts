@@ -1125,7 +1125,7 @@ ${memberAddresses.map((addr) => `• ${addr}`).join("\n")}`,
           await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
           return;
         }
-        break;
+      // Don't break here - let the case continue to process other intents
 
       case "confirmation":
         console.log("✅ Processing confirmation for pending purchase");

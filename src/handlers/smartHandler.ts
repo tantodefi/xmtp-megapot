@@ -716,12 +716,12 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       };
     }
 
-    // SECOND: Check for explicit pool purchase (clear intent - no confirmation needed)
-    const poolKeywords = ["pool", "together", "shared", "collective"];
-
-    // Check for "buy for everyone in group" pattern first
+    // Check for "buy for everyone in group" pattern FIRST (highest priority)
     const buyForEveryonePattern =
       /(?:buy|get).*(?:everyone|all|each\s+member|each\s+person).*(?:ticket|in\s+group|in\s+chat)|(?:buy|get).*(?:ticket).*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person|in\s+group|in\s+chat)/i;
+
+    // SECOND: Check for explicit pool purchase (clear intent - no confirmation needed)
+    const poolKeywords = ["pool", "together", "shared", "collective"];
 
     if (buyForEveryonePattern.test(lowerMessage)) {
       console.log(
@@ -1185,7 +1185,7 @@ Reply 'solo' or 'pool' to continue with your purchase.`,
     }
 
     // Check for pool context BEFORE returning buy_tickets
-    const poolKeywords = ["pool", "group", "together", "shared", "collective"];
+    const poolKeywords = ["pool", "together", "shared", "collective"];
     const hasPoolContext = poolKeywords.some((keyword) =>
       lowerMessage.includes(keyword),
     );
