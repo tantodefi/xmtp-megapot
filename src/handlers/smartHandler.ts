@@ -818,14 +818,16 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
         ticketCount = 1;
       }
 
+      // Otherwise, we need to ask for purchase type
+      const numTickets = ticketCount || 1;
       return {
         type: "buy_tickets",
         confidence: 0.9,
         extractedData: {
-          ticketCount,
-          askForPurchaseType: true, // Need to ask solo or pool
+          ticketCount: numTickets,
+          askForPurchaseType: true,
         },
-        response: `Would you like to buy ${ticketCount || 1} solo or pool tickets? (reply 'solo' or 'pool')`,
+        response: `Would you like to buy ${numTickets} solo or pool tickets? (reply 'solo' or 'pool')`,
       };
     }
 
