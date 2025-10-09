@@ -951,54 +951,7 @@ async function handleSmartTextMessage(
     // Handle specific actions based on intent
     switch (intent.type) {
       case "buy_tickets":
-        // If we have a purchase type, process the transaction immediately
-        if (
-          intent.extractedData?.purchaseType === "solo" &&
-          intent.extractedData?.ticketCount &&
-          userAddress
-        ) {
-          console.log(
-            `🎫 Processing solo ticket purchase: ${intent.extractedData.ticketCount} tickets`,
-          );
-          const txData = await megaPotManager.prepareTicketPurchase(
-            intent.extractedData.ticketCount,
-            userAddress,
-          );
-          await conversation.send(
-            `🎫 Transaction prepared! Open your wallet to approve the purchase of ${intent.extractedData.ticketCount} solo ticket${intent.extractedData.ticketCount > 1 ? "s" : ""}.`,
-          );
-          await conversation.send(txData, ContentTypeWalletSendCalls);
-          return;
-        }
-
-        // If we have a ticket count but no purchase type, ask for solo/pool choice
-        if (
-          intent.extractedData?.ticketCount &&
-          userAddress &&
-          !intent.extractedData?.purchaseType
-        ) {
-          const displayName = await getDisplayName(userAddress);
-          await conversation.send(
-            `${displayName}, would you like to buy ${intent.extractedData.ticketCount} solo or pool tickets? (reply 'solo' or 'pool')`,
-          );
-
-          // Save context for later
-          const buyContextHandler = smartHandler.getContextHandler();
-          buyContextHandler.updateContext(
-            conversation.id,
-            message.senderInboxId,
-            {
-              pendingTicketCount: intent.extractedData.ticketCount,
-              lastIntent: "standalone_number",
-              awaitingConfirmation: false,
-              isGroupChat: isGroupChat,
-              userAddress: userAddress,
-            },
-          );
-          return;
-        }
-
-        // Check if this is a buy for everyone intent
+        // Check if this is a buy for everyone intent FIRST (highest priority)
         if (
           intent.extractedData?.buyForEveryone &&
           isGroupChat &&
@@ -1125,7 +1078,57 @@ ${memberAddresses.map((addr) => `• ${addr}`).join("\n")}`,
           await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
           return;
         }
-      // Don't break here - let the case continue to process other intents
+
+        // If we have a purchase type, process the transaction immediately
+        if (
+          intent.extractedData?.purchaseType === "solo" &&
+          intent.extractedData?.ticketCount &&
+          userAddress
+        ) {
+          console.log(
+            `🎫 Processing solo ticket purchase: ${intent.extractedData.ticketCount} tickets`,
+          );
+          const txData = await megaPotManager.prepareTicketPurchase(
+            intent.extractedData.ticketCount,
+            userAddress,
+          );
+          await conversation.send(
+            `🎫 Transaction prepared! Open your wallet to approve the purchase of ${intent.extractedData.ticketCount} solo ticket${intent.extractedData.ticketCount > 1 ? "s" : ""}.`,
+          );
+          await conversation.send(txData, ContentTypeWalletSendCalls);
+          return;
+        }
+
+        // If we have a ticket count but no purchase type AND not buying for everyone, ask for solo/pool choice
+        if (
+          intent.extractedData?.ticketCount &&
+          userAddress &&
+          !intent.extractedData?.purchaseType &&
+          !intent.extractedData?.buyForEveryone
+        ) {
+          const displayName = await getDisplayName(userAddress);
+          await conversation.send(
+            `${displayName}, would you like to buy ${intent.extractedData.ticketCount} solo or pool tickets? (reply 'solo' or 'pool')`,
+          );
+
+          // Save context for later
+          const buyContextHandler = smartHandler.getContextHandler();
+          buyContextHandler.updateContext(
+            conversation.id,
+            message.senderInboxId,
+            {
+              pendingTicketCount: intent.extractedData.ticketCount,
+              lastIntent: "standalone_number",
+              awaitingConfirmation: false,
+              isGroupChat: isGroupChat,
+              userAddress: userAddress,
+            },
+          );
+          return;
+        }
+
+        // Continue to other buy_tickets cases if not handled above
+        break;
 
       case "confirmation":
         console.log("✅ Processing confirmation for pending purchase");
