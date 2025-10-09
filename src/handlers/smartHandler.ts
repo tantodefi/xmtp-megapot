@@ -717,7 +717,27 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
     }
 
     // SECOND: Check for explicit pool purchase (clear intent - no confirmation needed)
-    const poolKeywords = ["pool", "group", "together", "shared", "collective"];
+    const poolKeywords = ["pool", "together", "shared", "collective"];
+
+    // Check for "buy for everyone in group" pattern first
+    const buyForEveryonePattern =
+      /(?:buy|get).*(?:everyone|all|each\s+member|each\s+person).*(?:ticket|in\s+group|in\s+chat)|(?:buy|get).*(?:ticket).*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person|in\s+group|in\s+chat)/i;
+
+    if (buyForEveryonePattern.test(lowerMessage)) {
+      console.log(
+        `👥 DETECTED: Buy tickets for everyone: "${originalMessage}"`,
+      );
+      return {
+        type: "buy_tickets",
+        confidence: 0.95,
+        extractedData: {
+          ticketCount: ticketCount || 1,
+          clearIntent: true,
+          buyForEveryone: true,
+        },
+        response: "", // Let index.ts handle the group purchase flow
+      };
+    }
 
     const hasPoolContext = poolKeywords.some((keyword) =>
       lowerMessage.includes(keyword),
