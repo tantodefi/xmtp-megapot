@@ -437,7 +437,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           clearIntent: true,
           purchaseType: "solo",
         },
-        response: "",
+        response: `🎫 Preparing to buy ${ticketCount} solo ticket${ticketCount > 1 ? "s" : ""}...`,
       };
     }
 
@@ -825,7 +825,7 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
           ticketCount,
           askForPurchaseType: true, // Need to ask solo or pool
         },
-        response: "", // Let the main handler handle the response
+        response: `Would you like to buy ${ticketCount || 1} solo or pool tickets? (reply 'solo' or 'pool')`,
       };
     }
 

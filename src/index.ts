@@ -950,6 +950,26 @@ async function handleSmartTextMessage(
     // Handle specific actions based on intent
     switch (intent.type) {
       case "buy_tickets":
+        // If we have a purchase type, process the transaction immediately
+        if (
+          intent.extractedData?.purchaseType === "solo" &&
+          intent.extractedData?.ticketCount &&
+          userAddress
+        ) {
+          console.log(
+            `🎫 Processing solo ticket purchase: ${intent.extractedData.ticketCount} tickets`,
+          );
+          const txData = await megaPotManager.prepareTicketPurchase(
+            intent.extractedData.ticketCount,
+            userAddress,
+          );
+          await conversation.send(
+            `🎫 Transaction prepared! Open your wallet to approve the purchase of ${intent.extractedData.ticketCount} solo ticket${intent.extractedData.ticketCount > 1 ? "s" : ""}.`,
+          );
+          await conversation.send(txData, ContentTypeWalletSendCalls);
+          return;
+        }
+
         // If we have a ticket count but no purchase type, ask for solo/pool choice
         if (
           intent.extractedData?.ticketCount &&
