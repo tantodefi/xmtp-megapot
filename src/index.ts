@@ -1009,12 +1009,25 @@ async function handleSmartTextMessage(
 
           // Get group members
           const members = await conversation.members();
-          const memberCount = members.length;
-          console.log(`👥 Found ${memberCount} members in group`);
+          // Filter out the bot itself
+          const filteredMembers = members.filter(
+            (member: {
+              inboxId: string;
+              accountIdentifiers: Array<{
+                identifierKind: number;
+                identifier: string;
+              }>;
+            }) => member.inboxId.toLowerCase() !== client.inboxId.toLowerCase(),
+          );
+          const memberCount = filteredMembers.length;
+          console.log(
+            `👥 Found ${memberCount} members in group (excluding bot)`,
+          );
 
           // Prepare transactions for each member
           const transactions = [];
-          for (const member of members) {
+          const memberAddresses = [];
+          for (const member of filteredMembers) {
             // Get member's Ethereum address
             const memberIdentifier = member.accountIdentifiers.find(
               (id: any) => id.identifierKind === 0, // IdentifierKind.Ethereum
@@ -1032,6 +1045,7 @@ async function handleSmartTextMessage(
               memberAddress,
             );
             transactions.push(txData);
+            memberAddresses.push(memberAddress);
           }
 
           // Calculate total cost
@@ -1048,7 +1062,10 @@ async function handleSmartTextMessage(
 • Total cost: $${totalCost}.00 USDC
 
 ✅ Open your wallet to approve the batch transaction.
-⚡ Each member will receive their own tickets!`,
+⚡ Each member will receive their own tickets!
+
+Members receiving tickets:
+${memberAddresses.map((addr) => `• ${addr}`).join("\n")}`,
           );
 
           // Send the batch transaction
@@ -1057,7 +1074,7 @@ async function handleSmartTextMessage(
             chainId: `0x${base.id.toString(16)}`,
             from: userAddress as `0x${string}`,
             capabilities: {
-              reference: `megapot_group_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              reference: `lottobot_group_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
               app: "LottoBot",
               icon: "https://megapot.io/favicon.ico",
               domain: "megapot.io",
