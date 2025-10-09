@@ -1012,7 +1012,13 @@ async function handleSmartTextMessage(
 
             // Resolve member's display name
             const memberName = await getDisplayName(memberAddress);
-            selectedNames.push(memberName || memberAddress);
+            // If name doesn't already start with @, and it's not a shortened address, add @
+            const formattedName = memberName.startsWith("@")
+              ? memberName
+              : memberName.includes("...")
+                ? `@${memberName}`
+                : `@${memberName}`;
+            selectedNames.push(formattedName);
 
             // Prepare transaction for this member
             const txData = await megaPotManager.prepareTicketPurchase(

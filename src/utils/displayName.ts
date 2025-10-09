@@ -101,7 +101,7 @@ export async function getDisplayName(address: string): Promise<string> {
 }
 
 /**
- * Resolve ENS name for a wallet address using public ENS resolver
+ * Resolve ENS name for a wallet address using public ENS resolver with timeout
  */
 async function resolveENS(address: string): Promise<string | null> {
   try {
@@ -116,9 +116,21 @@ async function resolveENS(address: string): Promise<string | null> {
 
     console.log(`🔍 Resolving ENS for address: ${address}`);
 
-    const ensName = await mainnetClient.getEnsName({
-      address: address as `0x${string}`,
+    // Create timeout promise (3 seconds)
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => {
+        console.log(`⏱️ ENS resolution timeout for ${address}`);
+        resolve(null);
+      }, 3000);
     });
+
+    // Race between ENS resolution and timeout
+    const ensName = await Promise.race([
+      mainnetClient.getEnsName({
+        address: address as `0x${string}`,
+      }),
+      timeoutPromise,
+    ]);
 
     if (ensName && ensName.endsWith(".eth")) {
       console.log(`✅ Resolved ${address} via ENS: ${ensName}`);
@@ -494,15 +506,15 @@ async function resolveFarcaster(address: string): Promise<string | null> {
 
 /**
  * Format address as fallback display name
- * Creates a more friendly representation of wallet addresses
+ * Creates a more friendly representation of wallet addresses with @ mention
  */
 function formatFallbackName(address: string): string {
   if (!address || address.length < 8) {
     return "User";
   }
 
-  // Create a more friendly format: first 6 + last 4 chars
-  const friendlyAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
+  // Create a mention-style format: @first6...last4
+  const friendlyAddress = `@${address.slice(0, 6)}...${address.slice(-4)}`;
 
   console.log(
     `📝 Using fallback address format for ${address}: ${friendlyAddress}`,
@@ -539,16 +551,16 @@ export async function getMentionName(address: string): Promise<string> {
   try {
     const displayName = await getDisplayName(address);
 
-    // Format as mention
-    if (displayName && displayName !== "User") {
+    // Format as mention - fallback already includes @
+    if (displayName && displayName !== "User" && !displayName.startsWith("@")) {
       return `@${displayName}`;
     } else {
-      // Use formatted address for mention
-      return `@${formatFallbackName(address)}`;
+      // Fallback already includes @ prefix
+      return displayName;
     }
   } catch (error) {
     console.warn("Error getting mention name:", error);
-    return `@${formatFallbackName(address)}`;
+    return formatFallbackName(address);
   }
 }
 
