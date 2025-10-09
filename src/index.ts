@@ -979,7 +979,6 @@ async function handleSmartTextMessage(
 
           // Prepare transactions for each member
           const transactions = [];
-          const memberAddresses = [];
           for (const member of filteredMembers) {
             // Get member's Ethereum address
             const memberIdentifier = member.accountIdentifiers.find(
@@ -998,7 +997,6 @@ async function handleSmartTextMessage(
               memberAddress,
             );
             transactions.push(txData);
-            memberAddresses.push(memberAddress);
           }
 
           // Calculate total cost
@@ -1015,10 +1013,7 @@ async function handleSmartTextMessage(
 • Total cost: $${totalCost}.00 USDC
 
 ✅ Open your wallet to approve the batch transaction.
-⚡ Each member will receive their own tickets!
-
-Members receiving tickets:
-${memberAddresses.map((addr) => `• ${addr}`).join("\n")}`,
+⚡ Each member will receive their own solo tickets!`,
           );
 
           // Send the batch transaction
