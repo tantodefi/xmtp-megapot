@@ -951,7 +951,157 @@ async function handleSmartTextMessage(
     // Handle specific actions based on intent
     switch (intent.type) {
       case "buy_tickets":
-        // Check if this is a buy for everyone intent FIRST (highest priority)
+        // Check if this is a pick random members intent FIRST (highest priority)
+        if (
+          intent.extractedData?.pickRandomMembers &&
+          isGroupChat &&
+          userAddress
+        ) {
+          console.log(
+            `🎲 Processing pick random members intent: ${intent.extractedData.pickRandomMembers} members`,
+          );
+          const ticketCount = intent.extractedData.ticketCount || 1;
+          const randomCount = intent.extractedData.pickRandomMembers;
+
+          // Get group members
+          const members = await conversation.members();
+          // Filter out the bot itself
+          const filteredMembers = members.filter(
+            (member: {
+              inboxId: string;
+              accountIdentifiers: Array<{
+                identifierKind: number;
+                identifier: string;
+              }>;
+            }) => member.inboxId.toLowerCase() !== client.inboxId.toLowerCase(),
+          );
+          const totalMembers = filteredMembers.length;
+          console.log(
+            `👥 Found ${totalMembers} members in group (excluding bot)`,
+          );
+
+          // Check if we have enough members
+          if (randomCount > totalMembers) {
+            await conversation.send(
+              `⚠️ Cannot pick ${randomCount} members - the group only has ${totalMembers} members (excluding the bot).`,
+            );
+            return;
+          }
+
+          // Randomly select members using Fisher-Yates shuffle
+          const shuffled = [...filteredMembers].sort(() => Math.random() - 0.5);
+          const selectedMembers = shuffled.slice(0, randomCount);
+
+          console.log(`🎲 Randomly selected ${selectedMembers.length} members`);
+
+          // Prepare transactions for each selected member and resolve their names
+          const transactions = [];
+          const selectedAddresses = [];
+          const selectedNames = [];
+          for (const member of selectedMembers) {
+            // Get member's Ethereum address
+            const memberIdentifier = member.accountIdentifiers.find(
+              (id: any) => id.identifierKind === 0, // IdentifierKind.Ethereum
+            );
+            if (!memberIdentifier) continue;
+
+            const memberAddress = memberIdentifier.identifier;
+            console.log(
+              `🎲 Preparing transaction for randomly selected member: ${memberAddress}`,
+            );
+
+            // Resolve member's display name
+            const memberName = await getDisplayName(memberAddress);
+            selectedNames.push(memberName || memberAddress);
+
+            // Prepare transaction for this member
+            const txData = await megaPotManager.prepareTicketPurchase(
+              ticketCount,
+              memberAddress,
+            );
+            transactions.push(txData);
+            selectedAddresses.push(memberAddress);
+          }
+
+          // Calculate total cost
+          const totalCost = ticketCount * selectedAddresses.length;
+          const displayName = await getDisplayName(userAddress);
+
+          // Send message with transaction details and lucky winners
+          await conversation.send(
+            `🎲 Random Selection Complete!
+
+🎫 Buying ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} for ${selectedAddresses.length} randomly selected members:
+• ${selectedAddresses.length} lucky members selected
+• ${ticketCount} ticket${ticketCount > 1 ? "s" : ""} each
+• Total cost: $${totalCost}.00 USDC
+
+🎁 Lucky winners:
+${selectedNames.map((name, i) => `${i + 1}. ${name}`).join("\n")}
+
+✅ Open your wallet to approve the batch transaction.
+⚡ Each selected member will receive their own solo tickets!`,
+          );
+
+          // Send the batch transaction
+          const walletSendCalls = {
+            version: "1.0",
+            chainId: `0x${base.id.toString(16)}`,
+            from: userAddress as `0x${string}`,
+            capabilities: {
+              reference: `lottobot_random_purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              app: "LottoBot",
+              icon: "https://megapot.io/favicon.ico",
+              domain: "megapot.io",
+              name: "LottoBot Random Selection",
+              description: `Buy tickets for ${selectedAddresses.length} randomly selected members`,
+            },
+            calls: transactions.flatMap((tx, index) => {
+              // Only show descriptions for the first transaction
+              const isFirst = index === 0;
+              const metadata = {
+                transactionType: "erc20_approve",
+                source: "LottoBot",
+                origin: "megapot.io",
+                hostname: "megapot.io",
+                faviconUrl: "https://megapot.io/favicon.ico",
+                title: "LottoBot Random Selection",
+              };
+
+              return [
+                {
+                  to: tx.approveCall.to as `0x${string}`,
+                  data: tx.approveCall.data as `0x${string}`,
+                  value: tx.approveCall.value as `0x${string}`,
+                  gas: "0xC350",
+                  metadata: {
+                    ...metadata,
+                    description: isFirst
+                      ? `Approve USDC spending for random selection (${selectedAddresses.length} members)`
+                      : undefined,
+                  },
+                },
+                {
+                  to: tx.purchaseCall.to as `0x${string}`,
+                  data: tx.purchaseCall.data as `0x${string}`,
+                  value: tx.purchaseCall.value as `0x${string}`,
+                  gas: "0x30D40",
+                  metadata: {
+                    ...metadata,
+                    description: isFirst
+                      ? `Purchase tickets for ${selectedAddresses.length} randomly selected members`
+                      : undefined,
+                  },
+                },
+              ];
+            }),
+          };
+
+          await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
+          return;
+        }
+
+        // Check if this is a buy for everyone intent (high priority)
         if (
           intent.extractedData?.buyForEveryone &&
           isGroupChat &&

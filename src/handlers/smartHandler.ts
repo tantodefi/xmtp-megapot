@@ -44,6 +44,7 @@ export interface MessageIntent {
     recipientUsername?: string;
     targetUsername?: string;
     buyForEveryone?: boolean;
+    pickRandomMembers?: number;
   };
   response: string;
 }
@@ -716,7 +717,34 @@ Respond naturally but concisely, and I'll handle the specific actions.`;
       };
     }
 
-    // Check for "buy for everyone in group" pattern FIRST (highest priority)
+    // Check for "pick random members" pattern FIRST (highest priority)
+    const pickRandomPattern =
+      /(?:pick|choose|select)\s+(?:random\s+)?(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:random\s+)?(?:members?|users?|people|persons?).*(?:buy|ticket)|(?:buy|get).*(?:ticket).*(?:for\s+)?(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:random\s+)?(?:members?|users?|people|persons?)/i;
+
+    if (pickRandomPattern.test(lowerMessage)) {
+      console.log(`🎲 DETECTED: Pick random members: "${originalMessage}"`);
+      const match = lowerMessage.match(pickRandomPattern);
+      const memberCountStr = match?.[1] || match?.[2] || "1";
+      const memberCount =
+        this.parseNumberFromText(memberCountStr) ||
+        parseInt(memberCountStr) ||
+        1;
+      const ticketCountMatch = lowerMessage.match(/(\d+)\s+ticket/i);
+      const ticketCount = ticketCountMatch ? parseInt(ticketCountMatch[1]) : 1;
+
+      return {
+        type: "buy_tickets",
+        confidence: 0.95,
+        extractedData: {
+          ticketCount,
+          clearIntent: true,
+          pickRandomMembers: memberCount,
+        },
+        response: "", // Let index.ts handle the random selection flow
+      };
+    }
+
+    // Check for "buy for everyone in group" pattern (high priority)
     const buyForEveryonePattern =
       /(?:buy|get).*(?:everyone|all|each\s+member|each\s+person).*(?:ticket|in\s+group|in\s+chat)|(?:buy|get).*(?:ticket).*(?:for\s+everyone|for\s+all|for\s+each\s+member|for\s+each\s+person|in\s+group|in\s+chat)/i;
 
