@@ -839,7 +839,8 @@ async function handleSmartTextMessage(
       intent.type === "cancellation" ||
       intent.extractedData?.clearIntent === true;
 
-    if (!shouldSkipAIResponse) {
+    // Only send AI response if we should not skip it AND we're not asking for purchase type
+    if (!shouldSkipAIResponse && !intent.extractedData?.askForPurchaseType) {
       await conversation.send(intent.response);
     } else {
       console.log(
